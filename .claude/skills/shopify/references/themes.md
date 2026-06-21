@@ -24,15 +24,6 @@ Guide for developing Shopify themes with Liquid templating.
 {% for product in collection.products %}
   {{ product.title }}
 {% endfor %}
-
-{% case product.type %}
-  {% when 'Clothing' %}
-    <span>Apparel</span>
-  {% when 'Shoes' %}
-    <span>Footwear</span>
-  {% else %}
-    <span>Other</span>
-{% endcase %}
 ```
 
 **Filters (Transform):**
@@ -40,9 +31,12 @@ Guide for developing Shopify themes with Liquid templating.
 {{ product.title | upcase }}
 {{ product.price | money }}
 {{ product.description | strip_html | truncate: 100 }}
-{{ product.image | img_url: 'medium' }}
+{{ product.featured_image | image_url: width: 450 }}
+{{ product.featured_image | image_url: width: 450 | image_tag: alt: product.title }}
 {{ 'now' | date: '%B %d, %Y' }}
 ```
+
+Use `image_url` when you need a URL, and `image_tag` when rendering an `<img>` tag. Older `img_url` snippets are deprecated and should not be copied into new theme code.
 
 ### Common Objects
 
@@ -84,81 +78,33 @@ Guide for developing Shopify themes with Liquid templating.
 {{ cart.attributes }}
 ```
 
-**Customer:**
-```liquid
-{{ customer.email }}
-{{ customer.first_name }}
-{{ customer.last_name }}
-{{ customer.orders_count }}
-{{ customer.total_spent }}
-{{ customer.addresses }}
-{{ customer.default_address }}
-```
-
-**Shop:**
-```liquid
-{{ shop.name }}
-{{ shop.email }}
-{{ shop.domain }}
-{{ shop.currency }}
-{{ shop.money_format }}
-{{ shop.enabled_payment_types }}
-```
-
 ### Common Filters
 
-**String:**
-- `upcase`, `downcase`, `capitalize`
-- `strip_html`, `strip_newlines`
-- `truncate: 100`, `truncatewords: 20`
-- `replace: 'old', 'new'`
+**String:** `upcase`, `downcase`, `capitalize`, `strip_html`, `truncate`, `replace`
 
-**Number:**
-- `money` - Format currency
-- `round`, `ceil`, `floor`
-- `times`, `divided_by`, `plus`, `minus`
+**Number:** `money`, `round`, `ceil`, `floor`, `times`, `divided_by`, `plus`, `minus`
 
-**Array:**
-- `join: ', '`
-- `first`, `last`
-- `size`
-- `map: 'property'`
-- `where: 'property', 'value'`
+**Array:** `join`, `first`, `last`, `size`, `map`, `where`
 
-**URL:**
-- `img_url: 'size'` - Image URL
-- `url_for_type`, `url_for_vendor`
-- `link_to`, `link_to_type`
-
-**Date:**
-- `date: '%B %d, %Y'`
+**Image:**
+```liquid
+{{ image | image_url: width: 800 }}
+{{ image | image_url: width: 800 | image_tag: alt: image.alt, loading: 'lazy' }}
+```
 
 ## Theme Architecture
 
 ### Directory Structure
 
-```
+```text
 theme/
 ├── assets/              # CSS, JS, images
 ├── config/              # Theme settings
-│   ├── settings_schema.json
-│   └── settings_data.json
 ├── layout/              # Base templates
-│   └── theme.liquid
 ├── locales/             # Translations
-│   └── en.default.json
 ├── sections/            # Reusable blocks
-│   ├── header.liquid
-│   ├── footer.liquid
-│   └── product-grid.liquid
 ├── snippets/            # Small components
-│   ├── product-card.liquid
-│   └── icon.liquid
 └── templates/           # Page templates
-    ├── index.json
-    ├── product.json
-    ├── collection.json
-    └── cart.liquid
 ```
 
 ### Layout
@@ -172,26 +118,19 @@ Base template wrapping all pages (`layout/theme.liquid`):
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>{{ page_title }}</title>
-
   {{ content_for_header }}
-
   <link rel="stylesheet" href="{{ 'theme.css' | asset_url }}">
 </head>
 <body>
   {% section 'header' %}
-
-  <main>
-    {{ content_for_layout }}
-  </main>
-
+  <main>{{ content_for_layout }}</main>
   {% section 'footer' %}
-
-  <script src="{{ 'theme.js' | asset_url }}"></script>
+  <script src="{{ 'theme.js' | asset_url }}" defer></script>
 </body>
 </html>
 ```
 
-### Templates
+### JSON Templates
 
 Page-specific structures (`templates/product.json`):
 
@@ -213,11 +152,12 @@ Page-specific structures (`templates/product.json`):
 }
 ```
 
-Legacy format (`templates/product.liquid`):
+### Product Template Example
+
 ```liquid
 <div class="product">
   <div class="product-images">
-    <img src="{{ product.featured_image | img_url: 'large' }}" alt="{{ product.title }}">
+    {{ product.featured_image | image_url: width: 900 | image_tag: alt: product.title, loading: 'eager' }}
   </div>
 
   <div class="product-details">
@@ -230,7 +170,6 @@ Legacy format (`templates/product.liquid`):
           <option value="{{ variant.id }}">{{ variant.title }} - {{ variant.price | money }}</option>
         {% endfor %}
       </select>
-
       <button type="submit">Add to Cart</button>
     {% endform %}
   </div>
@@ -246,40 +185,13 @@ Reusable content blocks (`sections/product-grid.liquid`):
   {% for product in section.settings.collection.products %}
     <div class="product-card">
       <a href="{{ product.url }}">
-        <img src="{{ product.featured_image | img_url: 'medium' }}" alt="{{ product.title }}">
+        {{ product.featured_image | image_url: width: 450 | image_tag: alt: product.title, loading: 'lazy' }}
         <h3>{{ product.title }}</h3>
         <p>{{ product.price | money }}</p>
       </a>
     </div>
   {% endfor %}
 </div>
-
-{% schema %}
-{
-  "name": "Product Grid",
-  "settings": [
-    {
-      "type": "collection",
-      "id": "collection",
-      "label": "Collection"
-    },
-    {
-      "type": "range",
-      "id": "products_per_row",
-      "min": 2,
-      "max": 5,
-      "step": 1,
-      "default": 4,
-      "label": "Products per row"
-    }
-  ],
-  "presets": [
-    {
-      "name": "Product Grid"
-    }
-  ]
-}
-{% endschema %}
 ```
 
 ### Snippets
@@ -290,7 +202,7 @@ Small reusable components (`snippets/product-card.liquid`):
 <div class="product-card">
   <a href="{{ product.url }}">
     {% if product.featured_image %}
-      <img src="{{ product.featured_image | img_url: 'medium' }}" alt="{{ product.title }}">
+      {{ product.featured_image | image_url: width: 450 | image_tag: alt: product.title, loading: 'lazy' }}
     {% endif %}
     <h3>{{ product.title }}</h3>
     <p class="price">{{ product.price | money }}</p>
@@ -306,57 +218,37 @@ Include snippet:
 {% render 'product-card', product: product %}
 ```
 
+### Theme Blocks
+
+Theme Blocks are the current standard for building flexible sections: a section renders its blocks with `{% content_for 'blocks' %}`, and merchants add, remove, and reorder theme blocks (`@theme`) and app blocks (`@app`) in the theme editor.
+
+```liquid
+<div class="custom-section">
+  {% content_for 'blocks' %}
+</div>
+
+{% schema %}
+{
+  "name": "Custom section",
+  "blocks": [
+    { "type": "@theme" },
+    { "type": "@app" }
+  ],
+  "presets": [{ "name": "Custom section" }]
+}
+{% endschema %}
+```
+
+See the Theme Blocks docs for nested blocks, block-level settings, and static blocks: https://shopify.dev/docs/storefronts/themes/architecture/blocks
+
 ## Development Workflow
 
-### Setup
-
 ```bash
-# Initialize new theme
 shopify theme init
-
-# Choose Dawn (reference theme) or blank
-```
-
-### Local Development
-
-```bash
-# Start local server
 shopify theme dev
-
-# Preview at http://localhost:9292
-# Changes auto-sync to development theme
-```
-
-### Pull Theme
-
-```bash
-# Pull live theme
 shopify theme pull --live
-
-# Pull specific theme
-shopify theme pull --theme=123456789
-
-# Pull only templates
-shopify theme pull --only=templates
-```
-
-### Push Theme
-
-```bash
-# Push to development theme
 shopify theme push --development
-
-# Create new unpublished theme
 shopify theme push --unpublished
-
-# Push specific files
-shopify theme push --only=sections,snippets
-```
-
-### Theme Check
-
-Lint theme code:
-```bash
 shopify theme check
 shopify theme check --auto-correct
 ```
@@ -382,7 +274,6 @@ shopify theme check --auto-correct
 
   <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
   <input type="number" name="quantity" value="1" min="1">
-
   <button type="submit" {% unless product.available %}disabled{% endunless %}>
     {% if product.available %}Add to Cart{% else %}Sold Out{% endif %}
   </button>
@@ -398,62 +289,36 @@ shopify theme check --auto-correct
   {% endfor %}
 
   {% if paginate.pages > 1 %}
-    <div class="pagination">
-      {% if paginate.previous %}
-        <a href="{{ paginate.previous.url }}">Previous</a>
-      {% endif %}
-
+    <nav class="pagination" aria-label="Pagination">
+      {% if paginate.previous %}<a href="{{ paginate.previous.url }}">Previous</a>{% endif %}
       {% for part in paginate.parts %}
-        {% if part.is_link %}
-          <a href="{{ part.url }}">{{ part.title }}</a>
-        {% else %}
-          <span class="current">{{ part.title }}</span>
-        {% endif %}
+        {% if part.is_link %}<a href="{{ part.url }}">{{ part.title }}</a>{% else %}<span aria-current="page">{{ part.title }}</span>{% endif %}
       {% endfor %}
-
-      {% if paginate.next %}
-        <a href="{{ paginate.next.url }}">Next</a>
-      {% endif %}
-    </div>
+      {% if paginate.next %}<a href="{{ paginate.next.url }}">Next</a>{% endif %}
+    </nav>
   {% endif %}
 {% endpaginate %}
 ```
 
 ### Cart AJAX
 
+Use `window.Shopify.routes.root` so requests stay locale-aware on Shopify Markets storefronts (e.g. `/en-ca/cart/add.js`).
+
 ```javascript
-// Add to cart
-fetch('/cart/add.js', {
+fetch(window.Shopify.routes.root + 'cart/add.js', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    id: variantId,
-    quantity: 1
-  })
-})
-.then(res => res.json())
-.then(item => console.log('Added:', item));
+  body: JSON.stringify({ id: variantId, quantity: 1 })
+}).then(res => res.json());
 
-// Get cart
-fetch('/cart.js')
-  .then(res => res.json())
-  .then(cart => console.log('Cart:', cart));
-
-// Update cart
-fetch('/cart/change.js', {
+fetch(window.Shopify.routes.root + 'cart/change.js', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    id: lineItemKey,
-    quantity: 2
-  })
-})
-.then(res => res.json());
+  body: JSON.stringify({ id: lineItemKey, quantity: 2 })
+}).then(res => res.json());
 ```
 
 ## Metafields in Themes
-
-Access custom data:
 
 ```liquid
 {{ product.metafields.custom.care_instructions }}
@@ -466,33 +331,18 @@ Access custom data:
 
 ## Best Practices
 
-**Performance:**
-- Optimize images (use appropriate sizes)
-- Minimize Liquid logic complexity
-- Use lazy loading for images
-- Defer non-critical JavaScript
+**Performance:** size images with `image_url`, lazy-load non-hero images, minimize Liquid logic, defer non-critical JavaScript.
 
-**Accessibility:**
-- Use semantic HTML
-- Include alt text for images
-- Support keyboard navigation
-- Ensure sufficient color contrast
+**Accessibility:** use semantic HTML, preserve alt text, support keyboard navigation, and maintain contrast.
 
-**SEO:**
-- Use descriptive page titles
-- Include meta descriptions
-- Structure content with headings
-- Implement schema markup
+**SEO:** use descriptive titles, meta descriptions, headings, and structured data where appropriate.
 
-**Code Quality:**
-- Follow Shopify theme guidelines
-- Use consistent naming conventions
-- Comment complex logic
-- Keep sections focused and reusable
+**Code Quality:** follow Shopify theme guidelines, keep sections focused, and run Theme Check before publishing.
 
 ## Resources
 
 - Theme Development: https://shopify.dev/docs/themes
 - Liquid Reference: https://shopify.dev/docs/api/liquid
+- Theme Blocks: https://shopify.dev/docs/storefronts/themes/architecture/blocks
 - Dawn Theme: https://github.com/Shopify/dawn
 - Theme Check: https://shopify.dev/docs/themes/tools/theme-check

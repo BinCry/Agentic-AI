@@ -231,7 +231,7 @@ Load `references/social-photos-design.md` for sizes, templates, best practices.
 3. **Ideate** — 3-5 concepts, present via `AskUserQuestion`
 4. **Design** — `/ckm:brand` → `/ckm:design-system` → randomly invoke `/ck:ui-ux-pro-max` OR `/ck:frontend-design`; HTML per idea × size
 5. **Export** — `ck:agent-browser`, Chrome headless, or Playwright screenshot at exact px (2x deviceScaleFactor)
-6. **Verify** — Use Chrome MCP / `chrome-devtools-mcp`, `ck:agent-browser`, or Playwright to visually inspect exported designs; fix layout/styling issues and re-export
+6. **Verify** — Use Chrome MCP / `chrome-devtools-mcp`, `ck:agent-browser`, `ck:chrome-profile`, or Playwright to visually inspect exported designs; fix layout/styling issues and re-export
 7. **Report** — Summary to `plans/reports/` with design decisions
 8. **Organize** — Invoke `assets-organizing` skill to sort output files and reports
 
@@ -303,4 +303,4 @@ pip install google-genai pillow
 ## Integration
 
 **External sub-skills:** brand, design-system, ui-styling
-**Related Skills:** frontend-design, ui-ux-pro-max, ai-multimodal, agent-browser
+**Related Skills:** frontend-design, ui-ux-pro-max, ai-multimodal, agent-browser, chrome-profile

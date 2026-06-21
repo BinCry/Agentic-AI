@@ -33,7 +33,44 @@ function escapeRegex(value) {
 
 function buildVerbPattern(verbs) {
   if (!verbs.length) return null;
-  return new RegExp(`\\b(${verbs.map(escapeRegex).join('|')})\\b`, 'i');
+  const verbList = verbs.map(escapeRegex).join('|');
+  const actionPrefix = [
+    'please',
+    'can\\s+you',
+    'go\\s+ahead\\s+and',
+    "let'?s",
+    'ready\\s+to',
+    'time\\s+to'
+  ].join('|');
+  const actionObject = [
+    'it',
+    'this',
+    'that',
+    'these',
+    'the',
+    'my',
+    'our',
+    'changes?',
+    'branch',
+    'pr',
+    'pull\\s+request',
+    'release',
+    'package',
+    'prod(?:uction)?',
+    'staging',
+    'now',
+    'please',
+    'to'
+  ].join('|');
+
+  return new RegExp(
+    [
+      `/(?:ck:)?(${verbList})\\b`,
+      `\\b(?:${actionPrefix})\\s+(${verbList})\\b`,
+      `\\b(${verbList})\\b\\s+(?:${actionObject})\\b`
+    ].join('|'),
+    'i'
+  );
 }
 
 function matchedSeverity(prompt, hardVerbs, softVerbs) {

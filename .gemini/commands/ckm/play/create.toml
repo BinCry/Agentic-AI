@@ -1,0 +1,14 @@
+description = "Create a new marketing playbook from expert template"
+prompt = """
+Create a new marketing playbook from an expert-strategized template.
+
+<args>create {{args}}</args>
+
+## Workflow
+
+1. **Parse Arguments** — extract playbook name and optional `--template` flag from `{{args}}`
+2. **Activate Skill** — route to `ckm:play` skill with `create {{args}}`
+
+## Skill Used
+- `ckm:play` — Marketing playbook orchestrator
+"""

@@ -1,0 +1,42 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".gemini/hooks/simplify-gate.cjs\"",
+            "_origin": "engineer"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".gemini/hooks/descriptive-name.cjs\"",
+            "_origin": "engineer"
+          }
+        ]
+      },
+      {
+        "matcher": "run_shell_command|glob|grep_search|read_file|replace|write_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".gemini/hooks/scout-block.cjs\"",
+            "_origin": "engineer"
+          },
+          {
+            "type": "command",
+            "command": "node \".gemini/hooks/privacy-block.cjs\"",
+            "_origin": "engineer"
+          }
+        ]
+      }
+    ]
+  }
+}

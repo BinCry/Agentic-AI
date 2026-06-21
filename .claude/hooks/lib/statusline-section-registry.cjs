@@ -28,6 +28,8 @@ const DEFAULT_THEME = {
   contextLow:  'green',
   contextMid:  'yellow',
   contextHigh: 'red',
+  quotaLow:    'green',
+  quotaHigh:   'red',
   accent:      'cyan',
   muted:       'dim',
   separator:   'dim',
@@ -60,9 +62,8 @@ function getQuotaColorName(usageWindows, theme) {
       })
       .filter((percent) => Number.isFinite(percent))
     : [];
-  if (!theme.quotaLow && !theme.quotaHigh) return theme.muted;
   return percents.some((percent) => percent >= 85)
-    ? (theme.quotaHigh || theme.quotaLow || theme.muted)
+    ? (theme.quotaHigh || theme.muted)
     : (theme.quotaLow || theme.muted);
 }
 

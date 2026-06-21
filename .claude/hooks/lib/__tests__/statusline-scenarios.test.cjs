@@ -467,7 +467,58 @@ async function main() {
     }
   });
 
-  await test('Quota stays dim when no explicit quota palette is configured', async () => {
+  await test('Default quota color is green when no window exceeds 85%', async () => {
+    // No quota palette configured anywhere — default green must be applied.
+    // This replicates the exact shape that caused the screenshot bug:
+    // lines: [["context","model","quota"]], sectionConfig: { quota: { icon } } with no color.
+    const tmpDir = createTempConfigProject('full', {
+      statuslineLayout: {
+        lines: [['context', 'model', 'quota']],
+        sectionConfig: {
+          quota: { icon: '⌛' }
+        }
+      }
+    });
+
+    try {
+      withQuotaEligibilityCache({ timestamp: Date.now(), eligible: true, note: 'eligible' }, (env) => {
+        withUsageCache({
+          timestamp: Date.now(),
+          status: 'available',
+          snapshot: {
+            sourceVersion: 1,
+            fetchedAt: new Date().toISOString(),
+            fiveHourPercent: 63,
+            weekPercent: 39
+          },
+          data: {
+            five_hour: {
+              utilization: 63,
+              resets_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+            },
+            seven_day: {
+              utilization: 39,
+              resets_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        }, () => {
+          const payload = {
+            model: { display_name: 'Claude' },
+            workspace: { current_dir: tmpDir },
+            context_window: { context_window_size: 200000, current_usage: { input_tokens: 8000 } }
+          };
+          const result = runStatuslineSync({ payload, cwd: tmpDir, env });
+          assertSuccessfulRun(result, 'Default quota green scenario');
+          assertContains(result.stdout, '\x1b[32m5h 63%', 'Quota with no palette and all windows < 85% should render in default green');
+        });
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  await test('Default quota color is red when any window reaches 85% or above', async () => {
+    // No quota palette configured — 5h window at 91% triggers default red.
     const tmpDir = createTempConfigProject('full', {
       statuslineLayout: {
         lines: [['quota']]
@@ -502,8 +553,188 @@ async function main() {
             context_window: { context_window_size: 200000, current_usage: { input_tokens: 8000 } }
           };
           const result = runStatuslineSync({ payload, cwd: tmpDir, env });
-          assertSuccessfulRun(result, 'Default quota tint scenario');
-          assertContains(result.stdout, '\x1b[2m5h 91%', 'Quota should stay muted unless the user explicitly overrides its palette');
+          assertSuccessfulRun(result, 'Default quota red scenario');
+          assertContains(result.stdout, '\x1b[31m5h 91%', 'Quota with no palette and a window >= 85% should render in default red');
+        });
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  await test('sectionConfig.quota.color overrides the theme-derived quota color', async () => {
+    // Explicit sectionConfig color takes priority over both theme and defaults.
+    const tmpDir = createTempConfigProject('full', {
+      statuslineLayout: {
+        lines: [['quota']],
+        sectionConfig: {
+          quota: { color: 'magenta' }
+        }
+      }
+    });
+
+    try {
+      withQuotaEligibilityCache({ timestamp: Date.now(), eligible: true, note: 'eligible' }, (env) => {
+        withUsageCache({
+          timestamp: Date.now(),
+          status: 'available',
+          snapshot: {
+            sourceVersion: 1,
+            fetchedAt: new Date().toISOString(),
+            fiveHourPercent: 50,
+            weekPercent: 20
+          },
+          data: {
+            five_hour: {
+              utilization: 50,
+              resets_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+            },
+            seven_day: {
+              utilization: 20,
+              resets_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        }, () => {
+          const payload = {
+            model: { display_name: 'Claude' },
+            workspace: { current_dir: tmpDir },
+            context_window: { context_window_size: 200000, current_usage: { input_tokens: 5000 } }
+          };
+          const result = runStatuslineSync({ payload, cwd: tmpDir, env });
+          assertSuccessfulRun(result, 'sectionConfig quota color override scenario');
+          assertContains(result.stdout, '\x1b[35m5h 50%', 'Explicit sectionConfig.quota.color should override theme-derived quota color');
+        });
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  await test('Colors disabled via statuslineColors=false strips ANSI from quota text', async () => {
+    // statuslineColors: false in config disables all color — quota text must appear plain.
+    const tmpDir = createTempConfigProject('full', {
+      statuslineColors: false,
+      statuslineLayout: {
+        lines: [['quota']]
+      }
+    });
+
+    try {
+      withQuotaEligibilityCache({ timestamp: Date.now(), eligible: true, note: 'eligible' }, (env) => {
+        withUsageCache({
+          timestamp: Date.now(),
+          status: 'available',
+          snapshot: {
+            sourceVersion: 1,
+            fetchedAt: new Date().toISOString(),
+            fiveHourPercent: 55,
+            weekPercent: 25
+          },
+          data: {
+            five_hour: {
+              utilization: 55,
+              resets_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+            },
+            seven_day: {
+              utilization: 25,
+              resets_at: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        }, () => {
+          const payload = {
+            model: { display_name: 'Claude' },
+            workspace: { current_dir: tmpDir },
+            context_window: { context_window_size: 200000, current_usage: { input_tokens: 5000 } }
+          };
+          const result = runStatuslineSync({ payload, cwd: tmpDir, env });
+          assertSuccessfulRun(result, 'Colors disabled quota scenario');
+          assertContains(result.stdout, '5h 55%', 'Quota text should still appear when colors disabled');
+          assertTrue(
+            !result.stdout.includes('\x1b[32m') && !result.stdout.includes('\x1b[33m') && !result.stdout.includes('\x1b[2m'),
+            'No ANSI color codes should appear in quota section when statuslineColors is false'
+          );
+        });
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  await test('Compact mode: default quota color is green when no window exceeds 85%', async () => {
+    // Compact mode legacy fallback should also apply default green color.
+    const tmpDir = createTempConfigProject('compact', {});
+
+    try {
+      withQuotaEligibilityCache({ timestamp: Date.now(), eligible: true, note: 'eligible' }, (env) => {
+        withUsageCache({
+          timestamp: Date.now(),
+          status: 'available',
+          snapshot: {
+            sourceVersion: 1,
+            fetchedAt: new Date().toISOString(),
+            fiveHourPercent: 45,
+            weekPercent: 20
+          },
+          data: {
+            five_hour: {
+              utilization: 45,
+              resets_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+            },
+            seven_day: {
+              utilization: 20,
+              resets_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        }, () => {
+          const payload = {
+            model: { display_name: 'Claude' },
+            workspace: { current_dir: tmpDir },
+            context_window: { context_window_size: 200000, current_usage: { input_tokens: 5000 } }
+          };
+          const result = runStatuslineSync({ payload, cwd: tmpDir, env });
+          assertSuccessfulRun(result, 'Compact mode default quota green scenario');
+          assertContains(result.stdout, '\x1b[32m5h 45%', 'Compact mode quota with no palette and windows < 85% should render in default green');
+        });
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  await test('Minimal mode: default quota color is green when no window exceeds 85%', async () => {
+    // Minimal mode legacy fallback should also apply default green color.
+    const tmpDir = createTempConfigProject('minimal', {});
+
+    try {
+      withQuotaEligibilityCache({ timestamp: Date.now(), eligible: true, note: 'eligible' }, (env) => {
+        withUsageCache({
+          timestamp: Date.now(),
+          status: 'available',
+          snapshot: {
+            sourceVersion: 1,
+            fetchedAt: new Date().toISOString(),
+            fiveHourPercent: 40,
+            weekPercent: 15
+          },
+          data: {
+            five_hour: {
+              utilization: 40,
+              resets_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+            },
+            seven_day: {
+              utilization: 15,
+              resets_at: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        }, () => {
+          const payload = {
+            model: { display_name: 'Claude' },
+            workspace: { current_dir: tmpDir },
+            context_window: { context_window_size: 200000, current_usage: { input_tokens: 5000 } }
+          };
+          const result = runStatuslineSync({ payload, cwd: tmpDir, env });
+          assertSuccessfulRun(result, 'Minimal mode default quota green scenario');
+          assertContains(result.stdout, '\x1b[32m5h 40%', 'Minimal mode quota with no palette and windows < 85% should render in default green');
         });
       });
     } finally {

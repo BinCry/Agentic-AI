@@ -14,7 +14,7 @@ Follow these fundamental principles:
 - Compare pros and cons of different solutions
 - Consider short-term vs long-term implications
 - Balance complexity with maintainability
-- Assess development effort vs benefit
+- Assess implementation complexity vs benefit
 - Recommend optimal solution based on current best practices
 
 ### Security Assessment

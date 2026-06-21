@@ -181,6 +181,36 @@ describe('advisory boundary policy', () => {
     assert.match(verificationRoles, /Unresolved contradictions: N/);
   });
 
+  it('ck-plan requires reading all generated plan stubs before writing replacements', () => {
+    const planSkill = readRepoFile('claude/skills/ck-plan/SKILL.md');
+    const planOrganization = readRepoFile('claude/skills/ck-plan/references/plan-organization.md');
+
+    assert.match(planSkill, /Generated-file write guard/);
+    assert.match(planSkill, /Read `plan\.md`/);
+    assert.match(planSkill, /Read every generated `phase-\*\.md` stub/);
+    assert.match(planSkill, /Do not draft or submit a full phase body/);
+    assert.match(planSkill, /has not been read in the current session/);
+
+    assert.match(planOrganization, /Read generated files before writing content/);
+    assert.match(planOrganization, /find \{plan-dir\}/);
+    assert.match(planOrganization, /read `plan\.md` and every listed `phase-\*\.md` stub/i);
+    assert.match(planOrganization, /rejects Write calls to existing files that were not read first/i);
+  });
+
+  it('red-team workflows require descriptive report artifact names', () => {
+    const redTeamWorkflow = readRepoFile('claude/skills/ck-plan/references/red-team-workflow.md');
+    const redTeamPersonas = readRepoFile('claude/skills/ck-plan/references/red-team-personas.md');
+
+    assert.match(redTeamWorkflow, /`reports\/` directory/i);
+    assert.match(redTeamWorkflow, /from-code-reviewer-to-planner-red-team-security-adversary-plan-review-report\.md/);
+    assert.match(redTeamWorkflow, /Never use generic names such as `red-team-review\.md`/);
+    assert.match(redTeamWorkflow, /retry immediately with a descriptive filename/i);
+
+    assert.match(redTeamPersonas, /provided reports path/i);
+    assert.match(redTeamPersonas, /from-code-reviewer-to-planner-red-team-\{lens-name\}-plan-review-report\.md/);
+    assert.match(redTeamPersonas, /Do not invent generic report filenames such as red-team-review\.md/);
+  });
+
   it('advisory agent prompts do not tell reviewers to mutate plan files', () => {
     const codeReviewerPrompt = readRepoFile('claude/agents/code-reviewer.md');
 

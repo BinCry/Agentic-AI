@@ -25,7 +25,10 @@ In the active scope root:
 │   ├── scout-report.md
 │   ├── researcher-report.md
 │   └── ...
+├── assets/                                    # Generated image sources for plan.html
 ├── plan.md                                    # Overview access point
+├── plan.html                                  # Primary artifact when --html is used
+├── wiki-publish.md                            # Optional combined doc when --wiki publishes Markdown
 ├── phase-01-setup-environment.md              # Setup environment
 ├── phase-02-implement-database.md             # Database models
 ├── phase-03-implement-api-endpoints.md        # API endpoints
@@ -37,10 +40,44 @@ In the active scope root:
 
 ### Task Hydration
 
-After creating plan.md and phase files, hydrate tasks (unless `--no-tasks`):
+After creating plan.md and phase files, hydrate tasks (unless `--no-tasks`).
+When `--html` is present, hydrate tasks only from the companion `plan.md`
+index if it contains actionable checkboxes; otherwise skip hydration and state
+that `plan.html` is the authoritative artifact.
 1. TaskCreate per phase with `addBlockedBy` dependency chain
 2. Add critical step tasks for high-risk items
 3. See `task-management.md` for patterns and cook handoff protocol
+
+### HTML Artifact Layout
+
+When `--html` is present:
+- Keep `plan.html` as the primary user-facing artifact.
+- Keep `plan.md` as a concise index for metadata, GitHub links, and cook handoff
+  compatibility when needed.
+- Keep every `phase-*.md` as the detailed implementation contract when Markdown
+  phase files are generated.
+- Put generated image source files under `assets/`, then embed selected images
+  in `plan.html` as data URIs.
+- Verify the main page exposes every phase outline and that each outline opens
+  a rendered markdown detail modal.
+- Verify `plan.html` opens as a portable single file with no missing local asset
+  paths.
+
+### AgentWiki Publish Layout
+
+When `--wiki` is present:
+- Publish after final plan gates and after `plan.html` exists when `--html`
+  is also present.
+- For Markdown output, publish `plan.md` when it is complete enough to stand
+  alone. If phase details are split across files, create `wiki-publish.md` as
+  a concise combined document or index before publishing.
+- For HTML output, publish the portable `plan.html` through AgentWiki hosted
+  static sites.
+- Record returned AgentWiki document/share/site URLs in `plan.md` when a
+  companion Markdown index exists. If `--github` is active, add the URL to the
+  GitHub issue.
+- Do not publish secrets, raw logs, private env values, or local-only absolute
+  paths.
 
 ### Active Plan State Tracking
 
@@ -53,7 +90,7 @@ See SKILL.md "Active Plan State" section for full rules. Key points:
 
 After determining phases from research/design:
 
-1. **Scaffold via CLI:**
+1. **Scaffold via CLI when Markdown plan files are required:**
    ```bash
    ck plan create \
      --title "{plan title}" \
@@ -74,26 +111,51 @@ After determining phases from research/design:
      [--issue {N}]
    ```
 
-2. **Fill content sections** in plan.md via Edit tool:
+2. **Read generated files before writing content:**
+   ```bash
+   find {plan-dir} -maxdepth 1 -type f \( -name 'plan.md' -o -name 'phase-*.md' \) -print | sort
+   ```
+   Then read `plan.md` and every listed `phase-*.md` stub before any long Write/Edit. These files already exist after scaffolding; Claude Code rejects Write calls to existing files that were not read first. Reading all stubs upfront prevents late failures after a full phase body has already spent tokens.
+
+3. **Fill content sections** in plan.md via Edit tool:
    - `## Overview` — brief description
    - `## Dependencies` — cross-plan dependencies
 
-3. **Fill each phase-XX.md** with:
+4. **Fill each phase-XX.md** with:
    - Architecture, implementation steps, success criteria
    - Requirements, risk assessment, security considerations
 
-4. **NEVER edit the Phases table directly** — it's CLI-owned.
+5. **NEVER edit the Phases table directly** — it's CLI-owned.
    Use `ck plan check/uncheck/add-phase` for structural changes.
 
-**MANDATORY:** All plan creation goes through CLI. The `ck` CLI is required
-for ClaudeKit users. If `ck plan create` fails, report the error — do not
-fall back to direct file writes.
+6. **If `--html`, generate `plan.html` after final plan gates:**
+   - Re-read `plan.md` and every `phase-*.md` that exists.
+   - Extract visible phase outline summaries for the main page.
+   - Render full phase markdown into click-open detail modals.
+   - Embed generated watercolor technical sketch images when available.
+   - Verify `plan.html` opens without missing local assets.
+7. **If `--wiki`, publish final artifacts after gates:**
+   - Use `agentwiki doc upload`/`doc publish`/`doc share` for Markdown docs.
+   - Use `agentwiki sites upload` for `plan.html`.
+   - Use AgentWiki MCP only when equivalent document/share/site capabilities
+     are exposed in the active session.
+   - Capture and report the returned URL, or report the exact skip reason.
+
+**MANDATORY:** Markdown plan creation goes through CLI. The `ck` CLI is required
+for ClaudeKit users. If `ck plan create` fails, report the error; do not fall
+back to direct Markdown file scaffolding. In `--html` mode, write the primary
+`plan.html` after planning gates finish so the HTML reflects the reviewed plan.
+If `--github` is also present, use CLI scaffolding or a concise Markdown index
+only for the requested repo-relative `plan.md` link.
 
 ## File Structure
 
 ### Overview Plan (plan.md)
 
 **IMPORTANT:** All plan.md files MUST include YAML frontmatter. See `output-standards.md` for schema.
+When `--html` is active, `plan.md` may be a concise index instead of the full
+plan body. It should link to `plan.html`, summarize phases, and keep GitHub
+issue metadata stable.
 
 **Example plan.md structure:**
 ```markdown
@@ -102,7 +164,6 @@ title: "Feature Implementation Plan"
 description: "Add user authentication with OAuth2 support"
 status: pending
 priority: P1
-effort: 8h
 issue: 123
 branch: kai/feat/oauth-auth
 tags: [auth, backend, security]

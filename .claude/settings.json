@@ -6,18 +6,14 @@
     "commit": "",
     "pr": ""
   },
-  "statusLine": {
-    "type": "command",
-    "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/node-hook-runner.sh \"$CLAUDE_PROJECT_DIR\"/.claude/statusline.cjs",
-    "padding": 0
-  },
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/node-hook-runner.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/simplify-gate.cjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/simplify-gate.cjs",
+            "_origin": "engineer"
           }
         ]
       }
@@ -28,7 +24,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/node-hook-runner.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/descriptive-name.cjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/descriptive-name.cjs",
+            "_origin": "engineer"
           }
         ]
       },
@@ -37,34 +34,24 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/node-hook-runner.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scout-block.cjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/scout-block.cjs",
+            "_origin": "engineer"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/node-hook-runner.sh \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/privacy-block.cjs"
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/task-completed-handler.cjs"
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/teammate-idle-handler.cjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/privacy-block.cjs",
+            "_origin": "engineer"
           }
         ]
       }
     ]
+  },
+  "disabledMcpjsonServers": [
+    "human-mcp"
+  ],
+  "statusLine": {
+    "type": "command",
+    "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/statusline.cjs",
+    "padding": 0
   }
 }

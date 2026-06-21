@@ -69,7 +69,7 @@ Eval infrastructure for quantitative skill validation:
 3. Draft assertions while runs execute
 4. Grade outputs with grader agent template
 5. Aggregate results: `scripts/aggregate_benchmark.py`
-6. Launch viewer: `scripts/generate_review.py` → interactive HTML review
+6. Launch viewer: `eval-viewer/generate_review.py` → interactive HTML review
 7. Collect human feedback via viewer → `feedback.json`
 
 Details: `references/eval-infrastructure-guide.md`
@@ -135,7 +135,7 @@ Optimization patterns: `references/benchmark-optimization-guide.md`
 | `scripts/aggregate_benchmark.py` | Consolidate runs into summary stats |
 | `scripts/improve_description.py` | AI-powered description optimization |
 | `scripts/run_loop.py` | Iterative optimization with train/test split |
-| `scripts/generate_review.py` | Generate interactive HTML eval viewer |
+| `eval-viewer/generate_review.py` | Generate interactive HTML eval viewer |
 
 ## Validation & Distribution
 

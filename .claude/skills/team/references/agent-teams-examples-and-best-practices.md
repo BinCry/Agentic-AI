@@ -96,7 +96,7 @@ Agent(subagent_type: "researcher", run_in_background: true, ...)
 Agent(subagent_type: "researcher", run_in_background: true, ...)
 ```
 
-Lead continues orchestration immediately. TaskCompleted events notify when each finishes.
+Lead continues orchestration immediately. Teammates should mark tasks complete and send concise completion messages; the lead checks TaskList before synthesizing.
 
 ### Wait for Teammates
 
@@ -123,23 +123,23 @@ Check progress regularly. Redirect bad approaches. Synthesize findings as they a
 - If two tasks need same file: use worktree isolation OR escalate to lead
 - Tester owns test files only; reads implementation files but never edits them
 
-### Leverage Event-Driven Hooks
+### Monitor Explicitly
 
-With `TaskCompleted` and `TeammateIdle` hooks enabled:
+ClaudeKit keeps Agent Teams monitoring explicit by default:
 
-- Lead is automatically notified when tasks complete -- no manual polling needed
-- Progress is tracked via hook-injected context: "3/5 tasks done, 2 pending"
-- Idle teammates trigger suggestions: "worker-2 idle, 1 unblocked task available"
-- All tasks done triggers: "Consider shutting down teammates and synthesizing"
+- Teammates mark task status with `TaskUpdate`
+- Teammates send concise completion or blocked messages to the lead
+- Lead checks TaskList after 60s or after each message
+- Idle is not completion; verify task status before shutdown or synthesis
 
 **Cook workflow example:**
 ```
 1. Lead spawns 3 devs (run_in_background: true, isolation: "worktree")
-2. TaskCompleted(dev-1, task #1) -> "1/4 done"
-3. TaskCompleted(dev-2, task #2) -> "2/4 done"
-4. TaskCompleted(dev-3, task #3) -> "3/4 done"
-5. TaskCompleted(dev-1, task #4) -> "4/4 done. All tasks completed."
-6. Lead merges worktree branches, then spawns tester
+2. dev-1 marks task #1 completed and messages the lead
+3. dev-2 marks task #2 completed and messages the lead
+4. Lead checks TaskList and waits until all dev tasks are completed
+5. Lead spawns tester only after task status confirms all dev work is done
+6. Lead merges worktree branches after tester passes
 ```
 
 ### Use Agent Memory for Long-Running Projects

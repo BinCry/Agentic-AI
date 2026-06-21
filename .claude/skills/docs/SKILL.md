@@ -37,6 +37,9 @@ Present as options via `AskUserQuestion` with header "Documentation Operation", 
 | `/ck:docs update` | `references/update-workflow.md` | Analyze codebase and update existing documentation |
 | `/ck:docs summarize` | `references/summarize-workflow.md` | Quick analysis and update of codebase summary |
 
+When another workflow needs to decide whether docs should change, load
+`references/documentation-management.md` before invoking a docs update.
+
 ## Routing
 
 Parse `$ARGUMENTS` first word:
@@ -61,6 +64,6 @@ Documentation lives in `./docs` directory:
 
 Use `docs/` directory as the source of truth for documentation.
 
-When authoring or refreshing diagrams in `system-architecture.md`, apply the universal SVG layout rules from `/ck:tech-graph`'s `references/svg-layout-best-practices.md` (component spacing, arrow routing, label placement, z-index ordering). Pair with `/ck:preview --diagram` for visual self-review, or use `/ck:tech-graph` directly for publish-grade output.
+When authoring or refreshing diagrams in `system-architecture.md`, apply the universal SVG layout rules from `/ck:tech-graph` at `claude/skills/tech-graph/references/svg-layout-best-practices.md` (component spacing, arrow routing, label placement, z-index ordering). Pair with `/ck:preview --diagram` for visual self-review, or use `/ck:tech-graph` directly for publish-grade output.
 
 **IMPORTANT**: **Do not** start implementing code.

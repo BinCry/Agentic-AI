@@ -65,13 +65,14 @@ When processing arguments, follow this priority order:
 
 1. **`--stop`** → Stop server (exit)
 2. **`--html` flag present** → Set HTML output mode flag (continues to next step)
-3. **Generation flags** (`--explain`, `--slides`, `--diagram`, `--ascii`) → Generation mode. Load `references/generation-modes.md`
-4. **HTML-only flags** (`--diff`, `--plan-review`, `--recap`) → Auto-set HTML mode, then generation mode. Load `references/generation-modes.md`
-5. **Resolve path from argument:**
+3. **Workflow asked for visual explanation but mode is unclear** → Load `references/visual-explanation-routing.md`
+4. **Generation flags** (`--explain`, `--slides`, `--diagram`, `--ascii`) → Generation mode. Load `references/generation-modes.md`
+5. **HTML-only flags** (`--diff`, `--plan-review`, `--recap`) → Auto-set HTML mode, then generation mode. Load `references/generation-modes.md`
+6. **Resolve path from argument:**
    - If argument is an explicit path → use directly
    - If argument is a contextual reference → resolve from recent conversation context
-6. **Resolved path exists on filesystem** → View mode. Load `references/view-mode.md`
-7. **Path doesn't exist or can't resolve** → Ask user to clarify
+7. **Resolved path exists on filesystem** → View mode. Load `references/view-mode.md`
+8. **Path doesn't exist or can't resolve** → Ask user to clarify
 
 **Topic-to-slug conversion:**
 - Lowercase the topic

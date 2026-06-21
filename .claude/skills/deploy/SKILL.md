@@ -93,7 +93,7 @@ AWS, GCP, Digital Ocean, Vultr, Heroku ($5+/mo)
 
 1. Check CLI installed → install if missing
 2. Check auth → login if needed
-3. Run deploy command (see `references/platform-deploy-commands.md`)
+3. Run deploy command from the selected platform reference below
 4. Verify deployment URL
 5. Create/update `docs/deployment.md`
 

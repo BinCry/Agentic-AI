@@ -91,9 +91,9 @@ Each dev gets own worktree + branch. No file conflicts during parallel work. Lea
 Use `run_in_background: true` on the Agent tool to spawn teammates non-blocking:
 
 - Lead continues orchestration while teammates work
-- Automatic notification when teammate completes
-- No polling needed -- TaskCompleted hook fires on completion
-- Use TaskList as fallback if no events in 60s
+- Teammates message the lead when they complete or block
+- Use TaskList after 60s or when a teammate messages completion
+- Do not rely on ClaudeKit custom team hook handlers; they are not shipped by default
 
 ## Shutdown
 
@@ -109,21 +109,12 @@ After all teammates shut down, call `TeamDelete` (no parameters). Fails if activ
 
 Removes shared team resources (`~/.claude/teams/` and `~/.claude/tasks/` entries).
 
-## Hook-Based Orchestration
-
-### Event-Driven Monitoring
-
-Instead of polling TaskList, lead receives automatic context injection:
-
-- **TaskCompleted** -- fires when any teammate completes a task. Lead gets progress counts.
-- **TeammateIdle** -- fires when teammate turn ends. Lead gets available task info.
-
-### Recommended Pattern
+## Monitoring
 
 1. Lead creates tasks and spawns teammates (with `run_in_background: true`)
-2. TaskCompleted hook notifies lead as tasks finish (progress: N/M)
-3. TeammateIdle hook suggests reassignment or shutdown
-4. Lead acts on suggestions (spawn tester, shut down, reassign)
-5. Fallback: Check TaskList manually if no events received in 60s
+2. Teammates mark tasks with `TaskUpdate` and send concise completion messages
+3. Lead checks TaskList after 60s or after each completion message
+4. Lead acts on verified task state (spawn tester, shut down, reassign)
+5. If a task appears stale, message the owner before changing status
 
-This replaces the "poll TaskList every 30s" pattern with reactive orchestration.
+Claude Code exposes platform Agent Teams events, but ClaudeKit does not ship custom handlers for those events by default. Keep orchestration explicit until a live harness validates any hook-based flow.

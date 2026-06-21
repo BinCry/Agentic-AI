@@ -1,226 +1,126 @@
 # App Development Reference
 
-Guide for building Shopify apps with OAuth, GraphQL/REST APIs, webhooks, and billing.
+Guide for building Shopify apps with the GraphQL Admin API, webhooks, billing, metafields, and current Shopify CLI app configuration workflows.
 
-## OAuth Authentication
+GraphQL Admin API is the default for new apps. REST Admin API is legacy/migration-only; avoid REST examples for new development unless maintaining an existing integration.
 
-### OAuth 2.0 Flow
+## Authentication
 
-**1. Redirect to Authorization URL:**
-```
-https://{shop}.myshopify.com/admin/oauth/authorize?
-  client_id={api_key}&
-  scope={scopes}&
-  redirect_uri={redirect_uri}&
-  state={nonce}
-```
+New embedded apps use Shopify-managed installation, session tokens, and token exchange via the official app libraries (`@shopify/shopify-app-react-router`, `@shopify/shopify-app-remix`, or `@shopify/shopify-api`). Do not hand-roll the legacy authorization-code-grant OAuth flow for new apps.
 
-**2. Handle Callback:**
-```javascript
-app.get('/auth/callback', async (req, res) => {
-  const { code, shop, state } = req.query;
+See `references/embedded-apps.md` for managed install, App Bridge v4, session-token auth, token exchange, official libraries, and the expiring offline-token deadlines (2026-04-01 / 2027-01-01).
 
-  // Verify state to prevent CSRF
-  if (state !== storedState) {
-    return res.status(403).send('Invalid state');
-  }
+## App Configuration Workflow
 
-  // Exchange code for access token
-  const accessToken = await exchangeCodeForToken(shop, code);
-
-  // Store token securely
-  await storeAccessToken(shop, accessToken);
-
-  res.redirect(`https://${shop}/admin/apps/${appHandle}`);
-});
+```bash
+shopify app init
+shopify app config link
+shopify app config use
+shopify app dev
+shopify app deploy
 ```
 
-**3. Exchange Code for Token:**
-```javascript
-async function exchangeCodeForToken(shop, code) {
-  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: process.env.SHOPIFY_API_KEY,
-      client_secret: process.env.SHOPIFY_API_SECRET,
-      code
-    })
-  });
-
-  const { access_token } = await response.json();
-  return access_token;
-}
-```
-
-### Access Scopes
-
-**Common Scopes:**
-- `read_products`, `write_products` - Product catalog
-- `read_orders`, `write_orders` - Order management
-- `read_customers`, `write_customers` - Customer data
-- `read_inventory`, `write_inventory` - Stock levels
-- `read_fulfillments`, `write_fulfillments` - Order fulfillment
-- `read_shipping`, `write_shipping` - Shipping rates
-- `read_analytics` - Store analytics
-- `read_checkouts`, `write_checkouts` - Checkout data
-
-Full list: https://shopify.dev/api/usage/access-scopes
-
-### Session Tokens (Embedded Apps)
-
-For embedded apps using App Bridge:
-
-```javascript
-import { getSessionToken } from '@shopify/app-bridge/utilities';
-
-async function authenticatedFetch(url, options = {}) {
-  const app = createApp({ ... });
-  const token = await getSessionToken(app);
-
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    }
-  });
-}
-```
+Notes:
+- `shopify app config link` connects local config to an existing app.
+- `shopify app config use` selects the active config for development/deploy.
+- Named config files may use `shopify.app.{config}.toml`.
+- `shopify app dev` applies the selected config to the development store.
+- Production/global Shopify app config and extension changes require `shopify app deploy`.
+- `shopify app deploy` releases Shopify-managed config/extensions only. Deploy hosted web app code separately.
+- `shopify app config push` is historical/obsolete wording; do not recommend it in new workflows.
 
 ## GraphQL Admin API
 
-### Making Requests
+Use `{api_version}` in reusable snippets. Latest stable as of 2026-06-12 is `2026-04`; review API versions quarterly and verify current mutation signatures before future updates.
 
 ```javascript
-async function graphqlRequest(shop, accessToken, query, variables = {}) {
+async function graphqlRequest(shop, accessToken, apiVersion, query, variables = {}) {
   const response = await fetch(
-    `https://${shop}/admin/api/2025-01/graphql.json`,
+    `https://${shop}/admin/api/${apiVersion}/graphql.json`,
     {
       method: 'POST',
       headers: {
         'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query, variables })
+      body: JSON.stringify({ query, variables }),
     }
   );
 
-  const data = await response.json();
-
-  if (data.errors) {
-    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
-  }
-
-  return data.data;
+  const body = await response.json();
+  if (body.errors) throw new Error(`GraphQL errors: ${JSON.stringify(body.errors)}`);
+  return body;
 }
 ```
+
+Check `X-Shopify-API-Version` in responses to detect fall-forward behavior.
 
 ### Product Operations
 
 **Create Product:**
+
 ```graphql
-mutation CreateProduct($input: ProductInput!) {
-  productCreate(input: $input) {
-    product {
-      id
-      title
-      handle
-    }
-    userErrors {
-      field
-      message
-    }
+mutation CreateProduct($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
+  productCreate(product: $product, media: $media) {
+    product { id title handle }
+    userErrors { field message }
   }
 }
 ```
 
 Variables:
+
 ```json
 {
-  "input": {
+  "product": {
     "title": "New Product",
     "productType": "Apparel",
     "vendor": "Brand",
-    "status": "ACTIVE",
-    "variants": [
-      { "price": "29.99", "sku": "SKU-001", "inventoryQuantity": 100 }
-    ]
-  }
+    "status": "ACTIVE"
+  },
+  "media": [
+    {
+      "mediaContentType": "IMAGE",
+      "originalSource": "https://example.com/product.jpg",
+      "alt": "New Product"
+    }
+  ]
 }
 ```
 
 **Update Product:**
+
 ```graphql
-mutation UpdateProduct($input: ProductInput!) {
-  productUpdate(input: $input) {
+mutation UpdateProduct($product: ProductUpdateInput!, $identifier: ProductIdentifierInput) {
+  productUpdate(product: $product, identifier: $identifier) {
     product { id title }
     userErrors { field message }
   }
 }
 ```
 
-**Query Products:**
-```graphql
-query GetProducts($first: Int!, $query: String) {
-  products(first: $first, query: $query) {
-    edges {
-      node {
-        id
-        title
-        status
-        variants(first: 5) {
-          edges {
-            node { id price inventoryQuantity }
-          }
-        }
-      }
-    }
-    pageInfo { hasNextPage endCursor }
-  }
-}
-```
+**Create Variants After Options Exist:**
 
-### Order Operations
-
-**Query Orders:**
 ```graphql
-query GetOrders($first: Int!) {
-  orders(first: $first) {
-    edges {
-      node {
-        id
-        name
-        createdAt
-        displayFinancialStatus
-        totalPriceSet {
-          shopMoney { amount currencyCode }
-        }
-        customer { email firstName lastName }
-      }
-    }
-  }
-}
-```
-
-**Fulfill Order:**
-```graphql
-mutation FulfillOrder($input: FulfillmentInput!) {
-  fulfillmentCreate(input: $input) {
-    fulfillment { id status trackingInfo { number url } }
+mutation CreateVariants($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+  productVariantsBulkCreate(productId: $productId, variants: $variants) {
+    productVariants { id title }
     userErrors { field message }
   }
 }
 ```
+
+Create product options first, then use `productVariantsBulkCreate` for additional variants. Do not rely on old product input shapes that mixed initial variant fields into product creation.
 
 ## Webhooks
 
 ### Configuration
 
 In `shopify.app.toml`:
+
 ```toml
 [webhooks]
-api_version = "2025-01"
+api_version = "2026-04"
 
 [[webhooks.subscriptions]]
 topics = ["orders/create"]
@@ -234,137 +134,97 @@ uri = "/webhooks/products/update"
 topics = ["app/uninstalled"]
 uri = "/webhooks/app/uninstalled"
 
-# GDPR mandatory webhooks
-[webhooks.privacy_compliance]
-customer_data_request_url = "/webhooks/gdpr/data-request"
-customer_deletion_url = "/webhooks/gdpr/customer-deletion"
-shop_deletion_url = "/webhooks/gdpr/shop-deletion"
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "/webhooks/privacy"
 ```
 
 ### Webhook Handler
 
+Capture the raw request body before JSON/body parsing, verify `X-Shopify-Hmac-Sha256`, and reject invalid HMACs before processing payloads.
+
 ```javascript
 import crypto from 'crypto';
 
-function verifyWebhook(req) {
-  const hmac = req.headers['x-shopify-hmac-sha256'];
-  const body = req.rawBody; // Raw body buffer
+function verifyWebhookHmac(rawBody, headerValue, appSecret) {
+  if (!headerValue || typeof headerValue !== 'string') return false;
 
-  const hash = crypto
-    .createHmac('sha256', process.env.SHOPIFY_API_SECRET)
-    .update(body, 'utf8')
+  const digest = crypto
+    .createHmac('sha256', appSecret)
+    .update(rawBody)
     .digest('base64');
 
-  return hmac === hash;
+  const received = Buffer.from(headerValue, 'base64');
+  const expected = Buffer.from(digest, 'base64');
+
+  return received.length === expected.length && crypto.timingSafeEqual(received, expected);
 }
 
-app.post('/webhooks/orders/create', async (req, res) => {
-  if (!verifyWebhook(req)) {
-    return res.status(401).send('Unauthorized');
-  }
+app.post('/webhooks/orders/create', rawBodyMiddleware, async (req, res) => {
+  const valid = verifyWebhookHmac(
+    req.rawBody,
+    req.headers['x-shopify-hmac-sha256'],
+    process.env.SHOPIFY_API_SECRET
+  );
 
-  const order = req.body;
-  console.log('New order:', order.id, order.name);
+  if (!valid) return res.status(401).send('Unauthorized');
 
-  // Process order...
-
+  const order = JSON.parse(req.rawBody.toString('utf8'));
+  await processOrderWebhook(order.id);
   res.status(200).send('OK');
 });
 ```
 
-### Common Webhook Topics
-
-**Orders:**
-- `orders/create`, `orders/updated`, `orders/delete`
-- `orders/paid`, `orders/cancelled`, `orders/fulfilled`
-
-**Products:**
-- `products/create`, `products/update`, `products/delete`
-
-**Customers:**
-- `customers/create`, `customers/update`, `customers/delete`
-
-**Inventory:**
-- `inventory_levels/update`
-
-**App:**
-- `app/uninstalled` (critical for cleanup)
+Avoid logging full webhook payloads or customer/order data by default.
 
 ## Billing Integration
 
-### App Charges
-
 **One-time Charge:**
+
 ```graphql
-mutation CreateCharge($input: AppPurchaseOneTimeInput!) {
-  appPurchaseOneTimeCreate(input: $input) {
-    appPurchaseOneTime {
-      id
-      name
-      price { amount }
-      status
-      confirmationUrl
-    }
+mutation CreateOneTimeCharge(
+  $name: String!
+  $price: MoneyInput!
+  $returnUrl: URL!
+  $test: Boolean
+) {
+  appPurchaseOneTimeCreate(name: $name, price: $price, returnUrl: $returnUrl, test: $test) {
+    appPurchaseOneTime { id name status confirmationUrl }
     userErrors { field message }
   }
 }
 ```
 
-Variables:
-```json
-{
-  "input": {
-    "name": "Premium Feature",
-    "price": { "amount": 49.99, "currencyCode": "USD" },
-    "returnUrl": "https://your-app.com/billing/callback"
-  }
-}
-```
+**Subscription:**
 
-**Recurring Charge (Subscription):**
 ```graphql
-mutation CreateSubscription($input: AppSubscriptionCreateInput!) {
-  appSubscriptionCreate(input: $input) {
-    appSubscription {
-      id
-      name
-      status
-      confirmationUrl
-    }
+mutation CreateSubscription(
+  $name: String!
+  $returnUrl: URL!
+  $lineItems: [AppSubscriptionLineItemInput!]!
+  $test: Boolean
+) {
+  appSubscriptionCreate(name: $name, returnUrl: $returnUrl, lineItems: $lineItems, test: $test) {
+    appSubscription { id name status confirmationUrl }
     userErrors { field message }
   }
 }
 ```
 
-Variables:
-```json
-{
-  "input": {
-    "name": "Monthly Subscription",
-    "returnUrl": "https://your-app.com/billing/callback",
-    "lineItems": [
-      {
-        "plan": {
-          "appRecurringPricingDetails": {
-            "price": { "amount": 29.99, "currencyCode": "USD" },
-            "interval": "EVERY_30_DAYS"
-          }
-        }
-      }
-    ]
-  }
-}
-```
+**Usage Record:**
 
-**Usage-based Billing:**
 ```graphql
-mutation CreateUsageCharge($input: AppUsageRecordCreateInput!) {
-  appUsageRecordCreate(input: $input) {
-    appUsageRecord {
-      id
-      price { amount }
-      description
-    }
+mutation CreateUsageRecord(
+  $subscriptionLineItemId: ID!
+  $price: MoneyInput!
+  $description: String!
+) {
+  appUsageRecordCreate(
+    subscriptionLineItemId: $subscriptionLineItemId
+    price: $price
+    description: $description
+  ) {
+    appUsageRecord { id price { amount currencyCode } description }
     userErrors { field message }
   }
 }
@@ -372,99 +232,73 @@ mutation CreateUsageCharge($input: AppUsageRecordCreateInput!) {
 
 ## Metafields
 
-### Create Metafield
-
 ```graphql
-mutation CreateMetafield($input: MetafieldInput!) {
-  metafieldsSet(metafields: [$input]) {
-    metafields {
-      id
-      namespace
-      key
-      value
-    }
+mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+  metafieldsSet(metafields: $metafields) {
+    metafields { id namespace key value type }
     userErrors { field message }
   }
 }
 ```
 
 Variables:
+
 ```json
 {
-  "input": {
-    "ownerId": "gid://shopify/Product/123",
-    "namespace": "custom",
-    "key": "instructions",
-    "value": "Handle with care",
-    "type": "single_line_text_field"
-  }
+  "metafields": [
+    {
+      "ownerId": "gid://shopify/Product/123",
+      "namespace": "custom",
+      "key": "instructions",
+      "value": "Handle with care",
+      "type": "single_line_text_field"
+    }
+  ]
 }
 ```
-
-**Metafield Types:**
-- `single_line_text_field`, `multi_line_text_field`
-- `number_integer`, `number_decimal`
-- `date`, `date_time`
-- `url`, `json`
-- `file_reference`, `product_reference`
 
 ## Rate Limiting
 
-### GraphQL Cost-Based Limits
+GraphQL Admin API uses a cost model:
+- Single-query requested cost must not exceed 1000.
+- Response extensions include requested cost, actual cost, and throttle status.
+- Restore rates are plan-dependent; do not hardcode one global budget.
 
-**Limits:**
-- Available points: 2000
-- Restore rate: 100 points/second
-- Max query cost: 2000
-
-**Check Cost:**
 ```javascript
-const response = await graphqlRequest(shop, token, query);
-const cost = response.extensions?.cost;
+async function graphqlWithRetry(shop, token, apiVersion, query, variables = {}) {
+  const result = await graphqlRequest(shop, token, apiVersion, query, variables);
+  const cost = result.extensions?.cost;
 
-console.log(`Cost: ${cost.actualQueryCost}/${cost.throttleStatus.maximumAvailable}`);
-```
-
-**Handle Throttling:**
-```javascript
-async function graphqlWithRetry(shop, token, query, retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await graphqlRequest(shop, token, query);
-    } catch (error) {
-      if (error.message.includes('Throttled') && i < retries - 1) {
-        await sleep(Math.pow(2, i) * 1000); // Exponential backoff
-        continue;
-      }
-      throw error;
+  if (cost?.throttleStatus) {
+    const { currentlyAvailable, restoreRate } = cost.throttleStatus;
+    if (currentlyAvailable < cost.requestedQueryCost) {
+      const missing = cost.requestedQueryCost - currentlyAvailable;
+      const waitMs = Math.ceil((missing / restoreRate) * 1000);
+      await sleep(waitMs);
     }
   }
+
+  return result.data;
 }
 ```
 
+Use requested vs actual cost to tune field selection and page sizes.
+
 ## Best Practices
 
-**Security:**
-- Store credentials in environment variables
-- Verify webhook HMAC signatures
-- Validate OAuth state parameter
-- Use HTTPS for all endpoints
-- Implement rate limiting on your endpoints
+**Security:** authenticate via the official app libraries (managed install + session tokens + token exchange), store tokens encrypted, verify webhook HMACs from raw bodies, and never expose access tokens in browser code.
 
-**Performance:**
-- Cache access tokens securely
-- Use bulk operations for large datasets
-- Implement pagination for queries
-- Monitor GraphQL query costs
+**Performance:** use pagination, bulk operations for large jobs, and query only fields you need.
 
-**Reliability:**
-- Implement exponential backoff for retries
-- Handle webhook delivery failures
-- Log errors for debugging
-- Monitor app health metrics
+**Reliability:** retry only when throttle status indicates capacity will restore; handle webhook redelivery idempotently.
 
-**Compliance:**
-- Implement GDPR webhooks (mandatory)
-- Handle customer data deletion requests
-- Provide data export functionality
-- Follow data retention policies
+**Compliance:** subscribe to privacy compliance topics and minimize customer/order data logs.
+
+## Resources
+
+- App Development: https://shopify.dev/docs/apps
+- GraphQL Admin API: https://shopify.dev/docs/api/admin-graphql
+- Authentication & authorization: https://shopify.dev/docs/apps/build/authentication-authorization
+- Webhooks: https://shopify.dev/docs/apps/build/webhooks
+- Billing API: https://shopify.dev/docs/apps/launch/billing
+- Admin API rate limits: https://shopify.dev/docs/api/usage/rate-limits

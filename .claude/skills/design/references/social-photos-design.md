@@ -210,7 +210,7 @@ async function captureScreenshots(htmlFiles) {
 
 ### Step 6: Verify & Fix Designs
 
-Use Chrome MCP / `chrome-devtools-mcp`, `ck:agent-browser`, or Playwright to visually inspect each exported PNG:
+Use Chrome MCP / `chrome-devtools-mcp`, `ck:agent-browser`, `ck:chrome-profile`, or Playwright to visually inspect each exported PNG:
 
 1. Open exported screenshots and check for layout/styling issues
 2. Verify: fonts rendered correctly, colors match brand, text readable at thumbnail size

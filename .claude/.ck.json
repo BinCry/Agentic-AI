@@ -1,6 +1,6 @@
 {
   "$schema": "./schemas/ck-config.schema.json",
-  "codingLevel": -1,
+  "codingLevel": 5,
   "statusline": "full",
   "statuslineColors": true,
   "privacyBlock": true,
@@ -62,10 +62,17 @@
     "ClaudeKit Engineer": {
       "installedSettings": {
         "hooks": [
-          "bash $HOME/.claude/hooks/node-hook-runner.sh $HOME/.claude/hooks/simplify-gate.cjs",
-          "bash $HOME/.claude/hooks/node-hook-runner.sh $HOME/.claude/hooks/descriptive-name.cjs",
-          "bash $HOME/.claude/hooks/node-hook-runner.sh $HOME/.claude/hooks/scout-block.cjs",
-          "bash $HOME/.claude/hooks/node-hook-runner.sh $HOME/.claude/hooks/privacy-block.cjs",
+          "node $HOME/.claude/hooks/session-init.cjs",
+          "node $HOME/.claude/hooks/usage-quota-cache-refresh.cjs",
+          "node $HOME/.claude/hooks/simplify-gate.cjs",
+          "node $HOME/.claude/hooks/dev-rules-reminder.cjs",
+          "node $HOME/.claude/hooks/subagent-init.cjs",
+          "node $HOME/.claude/hooks/descriptive-name.cjs",
+          "node $HOME/.claude/hooks/scout-block.cjs",
+          "node $HOME/.claude/hooks/privacy-block.cjs",
+          "node $HOME/.claude/hooks/plan-format-kanban.cjs",
+          "node $HOME/.claude/hooks/session-state.cjs",
+          "node $HOME/.claude/hooks/cook-after-plan-reminder.cjs",
           "node $HOME/.claude/hooks/task-completed-handler.cjs",
           "node $HOME/.claude/hooks/teammate-idle-handler.cjs"
         ],

@@ -57,10 +57,14 @@ For each detected topic, formulate a concrete question with 2-4 options.
 Mark recommended option with "(Recommended)" suffix.
 
 ### Step 4: Interview User
-Use `AskUserQuestion` tool.
+
+**Present before asking (MANDATORY):** before the first question, output a brief visible recap of the plan — phases, key decisions, and the assumptions/risks the interview will probe (5-10 bullets). The interview often runs in a fresh session where the user has not seen the plan body; questions referencing unseen plan content appear to come from nowhere. Internal reasoning is invisible — externalize it first.
+
+Then use `AskUserQuestion` tool.
 - Use question count from `## Plan Context` validation settings
 - Group related questions (max 4 per tool call)
 - Focus on: assumptions, risks, tradeoffs, architecture
+- Write each question and option to stand alone: name the plan section or decision it refers to instead of assuming earlier turn text is visible
 
 ### Step 5: Document Answers
 Add or append `## Validation Log` section in `plan.md`.

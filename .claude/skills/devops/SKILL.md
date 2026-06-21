@@ -84,8 +84,8 @@ kubectl apply -f manifests/ && kubectl get pods
 - `kubernetes-troubleshooting.md` / `kubernetes-troubleshooting-advanced.md` - Debug
 
 ### Scripts
-- `scripts/cloudflare-deploy.py` - Automate Worker deployments
-- `scripts/docker-optimize.py` - Analyze Dockerfiles
+- `scripts/cloudflare_deploy.py` - Automate Worker deployments
+- `scripts/docker_optimize.py` - Analyze Dockerfiles
 
 ## Best Practices
 

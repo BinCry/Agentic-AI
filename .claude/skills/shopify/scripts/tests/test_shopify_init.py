@@ -1,385 +1,224 @@
-"""
-Tests for shopify_init.py
+"""Tests for the Shopify CLI wrapper."""
 
-Run with: pytest test_shopify_init.py -v --cov=shopify_init --cov-report=term-missing
-"""
-
-import os
-import sys
-import json
-import pytest
 import subprocess
+import sys
 from pathlib import Path
-from unittest.mock import Mock, patch, mock_open, MagicMock
+from unittest.mock import Mock, patch
 
-# Add parent directory to path
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from shopify_init import EnvLoader, EnvConfig, ShopifyInitializer
+from shopify_init import ShopifyCliWrapper, build_parser, main
 
 
-class TestEnvLoader:
-    """Test EnvLoader class."""
+@pytest.fixture
+def printed():
+    """Collect printed lines for assertions."""
+    lines = []
 
-    def test_load_env_file_success(self, tmp_path):
-        """Test loading valid .env file."""
-        env_file = tmp_path / ".env"
-        env_file.write_text("""
-SHOPIFY_API_KEY=test_key
-SHOPIFY_API_SECRET=test_secret
-SHOP_DOMAIN=test.myshopify.com
-# Comment line
-SCOPES=read_products,write_products
-""")
+    def capture(*args, **kwargs):
+        lines.append(" ".join(str(arg) for arg in args))
 
-        result = EnvLoader.load_env_file(env_file)
-
-        assert result['SHOPIFY_API_KEY'] == 'test_key'
-        assert result['SHOPIFY_API_SECRET'] == 'test_secret'
-        assert result['SHOP_DOMAIN'] == 'test.myshopify.com'
-        assert result['SCOPES'] == 'read_products,write_products'
-
-    def test_load_env_file_with_quotes(self, tmp_path):
-        """Test loading .env file with quoted values."""
-        env_file = tmp_path / ".env"
-        env_file.write_text("""
-SHOPIFY_API_KEY="test_key"
-SHOPIFY_API_SECRET='test_secret'
-""")
-
-        result = EnvLoader.load_env_file(env_file)
-
-        assert result['SHOPIFY_API_KEY'] == 'test_key'
-        assert result['SHOPIFY_API_SECRET'] == 'test_secret'
-
-    def test_load_env_file_nonexistent(self, tmp_path):
-        """Test loading non-existent .env file."""
-        result = EnvLoader.load_env_file(tmp_path / "nonexistent.env")
-        assert result == {}
-
-    def test_load_env_file_invalid_format(self, tmp_path):
-        """Test loading .env file with invalid lines."""
-        env_file = tmp_path / ".env"
-        env_file.write_text("""
-VALID_KEY=value
-INVALID_LINE_NO_EQUALS
-ANOTHER_VALID=test
-""")
-
-        result = EnvLoader.load_env_file(env_file)
-
-        assert result['VALID_KEY'] == 'value'
-        assert result['ANOTHER_VALID'] == 'test'
-        assert 'INVALID_LINE_NO_EQUALS' not in result
-
-    def test_get_env_paths(self, tmp_path):
-        """Test getting .env file paths."""
-        # Create directory structure
-        claude_dir = tmp_path / ".claude"
-        skills_dir = claude_dir / "skills"
-        skill_dir = skills_dir / "shopify"
-
-        skill_dir.mkdir(parents=True)
-
-        # Create .env files
-        (skill_dir / ".env").write_text("SKILL=1")
-        (skills_dir / ".env").write_text("SKILLS=1")
-        (claude_dir / ".env").write_text("CLAUDE=1")
-
-        paths = EnvLoader.get_env_paths(skill_dir)
-
-        assert len(paths) == 3
-        assert skill_dir / ".env" in paths
-        assert skills_dir / ".env" in paths
-        assert claude_dir / ".env" in paths
-
-    def test_load_config_priority(self, tmp_path, monkeypatch):
-        """Test configuration loading priority."""
-        skill_dir = tmp_path / "skill"
-        skills_dir = tmp_path
-        claude_dir = tmp_path.parent
-
-        skill_dir.mkdir(parents=True)
-
-        # Create .env files with different values
-        (skill_dir / ".env").write_text("SHOPIFY_API_KEY=skill_key")
-        (skills_dir / ".env").write_text("SHOPIFY_API_KEY=skills_key\nSHOP_DOMAIN=skills.myshopify.com")
-
-        # Override with process env
-        monkeypatch.setenv("SHOPIFY_API_KEY", "process_key")
-
-        config = EnvLoader.load_config(skill_dir)
-
-        # Process env should win
-        assert config.shopify_api_key == "process_key"
-        # Shop domain from skills/.env
-        assert config.shop_domain == "skills.myshopify.com"
-
-    def test_load_config_no_files(self, tmp_path):
-        """Test configuration loading with no .env files."""
-        config = EnvLoader.load_config(tmp_path)
-
-        assert config.shopify_api_key is None
-        assert config.shopify_api_secret is None
-        assert config.shop_domain is None
-        assert config.scopes is None
+    return lines, capture
 
 
-class TestShopifyInitializer:
-    """Test ShopifyInitializer class."""
+@pytest.fixture
+def wrapper(printed):
+    """Create wrapper with captured output."""
+    _, capture = printed
+    return ShopifyCliWrapper(print_func=capture)
 
-    @pytest.fixture
-    def config(self):
-        """Create test config."""
-        return EnvConfig(
-            shopify_api_key="test_key",
-            shopify_api_secret="test_secret",
-            shop_domain="test.myshopify.com",
-            scopes="read_products,write_products"
+
+def parse_args(argv):
+    """Parse argv with the production parser."""
+    return build_parser().parse_args(argv)
+
+
+class TestCommandBuilding:
+    """Command builders keep user values as separate list args."""
+
+    def test_app_command_with_name_and_path(self, wrapper):
+        command = wrapper.build_app_command("my-app", "/tmp/my app", interactive=False)
+
+        assert command.args == ["shopify", "app", "init", "--name", "my-app", "--path", "/tmp/my app"]
+
+    def test_extension_command_with_template_and_name(self, wrapper):
+        command = wrapper.build_extension_command("function", "gift message", interactive=False)
+
+        assert command.args == [
+            "shopify",
+            "app",
+            "generate",
+            "extension",
+            "--template",
+            "function",
+            "--name",
+            "gift message",
+        ]
+
+    def test_theme_command_with_name_and_path(self, wrapper):
+        command = wrapper.build_theme_command("demo theme", "themes/demo", interactive=False)
+
+        assert command.args == ["shopify", "theme", "init", "demo theme", "--path", "themes/demo"]
+
+    def test_config_link_command(self, wrapper):
+        command = wrapper.build_config_link_command()
+
+        assert command.args == ["shopify", "app", "config", "link"]
+
+    def test_config_use_command_with_name(self, wrapper):
+        command = wrapper.build_config_use_command("production")
+
+        assert command.args == ["shopify", "app", "config", "use", "production"]
+
+    def test_malicious_values_remain_single_args(self, wrapper):
+        malicious = '"; rm -rf /"'
+        command = wrapper.build_app_command(malicious, malicious, interactive=False)
+
+        assert command.args == ["shopify", "app", "init", "--name", malicious, "--path", malicious]
+        assert command.args.count(malicious) == 2
+
+    def test_interactive_prompt_supplies_missing_app_name(self, printed):
+        _, capture = printed
+        wrapper = ShopifyCliWrapper(input_func=lambda _: "prompted-app", print_func=capture)
+
+        command = wrapper.build_app_command(None, None, interactive=True)
+
+        assert command.args == ["shopify", "app", "init", "--name", "prompted-app"]
+
+
+class TestExecution:
+    """Execution is list-based and dry-run safe."""
+
+    def test_dry_run_executes_no_subprocess(self, wrapper, printed):
+        lines, _ = printed
+        command = wrapper.build_config_link_command()
+
+        with patch("shopify_init.shutil.which") as mock_which, patch("shopify_init.subprocess.run") as mock_run:
+            result = wrapper.execute(command, dry_run=True)
+
+        assert result == 0
+        mock_which.assert_not_called()
+        mock_run.assert_not_called()
+        assert lines == ["Dry run only; no subprocess executed: shopify app config link"]
+
+    def test_missing_cli_returns_nonzero(self, wrapper):
+        with patch("shopify_init.shutil.which", return_value=None), patch("shopify_init.subprocess.run") as mock_run:
+            result = wrapper.execute(wrapper.build_config_link_command(), dry_run=False)
+
+        assert result == 127
+        mock_run.assert_not_called()
+
+    def test_version_check_failure_returns_nonzero(self, wrapper):
+        version_result = Mock(returncode=1, stderr="bad install")
+
+        with patch("shopify_init.shutil.which", return_value="/bin/shopify"), patch(
+            "shopify_init.subprocess.run", return_value=version_result
+        ) as mock_run:
+            result = wrapper.execute(wrapper.build_config_link_command(), dry_run=False)
+
+        assert result == 127
+        mock_run.assert_called_once_with(
+            ["/bin/shopify", "version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
         )
 
-    @pytest.fixture
-    def initializer(self, config):
-        """Create initializer instance."""
-        return ShopifyInitializer(config)
+    def test_version_check_timeout_returns_nonzero(self, wrapper):
+        with patch("shopify_init.shutil.which", return_value="/bin/shopify"), patch(
+            "shopify_init.subprocess.run", side_effect=subprocess.TimeoutExpired(["/bin/shopify", "version"], 10)
+        ) as mock_run:
+            result = wrapper.execute(wrapper.build_config_link_command(), dry_run=False)
 
-    def test_prompt_with_default(self, initializer):
-        """Test prompt with default value."""
-        with patch('builtins.input', return_value=''):
-            result = initializer.prompt("Test", "default_value")
-            assert result == "default_value"
+        assert result == 127
+        mock_run.assert_called_once()
 
-    def test_prompt_with_input(self, initializer):
-        """Test prompt with user input."""
-        with patch('builtins.input', return_value='user_input'):
-            result = initializer.prompt("Test", "default_value")
-            assert result == "user_input"
+    def test_version_check_os_error_returns_nonzero(self, wrapper):
+        with patch("shopify_init.shutil.which", return_value="/bin/shopify"), patch(
+            "shopify_init.subprocess.run", side_effect=OSError("cannot execute")
+        ) as mock_run:
+            result = wrapper.execute(wrapper.build_config_link_command(), dry_run=False)
 
-    def test_select_option_valid(self, initializer):
-        """Test select option with valid choice."""
-        options = ['app', 'extension', 'theme']
-        with patch('builtins.input', return_value='2'):
-            result = initializer.select_option("Choose", options)
-            assert result == 'extension'
+        assert result == 127
+        mock_run.assert_called_once()
 
-    def test_select_option_invalid_then_valid(self, initializer):
-        """Test select option with invalid then valid choice."""
-        options = ['app', 'extension']
-        with patch('builtins.input', side_effect=['5', 'invalid', '1']):
-            result = initializer.select_option("Choose", options)
-            assert result == 'app'
+    def test_nonzero_shopify_exit_code_propagates(self, wrapper):
+        version_result = Mock(returncode=0, stderr="")
+        command_result = Mock(returncode=42)
 
-    def test_check_cli_installed_success(self, initializer):
-        """Test CLI installed check - success."""
-        mock_result = Mock()
-        mock_result.returncode = 0
+        with patch("shopify_init.shutil.which", return_value="/bin/shopify"), patch(
+            "shopify_init.subprocess.run", side_effect=[version_result, command_result]
+        ) as mock_run:
+            result = wrapper.execute(wrapper.build_config_use_command("production"), dry_run=False)
 
-        with patch('subprocess.run', return_value=mock_result):
-            assert initializer.check_cli_installed() is True
+        assert result == 42
+        assert mock_run.call_args_list[1].args[0] == ["/bin/shopify", "app", "config", "use", "production"]
+        assert mock_run.call_args_list[1].kwargs == {"check": False}
 
-    def test_check_cli_installed_failure(self, initializer):
-        """Test CLI installed check - failure."""
-        with patch('subprocess.run', side_effect=FileNotFoundError):
-            assert initializer.check_cli_installed() is False
+    def test_execute_uses_list_args_for_malicious_values(self, wrapper):
+        version_result = Mock(returncode=0, stderr="")
+        command_result = Mock(returncode=0)
+        command = wrapper.build_app_command('"; rm -rf /"', None, interactive=False)
 
-    def test_create_app_config(self, initializer, tmp_path):
-        """Test creating app configuration file."""
-        initializer.create_app_config(tmp_path, "test-app", "read_products")
+        with patch("shopify_init.shutil.which", return_value="/bin/shopify"), patch(
+            "shopify_init.subprocess.run", side_effect=[version_result, command_result]
+        ) as mock_run:
+            result = wrapper.execute(command, dry_run=False)
 
-        config_file = tmp_path / "shopify.app.toml"
-        assert config_file.exists()
-
-        content = config_file.read_text()
-        assert 'name = "test-app"' in content
-        assert 'scopes = "read_products"' in content
-        assert 'client_id = "test_key"' in content
-
-    def test_create_extension_config(self, initializer, tmp_path):
-        """Test creating extension configuration file."""
-        initializer.create_extension_config(tmp_path, "test-ext", "checkout")
-
-        config_file = tmp_path / "shopify.extension.toml"
-        assert config_file.exists()
-
-        content = config_file.read_text()
-        assert 'name = "test-ext"' in content
-        assert 'purchase.checkout.block.render' in content
-
-    def test_create_extension_config_admin_action(self, initializer, tmp_path):
-        """Test creating admin action extension config."""
-        initializer.create_extension_config(tmp_path, "admin-ext", "admin_action")
-
-        config_file = tmp_path / "shopify.extension.toml"
-        content = config_file.read_text()
-        assert 'admin.product-details.action.render' in content
-
-    def test_create_readme(self, initializer, tmp_path):
-        """Test creating README file."""
-        initializer.create_readme(tmp_path, "app", "Test App")
-
-        readme_file = tmp_path / "README.md"
-        assert readme_file.exists()
-
-        content = readme_file.read_text()
-        assert '# Test App' in content
-        assert 'shopify app dev' in content
-
-    @patch('builtins.input')
-    @patch('builtins.print')
-    def test_init_app(self, mock_print, mock_input, initializer, tmp_path, monkeypatch):
-        """Test app initialization."""
-        monkeypatch.chdir(tmp_path)
-
-        # Mock user inputs
-        mock_input.side_effect = ['my-app', 'read_products,write_products']
-
-        initializer.init_app()
-
-        # Check directory created
-        app_dir = tmp_path / "my-app"
-        assert app_dir.exists()
-
-        # Check files created
-        assert (app_dir / "shopify.app.toml").exists()
-        assert (app_dir / "README.md").exists()
-        assert (app_dir / "package.json").exists()
-
-        # Check package.json content
-        package_json = json.loads((app_dir / "package.json").read_text())
-        assert package_json['name'] == 'my-app'
-        assert 'dev' in package_json['scripts']
-
-    @patch('builtins.input')
-    @patch('builtins.print')
-    def test_init_extension(self, mock_print, mock_input, initializer, tmp_path, monkeypatch):
-        """Test extension initialization."""
-        monkeypatch.chdir(tmp_path)
-
-        # Mock user inputs: type selection (1 = checkout), name
-        mock_input.side_effect = ['1', 'my-extension']
-
-        initializer.init_extension()
-
-        # Check directory and files created
-        ext_dir = tmp_path / "my-extension"
-        assert ext_dir.exists()
-        assert (ext_dir / "shopify.extension.toml").exists()
-        assert (ext_dir / "README.md").exists()
-
-    @patch('builtins.input')
-    @patch('builtins.print')
-    def test_init_theme(self, mock_print, mock_input, initializer):
-        """Test theme initialization."""
-        mock_input.return_value = 'my-theme'
-
-        # Should just print instructions
-        initializer.init_theme()
-
-        # Verify print was called (instructions shown)
-        assert mock_print.called
-
-    @patch('builtins.print')
-    def test_run_no_cli(self, mock_print, initializer):
-        """Test run when CLI not installed."""
-        with patch.object(initializer, 'check_cli_installed', return_value=False):
-            with pytest.raises(SystemExit) as exc_info:
-                initializer.run()
-            assert exc_info.value.code == 1
-
-    @patch.object(ShopifyInitializer, 'check_cli_installed', return_value=True)
-    @patch.object(ShopifyInitializer, 'init_app')
-    @patch('builtins.input')
-    @patch('builtins.print')
-    def test_run_app_selected(self, mock_print, mock_input, mock_init_app, mock_cli_check, initializer):
-        """Test run with app selection."""
-        mock_input.return_value = '1'  # Select app
-
-        initializer.run()
-
-        mock_init_app.assert_called_once()
-
-    @patch.object(ShopifyInitializer, 'check_cli_installed', return_value=True)
-    @patch.object(ShopifyInitializer, 'init_extension')
-    @patch('builtins.input')
-    @patch('builtins.print')
-    def test_run_extension_selected(self, mock_print, mock_input, mock_init_ext, mock_cli_check, initializer):
-        """Test run with extension selection."""
-        mock_input.return_value = '2'  # Select extension
-
-        initializer.run()
-
-        mock_init_ext.assert_called_once()
+        assert result == 0
+        assert mock_run.call_args_list[1].args[0] == ["/bin/shopify", "app", "init", "--name", '"; rm -rf /"']
+        assert mock_run.call_args_list[1].kwargs == {"check": False}
 
 
 class TestMain:
-    """Test main function."""
+    """Main dispatches subcommands and returns exit codes."""
 
-    @patch('shopify_init.ShopifyInitializer')
-    @patch('shopify_init.EnvLoader')
-    def test_main_success(self, mock_loader, mock_initializer):
-        """Test main function success path."""
-        from shopify_init import main
+    @pytest.mark.parametrize(
+        ("argv", "expected"),
+        [
+            (["--dry-run", "app", "--name", "demo"], ["shopify", "app", "init", "--name", "demo"]),
+            (
+                ["--dry-run", "extension", "--template", "function", "--name", "gift"],
+                ["shopify", "app", "generate", "extension", "--template", "function", "--name", "gift"],
+            ),
+            (["--dry-run", "theme", "--name", "theme-demo"], ["shopify", "theme", "init", "theme-demo"]),
+            (["--dry-run", "config-link"], ["shopify", "app", "config", "link"]),
+            (["--dry-run", "config-use", "production"], ["shopify", "app", "config", "use", "production"]),
+        ],
+    )
+    def test_main_dispatches_commands(self, argv, expected):
+        with patch.object(ShopifyCliWrapper, "execute", return_value=0) as mock_execute:
+            result = main(argv)
 
-        mock_config = Mock()
-        mock_loader.load_config.return_value = mock_config
+        assert result == 0
+        command = mock_execute.call_args.args[0]
+        assert command.args == expected
+        assert mock_execute.call_args.args[1] is True
 
-        mock_init_instance = Mock()
-        mock_initializer.return_value = mock_init_instance
+    def test_main_without_subcommand_returns_usage_error(self):
+        assert main([]) == 2
 
-        with patch('builtins.print'):
-            main()
+    def test_parser_non_interactive_flag(self):
+        args = parse_args(["--non-interactive", "app"])
 
-        mock_init_instance.run.assert_called_once()
+        assert args.non_interactive is True
+        assert args.command == "app"
 
-    @patch('shopify_init.ShopifyInitializer')
-    @patch('sys.exit')
-    def test_main_keyboard_interrupt(self, mock_exit, mock_initializer):
-        """Test main function with keyboard interrupt."""
-        from shopify_init import main
+    def test_deprecated_type_alias_maps_to_template_flag(self):
+        with patch.object(ShopifyCliWrapper, "execute", return_value=0) as mock_execute:
+            result = main(["--dry-run", "--non-interactive", "extension", "--type", "function"])
 
-        mock_initializer.return_value.run.side_effect = KeyboardInterrupt
+        assert result == 0
+        command = mock_execute.call_args.args[0]
+        assert command.args == ["shopify", "app", "generate", "extension", "--template", "function"]
 
-        with patch('builtins.print'):
-            main()
+    def test_config_flag_alias_maps_to_positional_config(self):
+        with patch.object(ShopifyCliWrapper, "execute", return_value=0) as mock_execute:
+            result = main(["--dry-run", "config-use", "--config", "production"])
 
-        mock_exit.assert_called_with(0)
-
-    @patch('shopify_init.ShopifyInitializer')
-    @patch('sys.exit')
-    def test_main_exception(self, mock_exit, mock_initializer):
-        """Test main function with exception."""
-        from shopify_init import main
-
-        mock_initializer.return_value.run.side_effect = Exception("Test error")
-
-        with patch('builtins.print'):
-            main()
-
-        mock_exit.assert_called_with(1)
-
-
-class TestEnvConfig:
-    """Test EnvConfig dataclass."""
-
-    def test_env_config_defaults(self):
-        """Test EnvConfig default values."""
-        config = EnvConfig()
-
-        assert config.shopify_api_key is None
-        assert config.shopify_api_secret is None
-        assert config.shop_domain is None
-        assert config.scopes is None
-
-    def test_env_config_with_values(self):
-        """Test EnvConfig with values."""
-        config = EnvConfig(
-            shopify_api_key="key",
-            shopify_api_secret="secret",
-            shop_domain="test.myshopify.com",
-            scopes="read_products"
-        )
-
-        assert config.shopify_api_key == "key"
-        assert config.shopify_api_secret == "secret"
-        assert config.shop_domain == "test.myshopify.com"
-        assert config.scopes == "read_products"
+        assert result == 0
+        command = mock_execute.call_args.args[0]
+        assert command.args == ["shopify", "app", "config", "use", "production"]

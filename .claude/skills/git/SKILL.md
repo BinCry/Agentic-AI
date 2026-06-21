@@ -1,11 +1,11 @@
 ---
 name: ck:git
-description: "Git operations with conventional commits. Use for staging, committing, pushing, PRs, merges. Auto-splits commits by type/scope. Security scans for secrets."
+description: "Manage git commits, pushes, PRs, branch merges, and PR review-and-merge automation. Use for commit, push, PR creation, PR merge, CI follow-up, and secret scanning."
 user-invocable: true
 when_to_use: "Invoke for commits, PRs, branch hygiene, or release git steps."
 category: dev-tools
-keywords: [git, commits, staging, PR, merge]
-argument-hint: "cm|cp|pr|merge [args]"
+keywords: [git, commits, staging, PR, merge, merge-pr, ci]
+argument-hint: "cm|cp|pr|merge|merge-pr [args]"
 metadata:
   author: claudekit
   version: "1.0.0"
@@ -23,6 +23,7 @@ If invoked without arguments, use `AskUserQuestion` to present available git ope
 | `cp` | Stage files, create commits and push |
 | `pr` | Create Pull Request |
 | `merge` | Merge branches |
+| `merge-pr` | Review, label, merge PRs, then watch/fix CI |
 
 Present as options via `AskUserQuestion` with header "Git Operation", question "What would you like to do?".
 
@@ -43,6 +44,12 @@ Activate `ck:context-engineering` skill.
 - `merge`: Merge [to-branch] [from-branch]
   - `to-branch`: Target branch (default: main)
   - `from-branch`: Source branch (default: current branch)
+- `merge-pr`: Review, label, merge, and post-merge verify PRs
+  - Usage: `/ck:git merge-pr <PR numbers or URLs>`
+  - Accepts one or more PR numbers or GitHub PR URLs
+  - Runs `/ck:review-pr <PR> --fix --reply` before any label or merge
+  - Adds label `ready to ship` only after review/fix/reply reports the PR is merge-ready
+  - Merges only reviewed-and-ready PRs, then watches target-branch CI to success
 
 ## Quick Reference
 
@@ -52,6 +59,7 @@ Activate `ck:context-engineering` skill.
 | Push | `references/workflow-push.md` |
 | Pull Request | `references/workflow-pr.md` |
 | Merge | `references/workflow-merge.md` |
+| Merge PRs | `references/workflow-merge-pr.md` |
 | Standards | `references/commit-standards.md` |
 | Safety | `references/safety-protocols.md` |
 | Branches | `references/branch-management.md` |
@@ -114,6 +122,7 @@ git commit -m "type(scope): description"
 - `references/workflow-push.md` - Push workflow with error handling
 - `references/workflow-pr.md` - PR creation with remote diff analysis
 - `references/workflow-merge.md` - Branch merge workflow
+- `references/workflow-merge-pr.md` - PR review, ready label, merge, and CI convergence workflow
 - `references/commit-standards.md` - Conventional commit format rules
 - `references/safety-protocols.md` - Secret detection, branch protection
 - `references/branch-management.md` - Naming, lifecycle, strategies

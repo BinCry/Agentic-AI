@@ -1,6 +1,6 @@
 ---
 name: ck:ship
-description: "Ship pipeline: merge main, test, review, commit, push, PR. Single command from feature branch to PR URL. Use for shipping official releases to main/master or beta releases to dev/beta branches."
+description: "Ship pipeline: merge target, test, review, journal, optional AgentWiki publish, commit, push, PR. Use for official main/master or beta dev/beta releases."
 user-invocable: true
 when_to_use: "Invoke when a completed branch needs PR shipping workflow."
 category: dev-tools
@@ -69,7 +69,7 @@ Step 4:  Run tests        → Auto-detect test runner, run, check results
 Step 5:  Review           → Two-pass checklist review (critical + informational)
 Step 6:  Version bump     → Auto-detect version file, bump patch/minor
 Step 7:  Changelog        → Auto-generate from commits + diff
-Step 8:  Journal          → Write technical journal via /ck:journal
+Step 8:  Journal          → Write technical journal via /ck:journal, optionally publish to AgentWiki
 Step 9:  Docs update      → Update project docs via /ck:docs update (official only)
 Step 10: Commit           → Conventional commit with version/changelog
 Step 11: Push             → git push -u origin <branch>
@@ -85,6 +85,7 @@ Step 12: Create PR        → gh pr create with structured body + linked issues
 - Steps 4 (tests) and 5 (review): delegate to `tester` and `code-reviewer` subagents — don't inline
 - Steps 8 (journal) and 9 (docs): run in **background** — don't block pipeline
 - Step 2 (issues): use single `gh` command batch — avoid multiple API calls
+- Step 8 (journal): publish to AgentWiki only when `agentwiki` CLI or AgentWiki MCP exists; otherwise skip silently
 - Skip steps early via flags to save tokens on unnecessary work
 - Beta mode auto-skips: docs update (Step 9)
 - Capture step outputs inline — don't re-read files already in context
@@ -121,6 +122,7 @@ User says `/ck:ship official` → ship to main with full docs + journal.
 - **Framework-agnostic.** Works for Node, Python, Rust, Go, Ruby, Java, or any project with a test command.
 - **Subagent delegation.** Use `tester` for tests, `code-reviewer` for review, `journal-writer` for journal, `docs-manager` for docs. Don't inline.
 - **Background tasks.** Journal and docs run in background to not block the pipeline.
+- **AgentWiki journal publish.** After local journal creation, detect `agentwiki` CLI first, then AgentWiki MCP. If available, publish the note as a technical diary/journal with project folder placement, tags, and summary. If unavailable, skip without blocking ship.
 
 ## Workflow Position
 

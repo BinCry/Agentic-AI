@@ -136,6 +136,8 @@ echo "Search for Claude AI documentation, take a screenshot of the homepage, and
 echo "Navigate to https://example.com, click the signup button, and take a screenshot" | gemini -y -m <gemini.model>
 ```
 
+Before using that generic browser pattern, decide whether real Chrome profile state matters. If it does not, normal MCP navigation is fine. If the task needs the user's real Chrome cookies, account, workspace, tenant, or an exact profile key, first run `chrome-profile open --json <key> <url>`, then tell Gemini or the direct MCP client to select the page whose URL contains the returned `bind_selector`. Do not ask Chrome DevTools MCP to call `new_page` or `navigate_page` for profile-scoped work.
+
 ## Error Handling
 
 When gemini CLI fails, check exit code and output for known error markers:
@@ -206,6 +208,8 @@ Limit tool exposure:
   }
 }
 ```
+
+If this server will operate on real user Chrome profiles, do not use `navigate_page`/`new_page` as the profile-opening or navigation path for that profile-scoped work. Keep those tools available for generic, profile-independent inspection when needed. For profile-scoped work, route opens through `ck:chrome-profile` and use Chrome DevTools MCP only after binding to the returned `cdp-open=<token>` selector.
 
 ### Environment Variables
 

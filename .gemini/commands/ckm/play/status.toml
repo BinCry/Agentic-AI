@@ -1,0 +1,14 @@
+description = "Show playbook progress dashboard"
+prompt = """
+Show playbook progress dashboard with stages, steps, goals, and blockers.
+
+<args>status {{args}}</args>
+
+## Workflow
+
+1. **Parse Arguments** — extract optional playbook name from `{{args}}`
+2. **Activate Skill** — route to `ckm:play` skill with `status {{args}}`
+
+## Skill Used
+- `ckm:play` — Marketing playbook orchestrator
+"""

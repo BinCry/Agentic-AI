@@ -17,7 +17,7 @@ Unified skill for fixing issues of any complexity with intelligent routing.
 
 ## Arguments
 
-- `--auto` - Activate autonomous mode (**default**)
+- `--auto` - Activate autonomous mode (**default**); high-risk fixes stop for human approval before finalize/commit/ship
 - `--review` - Activate human-in-the-loop review mode
 - `--quick` - Activate quick mode
 - `--parallel` - Activate parallel mode: route to parallel `fullstack-developer` agents per issue
@@ -123,7 +123,7 @@ flowchart TD
 
 | Option | Recommend When | Behavior |
 |--------|----------------|----------|
-| **Autonomous** (default) | Simple/moderate issues | Auto-approve if score >= 9.5 & 0 critical |
+| **Autonomous** (default) | Simple/moderate issues | Auto-approve only when review artifacts and validator pass |
 | **Human-in-the-loop Review** | Critical/production code | Pause for approval at each step |
 | **Quick** | Type errors, lint, trivial bugs | Fast scout → diagnose → fix → review cycle |
 
@@ -192,8 +192,9 @@ Classify before routing. See `references/complexity-assessment.md`.
 2. **Regression test:** Add or update test(s) that specifically cover the fixed issue. The test MUST fail without the fix and pass with it.
 3. **Side-effect sweep (NEW):** Run tests across the full **blast radius** identified in Step 2 (not just the modified file). Walk each dependent code path. Confirm public contracts unchanged (signatures, response shapes, DB schemas, env vars).
 4. **Code review (delegate):** Spawn `code-reviewer` subagent with explicit instructions to check: (a) root cause actually addressed (not symptom-patched), (b) no broken business logic in blast radius, (c) no new failure modes, (d) follows existing patterns from scout. Pass scout summary + diagnosis report as context.
-5. **Prevention gate:** Apply defense-in-depth validation where applicable. See `references/prevention-gate.md`.
-6. **Parallel verification:** Launch `Bash` agents for typecheck + lint + build + test.
+5. **Artifact gate:** Write review artifacts from `../_shared/references/workflow-artifacts.md`, then run `node claude/hooks/workflow-artifact-gate.cjs --stage finalize --artifact-dir <artifact-dir>`.
+6. **Prevention gate:** Apply defense-in-depth validation where applicable. See `references/prevention-gate.md`.
+7. **Parallel verification:** Launch `Bash` agents for typecheck + lint + build + test.
 
 **If verification fails OR a side effect is detected:** Use `AskUserQuestion` per HARD-GATE-NO-SIDE-EFFECTS — present what broke, why, and 2-4 concrete options (revert, narrow scope, update dependents, accept). Never silently patch.
 
@@ -258,6 +259,7 @@ Load as needed:
 - `references/workflow-quick.md` - Quick: scout → diagnose → fix → verify+prevent → review
 - `references/workflow-standard.md` - Standard: full pipeline with Tasks
 - `references/workflow-deep.md` - Deep: research + brainstorm + plan with Tasks
+- `../_shared/references/workflow-artifacts.md` - Review artifact schema and validator contract
 - `references/review-cycle.md` - Review logic (autonomous vs HITL)
 - `references/skill-activation-matrix.md` - When to activate each skill
 - `references/parallel-exploration.md` - Parallel Explore/Bash/Task coordination patterns

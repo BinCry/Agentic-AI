@@ -131,6 +131,8 @@ Task dependencies resolve automatically -- completing a blocker unblocks depende
 
 ## Hook Events
 
+These are Claude Code platform events. ClaudeKit does not ship custom handlers for them by default; team workflows should monitor TaskList and teammate messages unless a project deliberately adds and validates its own handlers.
+
 ### TaskCompleted
 
 Fires when teammate calls `TaskUpdate` with `status: "completed"`.

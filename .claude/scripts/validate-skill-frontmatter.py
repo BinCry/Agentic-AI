@@ -41,7 +41,8 @@ CATEGORY_NAMES = {
 # Exact name→category mappings for high-signal CK skills (avoids falling into "other")
 EXACT_CATEGORY_MAP: dict[str, str] = {
     "ask": "utilities", "bootstrap": "utilities", "brainstorm": "utilities",
-    "ck-autoresearch": "utilities", "ck-debug": "utilities", "ck-loop": "utilities",
+    "ck-autoresearch": "utilities", "ck-code-review": "utilities",
+    "ck-debug": "utilities", "ck-loop": "utilities",
     "ck-predict": "utilities", "ck-scenario": "utilities", "code-review": "utilities",
     "coding-level": "utilities", "context-engineering": "utilities", "cook": "utilities",
     "copywriting": "utilities", "debug": "utilities", "docs": "utilities",
@@ -60,7 +61,7 @@ EXACT_CATEGORY_MAP: dict[str, str] = {
     "shader": "frontend", "stitch": "frontend", "web-design-guidelines": "frontend",
     "tanstack": "frameworks",
     "deploy": "infrastructure",
-    "agent-browser": "multimedia", "web-testing": "multimedia",
+    "agent-browser": "multimedia", "chrome-profile": "dev-tools", "web-testing": "multimedia",
     "ck-security": "security", "cti-expert": "security", "security-scan": "security",
 }
 

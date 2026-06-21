@@ -10,7 +10,7 @@
  * Mode function signatures: (ctx, layout) => void  (writes via console.log)
  */
 
-const { red, dim, resolveColor } = require('./colors.cjs');
+const { red, resolveColor } = require('./colors.cjs');
 const {
   DEFAULT_SECTIONS,
   getContextColorName,
@@ -207,11 +207,9 @@ function renderMinimal(ctx, layout) {
 
   if (ctx.usageWindows?.length > 0 && isEnabled('quota')) {
     const quotaConfig = getSectionConfig('quota');
-    const hasCustomQuotaTheme = Object.prototype.hasOwnProperty.call(themeOverrides, 'quotaLow')
-      || Object.prototype.hasOwnProperty.call(themeOverrides, 'quotaHigh');
     const quotaText = ctx.usageWindows.join('  ');
-    const quotaColor = quotaConfig.color || (hasCustomQuotaTheme ? getQuotaColorName(ctx.usageWindows, layout.theme) : null);
-    parts.push(`${quotaConfig.icon || '⏰'} ${quotaColor ? resolveColor(quotaColor)(quotaText) : dim(quotaText)}`);
+    const quotaColor = quotaConfig.color || getQuotaColorName(ctx.usageWindows, layout.theme);
+    parts.push(`${quotaConfig.icon || '⏰'} ${resolveColor(quotaColor)(quotaText)}`);
   }
 
   if (ctx.gitBranch && isEnabled('git')) {

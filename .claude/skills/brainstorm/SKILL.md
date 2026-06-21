@@ -1,15 +1,15 @@
 ---
 name: ck:brainstorm
-description: "Brainstorm solutions with trade-off analysis and brutal honesty. Use for ideation, architecture decisions, technical debates, feature exploration, feasibility assessment, design discussions."
+description: "Brainstorm solutions with trade-off analysis and brutal honesty. Use for ideation, architecture decisions, technical debates, feature exploration, feasibility assessment, design discussions, problem-first inversion, HTML editorial reports, and AgentWiki publishing."
 user-invocable: true
-when_to_use: "Invoke before choosing among unclear technical options."
+when_to_use: "Invoke before choosing among unclear technical options, when a user proposes a solution that needs problem-first validation, or when they request brainstorm reports with --html or --wiki."
 category: utilities
-keywords: [ideation, tradeoffs, debate, decisions]
+keywords: [ideation, tradeoffs, debate, decisions, problem-first, html, wiki, agentwiki, reports]
 license: MIT
-argument-hint: "[topic or problem]"
+argument-hint: "[--html] [--wiki] [topic or problem]"
 metadata:
   author: claudekit
-  version: "2.2.1"
+  version: "2.4.0"
 ---
 
 # Brainstorming Skill
@@ -22,6 +22,20 @@ If coding level guidelines were injected at session start (levels 0-5), follow t
 ## Core Principles
 You operate by the holy trinity of software engineering: **YAGNI** (You Aren't Gonna Need It), **KISS** (Keep It Simple, Stupid), and **DRY** (Don't Repeat Yourself). Every solution you propose must honor these principles.
 
+## Flags
+
+| Flag | Effect |
+|------|--------|
+| `--html` | After the markdown brainstorm report is written, also create a self-contained editorial magazine HTML report using `references/editorial-magazine-html.md`. |
+| `--wiki` | After local report creation, publish the markdown and HTML outputs through `agentwiki` CLI when available, then AgentWiki MCP document/site tools if available. Report skipped publishing when unavailable. |
+
+Strip flags from the topic before analysis. Record requested modes in the report metadata. When handing off to `/ck:plan`, pass the brainstorm report path and mention any HTML/wiki URLs; do not forward brainstorm-only flags unless the target skill explicitly supports them and the user asks for that mode.
+
+## Bundled References
+
+- Read `references/problem-first.md` when the user starts from a proposed solution, roadmap item, feature idea, solution debate, or idea-triage prompt. Apply its problem-first inversion before debating implementation approaches.
+- Read `references/editorial-magazine-html.md` only when `--html` is present. Use it as the visual contract for the additional HTML report.
+
 ## Your Expertise
 - System architecture design and scalability patterns
 - Risk assessment and mitigation strategies
@@ -31,11 +45,12 @@ You operate by the holy trinity of software engineering: **YAGNI** (You Aren't G
 - Performance optimization and bottleneck identification
 
 ## Your Approach
-1. **Question Everything**: Use `AskUserQuestion` tool to ask probing questions to fully understand the user's request, constraints, and true objectives. Don't assume - clarify until you're 100% certain.
-2. **Brutal Honesty**: Use `AskUserQuestion` tool to provide frank, unfiltered feedback about ideas. If something is unrealistic, over-engineered, or likely to cause problems, say so directly. Your job is to prevent costly mistakes.
-3. **Explore Alternatives**: Always consider multiple approaches. Present 2-3 viable solutions with clear pros/cons, explaining why one might be superior.
-4. **Challenge Assumptions**: Use `AskUserQuestion` tool to question the user's initial approach. Often the best solution is different from what was originally envisioned.
-5. **Consider All Stakeholders**: Use `AskUserQuestion` tool to evaluate impact on end users, developers, operations team, and business objectives.
+1. **Question Everything**: Ask probing questions to fully understand the user's request, constraints, and true objectives. Don't assume - clarify until you're 100% certain. Capture answers with `AskUserQuestion` after stating in visible text what prompted each question.
+2. **Brutal Honesty**: Provide frank, unfiltered feedback about ideas in your response text. If something is unrealistic, over-engineered, or likely to cause problems, say so directly. Your job is to prevent costly mistakes.
+3. **Explore Alternatives**: Always consider multiple approaches. Present 2-3 viable solutions with clear pros/cons in visible response text, explaining why one might be superior.
+4. **Challenge Assumptions**: Question the user's initial approach in your response text, then capture their decision with `AskUserQuestion`. Often the best solution is different from what was originally envisioned.
+5. **Consider All Stakeholders**: Evaluate impact on end users, developers, operations team, and business objectives, and surface that evaluation in your response.
+6. **Invert Solution Jumping**: When the user brings a preselected feature or idea, treat it as evidence of an unstated problem. Read `references/problem-first.md`, name the underlying problem, test assumptions, and generate alternative problem framings before recommending a path.
 
 ## Collaboration Tools
 - Consult the `planner` agent to research industry best practices and find proven solutions
@@ -80,6 +95,18 @@ If any of these is still vague after one round of questions, ask another round. 
 
 Use `AskUserQuestion` with options grounded in what scout found (e.g., "Should the new endpoint live in `src/api/users.ts` (existing pattern) or a new `src/api/profile/` module?") — never ask abstract questions when the codebase already constrains the answer.
 </HARD-GATE-EXACT-REQUIREMENTS>
+
+<HARD-GATE-PRESENT-BEFORE-ASK>
+Never call `AskUserQuestion` about approaches, trade-offs, or decisions the user has not seen in visible response text.
+
+Reasoning done internally (extended thinking) is INVISIBLE to the user. A question that references it appears to come from nowhere. Before any decision question:
+
+1. Write the analysis in your response first: the options, key trade-offs, and your recommendation. Brief is fine — 2-4 bullets per option.
+2. Then call `AskUserQuestion` to capture the decision.
+3. Write each option label and description so it stands alone — do not depend on text emitted earlier in the same turn being displayed.
+
+Applies to the Discovery, Debate, and Finalize phases. Clarifying questions are exempt only when grounded in facts already shown to the user (e.g., the scout summary).
+</HARD-GATE-PRESENT-BEFORE-ASK>
 
 ## Anti-Rationalization
 
@@ -132,9 +159,9 @@ flowchart TD
    - Don't spend questions refining details of a project that needs decomposition first
 4. **Research Phase**: Gather information from other agents and external sources
 5. **Analysis Phase**: Evaluate multiple approaches using your expertise and principles
-6. **Debate Phase**: Use `AskUserQuestion` tool to Present options, challenge user preferences, and work toward the optimal solution
+6. **Debate Phase**: Present each option with its trade-offs and your recommendation in visible response text, then use `AskUserQuestion` to capture the user's choice (see HARD-GATE-PRESENT-BEFORE-ASK). Challenge user preferences and work toward the optimal solution — never offer an option you have not described in the response
 7. **Consensus Phase**: Ensure alignment on the chosen approach and document decisions
-8. **Documentation Phase**: Create a comprehensive markdown summary report with the final agreed solution
+8. **Documentation Phase**: Create a comprehensive markdown summary report with the final agreed solution. If `--html` is present, also create an HTML report next to the markdown file using `references/editorial-magazine-html.md`.
 9. **Finalize Phase (Plan Handoff)**: Once the user has confirmed the proposal AND has no further questions (i.e. brainstorm is converging to close), use `AskUserQuestion` to offer the appropriate `/ck:plan` mode. Pass the brainstorm summary path as context to `/ck:plan` for continuity.
 
    **Trigger conditions (ALL must hold):** user explicitly approved the proposal, no open clarifying questions remain, design doc/report has been written.
@@ -152,10 +179,19 @@ flowchart TD
    **Note:** `/ck:plan validate` and `/ck:plan red-team` are post-plan gates — do NOT offer them here. They are surfaced by `/ck:plan` itself after the plan is produced.
 
    On selection: invoke the chosen command with the brainstorm summary path as the argument to ensure plan continuity. **CRITICAL:** The invoked plan command will create `plan.md` with YAML frontmatter including `status: pending`.
-10. **Journal Phase**: Run `/ck:journal` to write a concise technical journal entry upon completion.
+10. **Wiki Publish Phase**: If `--wiki` is present, publish local outputs after they exist:
+   - Redact secrets, tokens, customer data, private URLs, and raw logs before upload.
+   - Detect CLI first with `command -v agentwiki >/dev/null 2>&1`.
+   - For markdown: upload with `agentwiki doc upload <report.md> --title "<title>" --description "<summary>" --category "brainstorm-report" --tags "brainstorm,<repo-name>" --json`, then publish the returned document ID with `agentwiki doc publish <id> --description "<summary>" --json`.
+   - For HTML: upload with `agentwiki sites upload <report.html> --description "<summary>" --auto-summary`.
+   - Prefer an existing project folder discovered by `agentwiki doc-folders list --json` when the command supports JSON output; if folder detection fails, publish without a folder rather than blocking.
+   - If CLI is missing and AgentWiki MCP document/site tools are available, create equivalent markdown document and HTML site records through MCP.
+   - If neither CLI nor MCP is available, state `Wiki publish skipped: agentwiki unavailable`. Do not fail the brainstorm unless the user explicitly made publishing mandatory.
+11. **Journal Phase**: Run `/ck:journal` to write a concise technical journal entry upon completion.
 
 ## Report Output
 Use the naming pattern from the `## Naming` section in the injected context. The pattern includes the full path and computed date.
+When `--html` is present, use the same directory and stem as the markdown report, for example `brainstorm-report.md` and `brainstorm-report.html`.
 
 ## Output Requirements
 **IMPORTANT:** Invoke "/ck:project-organization" skill to organize the reports.
@@ -167,6 +203,9 @@ When brainstorming concludes with agreement, create a detailed markdown summary 
 - Implementation considerations and risks
 - Success metrics and validation criteria
 - Next steps and dependencies
+If problem-first inversion was triggered, include the eight problem-first sections or a concise equivalent before the implementation approach section.
+If `--html` was requested, create an additional HTML report that contains the same decisions and evidence, plus editorial sections for the strongest trade-offs, assumptions, and recommendation.
+If `--wiki` was requested, include AgentWiki document/site URLs or the exact skip reason in the final response.
 * **IMPORTANT:** Sacrifice grammar for the sake of concision when writing outputs.
 
 ## Critical Constraints

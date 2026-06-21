@@ -55,6 +55,8 @@ Rules:
 - Your verification role methods (apply these exactly):
 {VERIFICATION_ROLE_METHODS}
 - Findings without codebase evidence (file:line citations) will be rejected at adjudication
+- If writing a report artifact, use the provided reports path with a descriptive filename such as from-code-reviewer-to-planner-red-team-{lens-name}-plan-review-report.md
+- Do not invent generic report filenames such as red-team-review.md, review.md, report.md, or notes.md
 
 Output format per finding:
 ## Finding {N}: {title}

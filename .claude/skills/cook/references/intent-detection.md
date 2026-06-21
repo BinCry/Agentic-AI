@@ -56,15 +56,15 @@ Detect multiple features from natural language:
 | Mode | Skip Research | Skip Test | Review Gates | Auto-Approve | Parallel Exec |
 |------|---------------|-----------|--------------|--------------|---------------|
 | interactive | ✗ | ✗ | **Yes (stops)** | ✗ | ✗ |
-| auto | ✗ | ✗ | **No (skips)** | ✓ (score≥9.5) | ✓ (all phases) |
+| auto | ✗ | ✗ | Low-risk only | ✓ (artifact-gated) | ✓ (low-risk phases) |
 | fast | ✓ | ✗ | Yes (stops) | ✗ | ✗ |
 | parallel | Optional | ✗ | Yes (stops) | ✗ | ✓ |
 | no-test | ✗ | ✓ | Yes (stops) | ✗ | ✗ |
 | code | ✓ | ✗ | Yes (stops) | Per plan | Per plan |
 
 **Review Gates:** Human approval checkpoints between major steps (see `workflow-steps.md`).
-- All modes EXCEPT `auto` stop at review gates for human approval.
-- `auto` mode is the only mode that runs continuously without stopping.
+- All modes EXCEPT low-risk `auto` stop at review gates for human approval.
+- `auto` mode runs continuously only when review artifacts pass and `risk-gate.autoStopRequired` is false.
 
 ## Examples
 
@@ -91,10 +91,10 @@ Detect multiple features from natural language:
 → Mode: interactive (default mode, with tests-first implementation behavior)
 
 "/ck:cook implement everything --auto"
-→ Mode: auto (NO STOPS, implements all phases continuously)
+→ Mode: auto (continuous only for low-risk, artifact-validated work)
 
 "/ck:cook implement dashboard trust me"
-→ Mode: auto ("trust me" keyword, NO STOPS)
+→ Mode: auto ("trust me" keyword, still stops on high-risk changes)
 ```
 
 **Note:** Only `--auto` flag or "trust me"/"auto"/"yolo" keywords enable continuous execution.

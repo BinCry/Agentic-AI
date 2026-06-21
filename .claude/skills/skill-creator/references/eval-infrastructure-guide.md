@@ -72,7 +72,7 @@ Run `scripts/aggregate_benchmark.py`:
 
 ### 5. Launch Viewer
 
-Run `scripts/generate_review.py`:
+Run `eval-viewer/generate_review.py`:
 - Interactive HTML with two tabs:
   - **Outputs** — qualitative review, feedback textbox, prev/next
   - **Benchmark** — quantitative metrics, analyst observations

@@ -17,7 +17,7 @@ metadata:
 
 Cyber threat intelligence and open-source intelligence skill. Turns Claude into a trained CTI/OSINT analyst. Generates precision search queries, interprets public data, builds case timelines, and delivers structured intelligence products — no API keys, no paid subscriptions.
 
-Collection method: `agent-browser` when available (JavaScript-heavy sites, infinite-scroll, screenshot evidence), with automatic fallback to web search / web fetch / direct URL fetch. Tool limitations are logged as collection gaps — never as case blockers.
+Collection method: `agent-browser` when available (JavaScript-heavy sites, infinite-scroll, screenshot evidence without real user login state); use `ck:chrome-profile` only when the collection needs the user's actual Chrome cookies, with automatic fallback to web search / web fetch / direct URL fetch. Tool limitations are logged as collection gaps — never as case blockers.
 
 ---
 
@@ -74,6 +74,7 @@ Commands grouped by AEAD phase.
 | `/techstack [domain]` | Technology fingerprint (CMS, analytics, CDN, server) | `/techstack example.com` |
 | `/competitors [domain]` | Competitor & related site discovery | `/competitors example.com` |
 | `/secrets [target]` | Exposed credentials in repos and paste sites | `/secrets github.com/org` |
+| `/github-osint [target]` | GitHub profile, org, repo, code, commit metadata, and collaboration recon | `/github-osint github.com/org/repo` |
 | `/threat-check [target]` | IP/domain/URL/hash threat intelligence | `/threat-check 185.1.1.1` |
 | `/scam-check [domain]` | Phishing/scam/malicious domain check | `/scam-check susp-site.xyz` |
 | `/vuln-check [query]` | CVE/vulnerability lookup (CIRCL + NVD) | `/vuln-check CVE-2024-1234` or `/vuln-check apache/httpd` |
@@ -834,8 +835,8 @@ When `/case` or `/sweep` runs on a Domain or Org target, it inspects the MX reco
 
 ## Tool Priority & Fallback
 
-1. Check `agent-browser` availability first
-2. Use `agent-browser` for: screenshot evidence, interactive UI, complex multi-step browser flows
+1. Check `agent-browser` availability first; use `ck:chrome-profile` only if real user Chrome cookies are required
+2. Use `agent-browser` for generic screenshot evidence and interactive UI; use `ck:chrome-profile` only when real Chrome profile state is required
 3. Use Scrapling DynamicFetcher for: JS-heavy sites, SPA content, auto-escalation from static
 4. Use Scrapling StealthyFetcher for: anti-bot bypass, Cloudflare-protected targets
 5. Use Scrapling Fetcher for: fast static page collection, HTML parsing (~2ms)

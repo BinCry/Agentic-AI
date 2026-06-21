@@ -1,6 +1,6 @@
 ---
 name: ck:shopify
-description: Build Shopify apps, extensions, themes with Shopify CLI. Use for GraphQL/REST APIs, Polaris UI, Liquid templates, checkout customization, webhooks, billing integration.
+description: Build Shopify apps, extensions, and themes with Shopify CLI, GraphQL Admin API, Polaris UI, Liquid, webhooks, billing, and app configuration workflows.
 user-invocable: true
 when_to_use: "Invoke for Shopify apps, themes, extensions, or billing."
 category: frameworks
@@ -8,70 +8,70 @@ keywords: [shopify, polaris, liquid, checkout]
 argument-hint: "[extension-type] [feature]"
 metadata:
   author: claudekit
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Shopify Development
 
-Comprehensive guide for building on Shopify platform: apps, extensions, themes, and API integrations.
+Build Shopify apps, extensions, themes, and API integrations with current Shopify CLI workflows and GraphQL-first Admin API guidance.
 
 ## Platform Overview
 
 **Core Components:**
-- **Shopify CLI** - Development workflow tool
-- **GraphQL Admin API** - Primary API for data operations (recommended)
-- **REST Admin API** - Legacy API (maintenance mode)
-- **Polaris UI** - Design system for consistent interfaces
-- **Liquid** - Template language for themes
+- **Shopify CLI** - Official app, extension, and theme workflow tool
+- **GraphQL Admin API** - Default API for new app data operations
+- **REST Admin API** - Legacy/migration-only for new development
+- **Polaris UI** - Merchant-facing design system
+- **Liquid** - Theme template language
+
+New public apps created after 2025-04-01 must use the GraphQL Admin API. Use REST only for legacy maintenance or migration work.
 
 **Extension Points:**
-- Checkout UI - Customize checkout experience
-- Admin UI - Extend admin dashboard
+- Checkout UI - Customize checkout and thank-you surfaces
+- Admin UI - Extend admin resource pages
 - POS UI - Point of Sale customization
-- Customer Account - Post-purchase pages
-- Theme App Extensions - Embedded theme functionality
+- Customer Account - Account and order status pages
+- Theme App Extensions - Embedded storefront functionality
+- Shopify Functions - Discount, delivery, payment, and validation logic
 
 ## Quick Start
 
 ### Prerequisites
 
 ```bash
-# Install Shopify CLI
 npm install -g @shopify/cli@latest
-
-# Verify installation
 shopify version
 ```
 
-### Create New App
+### App Workflow
 
 ```bash
-# Initialize app
+# Create an app from official Shopify templates
 shopify app init
+cd my-app
 
-# Start development server
+# Link/select the app configuration used by this checkout
+shopify app config link
+shopify app config use
+
+# Start local development against the selected config/store
 shopify app dev
 
-# Generate extension
-shopify app generate extension --type checkout_ui_extension
+# Generate an extension (interactive picker selects the type)
+shopify app generate extension
 
-# Deploy
+# Release Shopify-managed app config and extensions
 shopify app deploy
 ```
 
-### Theme Development
+`shopify app deploy` deploys Shopify-managed app configuration and extensions. Deploy your hosted web app/server separately on your hosting platform.
+
+### Theme Workflow
 
 ```bash
-# Initialize theme
 shopify theme init
-
-# Start local preview
 shopify theme dev
-
-# Pull from store
 shopify theme pull --live
-
-# Push to store
 shopify theme push --development
 ```
 
@@ -79,147 +79,76 @@ shopify theme push --development
 
 ### 1. App Development
 
-**Setup:**
-```bash
-shopify app init
-cd my-app
-```
+Configure scopes in `shopify.app.toml`:
 
-**Configure Access Scopes** (`shopify.app.toml`):
 ```toml
 [access_scopes]
 scopes = "read_products,write_products,read_orders"
 ```
 
-**Start Development:**
-```bash
-shopify app dev  # Starts local server with tunnel
-```
-
-**Add Extensions:**
-```bash
-shopify app generate extension --type checkout_ui_extension
-```
-
-**Deploy:**
-```bash
-shopify app deploy  # Builds and uploads to Shopify
-```
+Use `shopify app dev` for local development. Use `shopify app deploy` when production/global app configuration or Shopify-managed extensions must be released.
 
 ### 2. Extension Development
 
-**Available Types:**
-- Checkout UI - `checkout_ui_extension`
-- Admin Action - `admin_action`
-- Admin Block - `admin_block`
-- POS UI - `pos_ui_extension`
-- Function - `function` (discounts, payment, delivery, validation)
+Common extension types (select via the interactive picker; UI extensions use Preact + web components):
+- Checkout UI
+- Admin Action / Admin Block
+- POS UI
+- Customer Account UI
+- Function
 
-**Workflow:**
 ```bash
 shopify app generate extension
-# Select type, configure
-shopify app dev  # Test locally
-shopify app deploy  # Publish
+shopify app dev
+shopify app deploy
 ```
 
 ### 3. Theme Development
 
-**Setup:**
 ```bash
 shopify theme init
-# Choose Dawn (reference theme) or start fresh
-```
-
-**Local Development:**
-```bash
 shopify theme dev
-# Preview at localhost:9292
-# Auto-syncs to development theme
-```
-
-**Deployment:**
-```bash
-shopify theme push --development  # Push to dev theme
-shopify theme publish --theme=123  # Set as live
+shopify theme push --development
+shopify theme publish --theme=123
 ```
 
 ## When to Build What
 
-### Build an App When:
+### Build an App When
 - Integrating external services
-- Adding functionality across multiple stores
-- Building merchant-facing admin tools
 - Managing store data programmatically
-- Implementing complex business logic
+- Building merchant-facing admin tools
+- Implementing complex backend logic
 - Charging for functionality
 
-### Build an Extension When:
-- Customizing checkout flow
-- Adding fields/features to admin pages
-- Creating POS actions for retail
-- Implementing discount/payment/shipping rules
-- Extending customer account pages
+### Build an Extension When
+- Customizing checkout, admin, POS, or customer-account surfaces
+- Adding theme app blocks/snippets to storefronts
+- Implementing Shopify Functions for discounts, delivery, payment, or validation
 
-### Build a Theme When:
-- Creating custom storefront design
-- Building unique shopping experiences
-- Customizing product/collection pages
-- Implementing brand-specific layouts
-- Modifying homepage/content pages
-
-### Combination Approach:
-**App + Theme Extension:**
-- App handles backend logic and data
-- Theme extension provides storefront UI
-- Example: Product reviews, wishlists, size guides
+### Build a Theme When
+- Creating or customizing storefront presentation
+- Building product, collection, cart, or content page layouts
+- Implementing brand-specific Liquid sections and snippets
 
 ## Essential Patterns
 
 ### GraphQL Product Query
 
 ```graphql
-query GetProducts($first: Int!) {
-  products(first: $first) {
+query GetProducts($first: Int!, $after: String) {
+  products(first: $first, after: $after) {
     edges {
+      cursor
       node {
         id
         title
         handle
-        variants(first: 5) {
-          edges {
-            node {
-              id
-              price
-              inventoryQuantity
-            }
-          }
-        }
+        status
       }
     }
-    pageInfo {
-      hasNextPage
-      endCursor
-    }
+    pageInfo { hasNextPage endCursor }
   }
-}
-```
-
-### Checkout Extension (React)
-
-```javascript
-import { reactExtension, BlockStack, TextField, Checkbox } from '@shopify/ui-extensions-react/checkout';
-
-export default reactExtension('purchase.checkout.block.render', () => <Extension />);
-
-function Extension() {
-  const [message, setMessage] = useState('');
-
-  return (
-    <BlockStack>
-      <TextField label="Gift Message" value={message} onChange={setMessage} />
-    </BlockStack>
-  );
 }
 ```
 
@@ -228,7 +157,7 @@ function Extension() {
 ```liquid
 {% for product in collection.products %}
   <div class="product-card">
-    <img src="{{ product.featured_image | img_url: 'medium' }}" alt="{{ product.title }}">
+    {{ product.featured_image | image_url: width: 450 | image_tag: alt: product.title }}
     <h3>{{ product.title }}</h3>
     <p>{{ product.price | money }}</p>
     <a href="{{ product.url }}">View Details</a>
@@ -236,92 +165,27 @@ function Extension() {
 {% endfor %}
 ```
 
-## Best Practices
-
-**API Usage:**
-- Prefer GraphQL over REST for new development
-- Request only needed fields to reduce costs
-- Implement pagination for large datasets
-- Use bulk operations for batch processing
-- Respect rate limits (cost-based for GraphQL)
-
-**Security:**
-- Store API credentials in environment variables
-- Verify webhook signatures
-- Use OAuth for public apps
-- Request minimal access scopes
-- Implement session tokens for embedded apps
-
-**Performance:**
-- Cache API responses when appropriate
-- Optimize images in themes
-- Minimize Liquid logic complexity
-- Use async loading for extensions
-- Monitor query costs in GraphQL
-
-**Testing:**
-- Use development stores for testing
-- Test across different store plans
-- Verify mobile responsiveness
-- Check accessibility (keyboard, screen readers)
-- Validate GDPR compliance
-
-## Reference Documentation
-
-Detailed guides for advanced topics:
-
-- **[App Development](references/app-development.md)** - OAuth, APIs, webhooks, billing
-- **[Extensions](references/extensions.md)** - Checkout, Admin, POS, Functions
-- **[Themes](references/themes.md)** - Liquid, sections, deployment
-
-## Scripts
-
-**[shopify_init.py](scripts/shopify_init.py)** - Initialize Shopify projects interactively
-```bash
-python scripts/shopify_init.py
-```
-
 ## Troubleshooting
 
-**Rate Limit Errors:**
-- Monitor `X-Shopify-Shop-Api-Call-Limit` header
-- Implement exponential backoff
-- Use bulk operations for large datasets
+**GraphQL throttling:** inspect `extensions.cost.throttleStatus` for `currentlyAvailable`, `maximumAvailable`, and `restoreRate`. Retry only after enough cost budget is restored; reduce requested fields and page sizes when possible.
 
-**Authentication Failures:**
-- Verify access token validity
-- Check required scopes granted
-- Ensure OAuth flow completed
+**API versions:** reusable snippets should use `{api_version}` unless showing a concrete tested config. Latest stable as of 2026-06-12 is `2026-04`; review Shopify API versions quarterly. Check `X-Shopify-API-Version` in responses to detect fall-forward behavior.
 
-**Extension Not Appearing:**
-- Verify extension target correct
-- Check extension published
-- Ensure app installed on store
+**Deploy confusion:** `shopify app deploy` does not publish your hosted app code. Run your hosting provider deploy separately.
 
-**Webhook Not Receiving:**
-- Verify webhook URL accessible
-- Check signature validation
-- Review logs in Partner Dashboard
+## Official Docs
 
-## Resources
-
-**Official Documentation:**
-- Shopify Docs: https://shopify.dev/docs
-- GraphQL API: https://shopify.dev/docs/api/admin-graphql
+- Apps: https://shopify.dev/docs/apps
+- GraphQL Admin API: https://shopify.dev/docs/api/admin-graphql
 - Shopify CLI: https://shopify.dev/docs/api/shopify-cli
-- Polaris: https://polaris.shopify.com
+- Polaris (web components): https://shopify.dev/docs/api/app-home/polaris-web-components
+- Themes & Liquid: https://shopify.dev/docs/themes · https://shopify.dev/docs/api/liquid
+- Functions: https://shopify.dev/docs/apps/build/functions
 
-**Tools:**
-- GraphiQL Explorer (Admin → Settings → Apps → Develop apps)
-- Partner Dashboard (app management)
-- Development stores (free testing)
+## References
 
-**API Versioning:**
-- Quarterly releases (YYYY-MM format)
-- Current: 2025-01
-- 12-month support per version
-- Test before version updates
-
----
-
-**Note:** This skill covers Shopify platform as of January 2025. Refer to official documentation for latest updates.
+- `references/app-development.md` - GraphQL Admin API, webhooks, billing, metafields, rate limits
+- `references/embedded-apps.md` - Embedded app auth: managed install, App Bridge v4, session tokens, token exchange, official libraries
+- `references/extensions.md` - UI extensions (Preact + web components) and Shopify Functions
+- `references/themes.md` - Liquid theme development
+- `scripts/shopify_init.py` - Thin wrapper around official Shopify CLI commands

@@ -51,7 +51,7 @@ The skill automatically detects your intent and routes to the appropriate workfl
 | Mode | Research | Testing | Review | Use Case |
 |------|----------|---------|--------|----------|
 | interactive | ✓ | ✓ | User approval | Default, full control |
-| auto | ✓ | ✓ | Auto if score≥9.5 | Trusted, hands-off |
+| auto | ✓ | ✓ | Artifact-gated auto, stops on high risk | Trusted low-risk work |
 | fast | ✗ | ✓ | Simplified | Quick fixes |
 | parallel | Optional | ✓ | User approval | Multi-feature work |
 | no-test | ✓ | ✗ | User approval | Speed priority |
@@ -87,6 +87,7 @@ cook/
 
 ## Version
 
+2.2.1 - Review artifacts and high-risk auto stop
 2.1.1 - Added `--tdd` guidance and stronger implementation conformance rules
 2.1.0 - Review gates added for human-in-the-loop mode
 2.0.0 - Smart intent detection (hybrid approach)

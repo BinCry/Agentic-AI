@@ -12,7 +12,6 @@ title: "{Brief plan title}"
 description: "{One-sentence summary for card preview}"
 status: pending  # pending | in-progress | completed | cancelled
 priority: P2     # P1 (High) | P2 (Medium) | P3 (Low)
-effort: 4h       # Estimated total effort
 issue: 74        # GitHub issue number (if applicable)
 branch: kai/feat/feature-name
 tags: [frontend, api]  # Category tags
@@ -22,6 +21,60 @@ created: 2025-12-16
 ---
 ```
 
+When `--html` is active, `plan.html` is the primary artifact after validation
+and red-team gates. A companion `plan.md` may exist as a short index for
+metadata, issue links, and cook handoff compatibility only. Do not duplicate
+the full plan body in both files unless a downstream cook handoff needs
+Markdown.
+
+### HTML Plan Format (`--html`)
+
+`plan.html` must be:
+- Self-contained with inline CSS and JavaScript.
+- Responsive and keyboard-accessible.
+- Structured around overview, visible phase outlines, user flows, risks,
+  diagrams, charts, citations, and open questions.
+- Interactive where useful: tabs, expandable sections, filters, toggles, or
+  chart controls.
+- Source-cited with visible URL citations for external docs, GitHub issues,
+  specs, and research links.
+- Safe to open directly from disk without a dev server.
+- Designed in editorial magazine style: warm paper `#faf7f2`, paper panels
+  `#f0ebe1`, ink `#0a0a0a`, muted `#6b6258`, accent red `#b8232c`, serif
+  display, mono labels, hairline dividers, asymmetric grids, rule lines, and
+  subtle paper grain.
+- Free of gradients, shadows, rounded cards, pure white backgrounds, emoji
+  icons, generic SaaS styling, and decorative bokeh/orbs.
+- Explicit on the main page: every phase shows title, status, priority,
+  dependencies, objective, 3-6 key bullets, related files, success highlights,
+  and test/validation gate when known.
+- Modal-driven for detail: every phase outline opens a keyboard-accessible
+  modal that renders full phase markdown with headings, lists, checkboxes,
+  tables, code fences, inline code, blockquotes, links, horizontal rules, and
+  frontmatter metadata.
+- Illustrated when image generation is available: use `imagegen`,
+  built-in `image_gen`, or `create_image` to generate 1-3 watercolor technical
+  sketch assets, keep sources under `{plan-dir}/assets/`, and embed selected
+  images as data URIs so `plan.html` remains portable.
+
+### AgentWiki Publish Format (`--wiki`)
+
+When `--wiki` is active:
+- Publish only final reviewed artifacts after validation/red-team gates.
+- Use AgentWiki CLI when `agentwiki whoami` succeeds; otherwise use AgentWiki
+  MCP document/upload/share/static-site tools when exposed.
+- Markdown plans publish as AgentWiki documents. If details live across
+  phase files, prepare `{plan-dir}/wiki-publish.md` as a concise combined
+  document or index before upload.
+- HTML plans publish through AgentWiki hosted static sites using the
+  self-contained `plan.html`.
+- Record returned document, share, publish, or site URLs in the final response.
+  If `--github` is also active, add the wiki URL to the GitHub issue.
+- If AgentWiki is unavailable or unauthenticated, skip publishing without
+  failing plan creation and report the exact missing capability.
+- Redact secrets, tokens, private logs, customer data, and local-only absolute
+  paths before publishing.
+
 ### Auto-Population Rules
 
 When creating plans, auto-populate these fields:
@@ -29,7 +82,6 @@ When creating plans, auto-populate these fields:
 - **description**: First sentence of Overview section
 - **status**: Always `pending` for new plans
 - **priority**: From user request or default `P2`
-- **effort**: Sum of phase estimates
 - **issue**: Parse from branch name or context
 - **branch**: Current git branch (`git branch --show-current`)
 - **tags**: Infer from task keywords (e.g., frontend, backend, api, auth)
@@ -91,7 +143,8 @@ List affected files with:
 2. **Research Phase** → Spawn researchers in parallel, investigate approaches
 3. **Synthesis** → Analyze reports, identify optimal solution
 4. **Design Phase** → Create architecture, implementation design
-5. **Plan Documentation** → Write comprehensive plan in Markdown
+5. **Plan Documentation** → Write comprehensive plan in Markdown, or `plan.html`
+   when `--html` is present
 6. **Review & Refine** → Ensure completeness, clarity, actionability
 
 ## Output Requirements
@@ -99,6 +152,9 @@ List affected files with:
 ### What Planners Do
 - Create plans ONLY (no implementation)
 - Provide plan file path and summary
+- With `--html`, provide the `plan.html` path first and say it is authoritative
+- With `--wiki`, provide the AgentWiki document/share/site URL when published,
+  or the exact skip reason when unavailable
 - Self-contained plans with necessary context
 - Code snippets/pseudocode when clarifying
 - Multiple options with trade-offs when appropriate

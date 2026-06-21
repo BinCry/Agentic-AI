@@ -30,7 +30,7 @@ End-to-end implementation with automatic workflow detection.
 - `--fast`: Skip research, scout→plan→code
 - `--parallel`: Multi-agent execution
 - `--no-test`: Skip testing step
-- `--auto`: Auto-approve all steps
+- `--auto`: Auto-approve low-risk steps; high-risk changes stop for human approval before finalize/commit/ship
 
 **Composable flags** (combine with any mode):
 - `--tdd`: Tests-first per phase — write tests for current behavior before
@@ -113,12 +113,15 @@ Let the user decide. Do not silently patch around regressions.
 |---------------|---------------|----------|
 | Path to `plan.md` or `phase-*.md` | code | Execute existing plan |
 | Contains "fast", "quick" | fast | Skip research, scout→plan→code |
-| Contains "trust me", "auto" | auto | Auto-approve all steps |
+| Contains "trust me", "auto" | auto | Auto-approve low-risk artifact-validated steps; stop on high-risk |
 | Lists 3+ features OR "parallel" | parallel | Multi-agent execution |
 | Contains "no test", "skip test" | no-test | Skip testing step |
 | Default | interactive | Full workflow with user input |
 
 See `references/intent-detection.md` for detection logic.
+
+For cross-skill workflow sequence decisions, load
+`references/workflow-routing.md` before selecting the owning skill.
 
 ## Process Flow (Authoritative)
 
@@ -158,13 +161,13 @@ flowchart TD
 ```
 
 **Default (non-auto):** Stops at `[Review]` gates for human approval before each major step.
-**Auto mode (`--auto`):** Skips human review gates, implements all phases continuously.
+**Auto mode (`--auto`):** Skips human review gates only for low-risk work. High-risk changes stop for human approval before finalize/commit/ship.
 **Claude Tasks:** Utilize `TaskCreate`, `TaskUpdate`, `TaskGet`, `TaskList` during implementation step. **Fallback:** These are CLI-only tools — unavailable in VSCode extension. If they error, use `TodoWrite` for progress tracking instead.
 
 | Mode | Research | Testing | Review Gates | Phase Progression |
 |------|----------|---------|--------------|-------------------|
 | interactive | ✓ | ✓ | **User approval at each step** | One at a time |
-| auto | ✓ | ✓ | Auto if score≥9.5 | All at once (no stops) |
+| auto | ✓ | ✓ | Auto only if artifacts pass and high-risk stop is false | All low-risk phases continuously |
 | fast | ✗ | ✓ | **User approval at each step** | One at a time |
 | parallel | Optional | ✓ | **User approval at each step** | Parallel groups |
 | no-test | ✓ | ✗ | **User approval at each step** | One at a time |
@@ -193,7 +196,7 @@ Human review required at these checkpoints (skipped with `--auto`):
   (d) follows existing patterns from scout,
   (e) no new lint/type/build errors anywhere.
   Pass scout summary + acceptance criteria as context. If reviewer flags side effects → trigger HARD-GATE-NO-SIDE-EFFECTS (`AskUserQuestion` with 2-4 options).
-  Then: User approval OR auto-approve (score≥9.5, 0 critical).
+  Then: User approval OR artifact-gated auto approval. Score is advisory; it never approves by itself.
 - **Finalize (MANDATORY - never skip):**
   1. **Activate `/ck:project-management` skill (MANDATORY)** → run full plan sync-back across ALL `phase-XX-*.md` (not only current phase), update `plan.md` status/progress, hydrate Claude Tasks, generate progress report
   2. `docs-manager` subagent → update `./docs` if changes warrant
@@ -222,9 +225,11 @@ Human review required at these checkpoints (skipped with `--auto`):
 ## References
 
 - `references/intent-detection.md` - Detection rules and routing logic
+- `references/workflow-routing.md` - Cross-skill sequence routing
 - `references/workflow-steps.md` - Detailed step definitions for all modes
 - `references/review-cycle.md` - Interactive and auto review processes
 - `references/subagent-patterns.md` - Subagent invocation patterns
+- `../_shared/references/workflow-artifacts.md` - Review artifact schema and validator contract
 
 ## Workflow Position
 

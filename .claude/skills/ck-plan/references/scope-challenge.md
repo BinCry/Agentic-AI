@@ -83,7 +83,7 @@ After scope challenge, output brief summary before proceeding:
 Scope Challenge:
 - Existing code: [what was found that's reusable]
 - Minimum changes: [what's essential vs deferrable]
-- Complexity: [estimated files, new abstractions]
+- Complexity: [expected files, new abstractions]
 - Selected mode: [EXPANSION/HOLD/REDUCTION]
 ```
 

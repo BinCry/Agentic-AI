@@ -26,6 +26,12 @@ Use this skill when the user:
 - Wants to search for tools, templates, or workflows
 - Mentions they wish they had help with a specific domain (design, testing, deployment, etc.)
 
+## Local ClaudeKit Routing
+
+When the question is which installed ClaudeKit skill to use, load
+`references/domain-routing.md`. Use the Skills CLI sections below only when the
+user wants to discover or install external skills.
+
 ## What is the Skills CLI?
 
 The Skills CLI (`npx skills`) is the package manager for the open agent skills ecosystem. Skills are modular packages that extend agent capabilities with specialized knowledge, workflows, and tools.

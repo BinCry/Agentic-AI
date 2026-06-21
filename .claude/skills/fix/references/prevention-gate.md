@@ -62,6 +62,8 @@ Apply layered validation from `ck:debug` defense-in-depth technique:
 □ Defense-in-depth layers considered? (applied where relevant)
 □ No new warnings/errors introduced?
 □ Parallel verification passed? (typecheck + lint + build + test)
+□ `verification.json` updated with summarized command proof?
+□ `review-decision.json` and `risk-gate.json` pass artifact validator?
 ```
 
 ## Output Format

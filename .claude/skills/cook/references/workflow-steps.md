@@ -180,7 +180,7 @@ Skip the step entirely when `CK_SIMPLIFY_DISABLED=1` or
 - Requires user approval
 
 **Auto:**
-- Auto-approve if score≥9.5 AND 0 critical
+- Auto-approve only if `review-decision.json` is `PASS`, artifact validator passes, and `risk-gate.autoStopRequired` is false
 - Auto-fix critical (max 3 cycles)
 - Escalate to user after 3 failed cycles
 
@@ -189,6 +189,15 @@ Skip the step entirely when `CK_SIMPLIFY_DISABLED=1` or
 - User approves or aborts
 
 **Output:** `✓ Step 5: Review [score]/10 - [Approved|Auto-approved] - code-reviewer subagent invoked`
+
+**Artifact gate:** Step 5 must write review artifacts from
+`claude/skills/_shared/references/workflow-artifacts.md` and run:
+
+```bash
+node claude/hooks/workflow-artifact-gate.cjs --stage finalize --artifact-dir <artifact-dir>
+```
+
+For high-risk `--auto`, stop with AskUserQuestion before finalize/commit/ship unless `risk-gate.json` has `humanApproved: true`.
 
 ## Step 6: Finalize
 
@@ -236,14 +245,14 @@ Legend: `[R]` = Review Gate (human approval required)
 
 ```
 interactive: 0 → 1 → [R] → 2 → [R] → 3 → [R] → 4 → [R] → 5(user) → 6
-auto:        0 → 1 → 2 → 3 → 4 → 5(auto) → 6 → next phase (NO stops)
+auto:        0 → 1 → 2 → 3 → 4 → 5(artifact-gated auto) → 6 → next phase (stops on high risk)
 fast:        0 → skip → 2(fast) → [R] → 3 → [R] → 4 → [R] → 5(simple) → 6
 parallel:    0 → 1? → [R] → 2(parallel) → [R] → 3(multi-agent) → [R] → 4 → [R] → 5(user) → 6
 no-test:     0 → 1 → [R] → 2 → [R] → 3 → [R] → skip → 5(user) → 6
 code:        0 → skip → skip → 3 → [R] → 4 → [R] → 5(user) → 6
 ```
 
-**Key difference:** `auto` mode is the ONLY mode that skips all review gates.
+**Key difference:** `auto` mode skips human review gates only for low-risk, artifact-validated work.
 
 ## Critical Rules
 

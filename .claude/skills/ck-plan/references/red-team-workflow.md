@@ -33,6 +33,8 @@ Launch reviewers simultaneously via Task tool with `subagent_type: "code-reviewe
 Each reviewer prompt MUST include override, persona, plan file paths, and hostile instructions.
 Load: `references/red-team-personas.md` for reviewer prompt template.
 
+If a reviewer or controller writes report artifacts, create the plan `reports/` directory first and use a plan-scoped descriptive filename. Use names like `from-code-reviewer-to-planner-red-team-security-adversary-plan-review-report.md`. Never use generic names such as `red-team-review.md`, `review.md`, `report.md`, or `notes.md`. If filename guidance rejects a write, retry immediately with a descriptive filename and continue the review.
+
 ### Step 5: Collect, Deduplicate & Cap
 1. Collect all findings
 2. Deduplicate overlapping findings
@@ -94,4 +96,5 @@ Add `--auto` only when the user explicitly asks for autonomous implementation.
 - Deduplicate aggressively
 - Adjudication must be evidence-based
 - Reviewers read plan files directly
+- Report artifacts use the provided reports path and descriptive plan-scoped filenames
 - Never recommend cooking until the whole-plan consistency sweep has no unresolved contradictions

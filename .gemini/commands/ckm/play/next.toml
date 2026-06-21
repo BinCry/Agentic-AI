@@ -1,0 +1,14 @@
+description = "Show and execute next ready playbook step"
+prompt = """
+Show smart suggestions and execute the next ready step in a playbook.
+
+<args>next {{args}}</args>
+
+## Workflow
+
+1. **Parse Arguments** — extract optional playbook name from `{{args}}`
+2. **Activate Skill** — route to `ckm:play` skill with `next {{args}}`
+
+## Skill Used
+- `ckm:play` — Marketing playbook orchestrator
+"""

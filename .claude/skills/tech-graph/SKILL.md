@@ -2,7 +2,7 @@
 name: ck:tech-graph
 description: >-
   Generate production-quality SVG+PNG technical diagrams — architecture, data
-  flow, flowchart, sequence, agent/memory, or concept maps — across 7 visual
+  flow, flowchart, sequence, agent/memory, or concept maps — across 8 visual
   styles. Use when user wants "generate diagram", "draw diagram", "visualize",
   "architecture diagram", "flowchart", or any system/flow they want illustrated.
   Pairs with /ck:preview --diagram for visual self-review and /ck:mermaidjs-v11
@@ -18,8 +18,8 @@ metadata:
   attribution: "Vendored from fireworks-tech-graph by yizhiyanhua-ai (MIT)"
   license: MIT
   upstream: "github.com/yizhiyanhua-ai/fireworks-tech-graph"
-  upstream_sha: "7b22cdd"
-  imported_at: "2026-04-28"
+  upstream_sha: "8925283"
+  imported_at: "2026-06-03"
 ---
 
 # Tech Graph
@@ -85,7 +85,7 @@ python3 ./scripts/generate-from-template.py architecture ./output/arch.svg '{"ti
 1. **Classify** the diagram type (see Diagram Types below)
 2. **Extract structure** — identify layers, nodes, edges, flows, and semantic groups from user description
 3. **Plan layout** — apply the layout rules for the diagram type
-4. **Load style reference** — always load `references/style-1-flat-icon.md` unless user specifies another; load the matching `references/style-N.md` for exact color tokens and SVG patterns
+4. **Load style reference** — always load `references/style-1-flat-icon.md` unless user specifies another; load the matching numbered style reference for exact color tokens and SVG patterns. Style 8 is AI-authored: load `references/style-8-dark-luxury.md` and hand-craft the SVG directly instead of using `generate-from-template.py`.
 5. **Map nodes to shapes** — use Shape Vocabulary below
 6. **Check icon needs** — load `references/icons.md` for known products
 7. **Write SVG** with adaptive strategy (see SVG Generation Strategy below)
@@ -107,7 +107,7 @@ python3 ./scripts/generate-from-template.py architecture ./output/arch.svg '{"ti
 Nodes = services/components. Group into **horizontal layers** (top→bottom or left→right).
 - Typical layers: Client → Gateway/LB → Services → Data/Storage
 - Use `<rect>` dashed containers to group related services in the same layer
-- Arrow direction follows data/request flow
+- Arrow direction follows data or request flow
 - ViewBox: `0 0 960 600` standard, `0 0 960 800` for tall stacks
 
 ### Data Flow Diagram
@@ -320,7 +320,8 @@ Always include a **legend** when 2+ arrow types are used.
 - Snap to 8px grid: horizontal 120px intervals, vertical 120px intervals
 
 **Arrow Labels** (CRITICAL):
-- MUST have background rect: `<rect fill="canvas_bg" opacity="0.95"/>` with 4px horizontal, 2px vertical padding
+- **Offset-first**: place labels 6-8px above horizontal arrows, or 8px left/right of vertical arrows. Do not overlap the arrow line.
+- **Background fallback**: add `<rect fill="canvas_bg" opacity="0.95"/>` only when the offset label still crosses another visual element.
 - Place mid-arrow, ≤3 words, stagger by 15-20px when multiple arrows converge
 - Maintain 10px safety distance from nodes
 
@@ -329,6 +330,7 @@ Always include a **legend** when 2+ arrow types are used.
 - Anchor arrows on component edges, not geometric centers
 - Route around dense node clusters, use different y-offsets for parallel arrows
 - Jump-over arcs (5px radius) for unavoidable crossings
+- For JSON/template rendering, set `"label_style": "offset"` on individual arrows when badge backgrounds create visual clutter; default `"badge"` preserves legacy output.
 
 **Line Overlap Prevention** (CRITICAL - most common bug on Codex):
 When two arrows must cross each other, ALWAYS use jump-over arcs to prevent visual overlap:
@@ -340,7 +342,7 @@ When two arrows must cross each other, ALWAYS use jump-over arcs to prevent visu
 **Validation Checklist** (run before finalizing):
 1. **Arrow-Component Collision**: Arrows MUST NOT pass through component interiors (route around with orthogonal paths)
 2. **Text Overflow**: All text MUST fit with 8px padding (estimate: `text.length × 7px ≤ shape_width - 16px`)
-3. **Arrow-Text Alignment**: Arrow endpoints MUST connect to shape edges (not floating); all arrow labels MUST have background rects
+3. **Arrow-Text Alignment**: Arrow endpoints MUST connect to shape edges (not floating); arrow labels should not overlap arrow lines (use offset positioning or background rects)
 4. **Container Discipline**: Prefer arrows entering and leaving section containers through open gaps between components, not through inner component bodies
 
 ## SVG Technical Rules
@@ -421,12 +423,13 @@ rsvg-convert file.svg -o /tmp/test.png 2>&1 && echo "✓ Valid" && rm /tmp/test.
 | 5 | **Glassmorphism** | Dark gradient | Product sites, keynotes |
 | 6 | **Claude Official** | Warm cream `#f8f6f3` | Anthropic-style diagrams |
 | 7 | **OpenAI Official** | Pure white `#ffffff` | OpenAI-style diagrams |
+| 8 | **Dark Luxury** *(AI-authored)* | Deep black `#0a0a0a` | Premium editorial architecture/docs |
 
-Load `references/style-N.md` for exact color tokens and SVG patterns.
+Load the matching numbered style reference for exact color tokens and SVG patterns.
 
 ## Style Selection
 
-**Default**: Style 1 (Flat Icon) for most diagrams. Load `references/style-diagram-matrix.md` for detailed style-to-diagram-type recommendations.
+**Default**: Style 1 (Flat Icon) for most diagrams. Load `references/style-diagram-matrix.md` for detailed style-to-diagram-type recommendations. Use Style 8 only when the user asks for a premium dark editorial look; it is not supported by the template generator.
 
 These patterns appear frequently — internalize them:
 

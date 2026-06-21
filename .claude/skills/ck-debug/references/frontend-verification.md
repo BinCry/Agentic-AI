@@ -1,6 +1,8 @@
 # Frontend Verification
 
-Visual verification of frontend implementations using Chrome MCP / `chrome-devtools-mcp`, `ck:agent-browser`, or project-native browser tests.
+Visual verification of frontend implementations using `ck:agent-browser`, `ck:chrome-profile`, Chrome MCP / `chrome-devtools-mcp`, or project-native browser tests.
+
+Reason first: does this verification need real Chrome profile state? If no, Chrome MCP is safe for generic pages and low-level inspection. If yes, open the page with `ck:chrome-profile` first and bind to the exact selector it returns. Do not create or navigate profile-scoped tabs with raw Chrome MCP tools.
 
 ## Applicability Check
 
@@ -11,28 +13,32 @@ Visual verification of frontend implementations using Chrome MCP / `chrome-devto
 
 If none match, skip this technique.
 
-## Step 1: Detect Chrome MCP Availability
+## Step 1: Detect Browser Bridge Availability
 
-Check if Chrome MCP server is available via `ListMcpResourcesTool`:
+First decide whether the verification needs real user Chrome state.
 
+- No real login/cookies needed: use `ck:agent-browser`, Chrome MCP, or project-native browser tests.
+- Real user login/cookies/profile needed: invoke `ck:chrome-profile` and run:
+
+```bash
+chrome-profile doctor
 ```
-Use ListMcpResourcesTool to check for Chrome MCP tools.
-Look for tools prefixed with "chrome__" (e.g., chrome__navigate, chrome__screenshot).
-```
 
-**Available** → Proceed to Step 2A (Chrome MCP)
-**Not available** → Proceed to Step 2B (agent-browser or project-native fallback)
+**ok=true** → Proceed to Step 2A (Chrome profile + MCP)
+**ok=false** → Follow the skill's setup playbook, or use `ck:agent-browser` / project-native browser tests if profile state is not required.
 
-## Step 2A: Chrome MCP Available — Direct Verification
+## Step 2A: Chrome Profile Available — Direct Verification
 
-Use Chrome MCP tools to verify the implementation in the user's actual browser. Ensure dev server is running first.
+Use `chrome-profile <key> <url>` to open the implementation in the user's actual browser profile. Ensure dev server is running first.
 
 ### Navigate & Screenshot
 
 ```
-1. chrome__navigate → http://localhost:3000 (or project dev URL)
-2. chrome__screenshot → capture current page state
-3. Read the screenshot with Read tool to visually inspect
+1. `chrome-profile open --json <key> http://localhost:3000`
+2. List MCP pages/tabs and select the tab whose URL contains the returned `bind_selector`
+3. Verify the selected tab URL also contains `cdp-profile=<key>`
+4. Capture screenshot or snapshot through the active MCP bridge
+5. Read the screenshot with Read tool to visually inspect
 ```
 
 ### Visual Inspection Checklist
@@ -58,18 +64,21 @@ Or navigate and observe any error output from Chrome MCP tool responses.
 chrome__get_content → extract DOM/text to verify rendered output matches expectations
 ```
 
-## Step 2B: Chrome MCP NOT Available — Fallback to agent-browser
+## Step 2B: Real Chrome Profile NOT Required — Generic Browser Fallback
 
 ```bash
-# Screenshot + console error check
+# Use agent-browser for ad-hoc visual checks.
 agent-browser open http://localhost:3000
 agent-browser screenshot -o ./verification-screenshot.png
+
+# Prefer the project's own browser tests for repeatable evidence.
+npm run test:e2e
 ```
 
 For repeatable test evidence, prefer the project's Playwright/Vitest/Cypress commands if present.
 
 If no browser tool is available, skip visual verification and note in report:
-> "Visual verification skipped — no Chrome MCP, agent-browser, or project-native browser test available."
+> "Visual verification skipped — no Chrome profile bridge, agent-browser, or project-native browser test available."
 
 ## Step 3: Analyze Results
 
@@ -90,7 +99,7 @@ Standard verification → Tests pass → Build succeeds → Frontend visual veri
 Report format:
 ```
 ## Frontend Verification
-- Method: [Chrome MCP | agent-browser | project-native browser test | skipped]
+- Method: [agent-browser | chrome-profile | Chrome MCP | project-native browser test | skipped]
 - Screenshot: ./verification-screenshot.png
 - Console errors: [none | list]
 - Visual check: [pass | issues found]

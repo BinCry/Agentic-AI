@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/Siinn/Downloads/claudekit/.codex/hooks/6cbdb017-simplify-gate.cjs\"",
+            "_origin": "engineer"
+          }
+        ]
+      }
+    ]
+  }
+}

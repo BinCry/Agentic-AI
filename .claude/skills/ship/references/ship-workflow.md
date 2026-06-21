@@ -165,7 +165,36 @@ Write a technical journal entry capturing this ship session. Run as **background
    - Topic: summary of shipped changes (from commit messages + diff stats)
    - Include: what was shipped, key decisions, technical challenges encountered
    - Output: saved to `./docs/journals/` directory
-2. Don't wait for completion — continue to next step immediately.
+2. If a local journal file is produced before PR creation, optionally publish it to AgentWiki:
+   - Build publish content as markdown: `## Summary` with 2-4 concise bullets, then the full journal body. Redact secrets, tokens, customer data, private URLs, and raw logs before upload.
+   - Detect CLI first:
+     ```bash
+     command -v agentwiki >/dev/null 2>&1
+     ```
+   - If CLI exists, identify the project doc folder from the current repo:
+     ```bash
+     gh repo view --json nameWithOwner --jq .nameWithOwner
+     agentwiki doc-folders list --json --full-ids
+     ```
+   - Prefer an existing folder whose path or name exactly matches `<repo-owner>/<repo-name>` or `<repo-name>`. If none exists, create the missing project folder under the closest existing owner/project parent; if no suitable parent exists, create `<repo-name>` at the root.
+   - Publish the prepared markdown with title, category, tags, and folder:
+     ```bash
+     agentwiki doc upload <prepared-journal-file> \
+       --title "<YYYY-MM-DD> <ship summary>" \
+       --category "technical-diary" \
+       --tags "technical-diary,journal,ship,<repo-name>,<branch-name>,<ship-mode>" \
+       --folder <folder-id> \
+       --json
+     ```
+   - If CLI is missing but AgentWiki MCP document tools exist, use MCP to create the same project folder when needed, then create a document with:
+     - Title: `<YYYY-MM-DD> <ship summary>`
+     - Category: `technical-diary`
+     - Tags: `technical-diary`, `journal`, `ship`, repo name, branch name, ship mode
+     - Content: the prepared markdown with summary first, then full journal body
+     - Folder: the matching project folder ID when discoverable or newly created
+   - If neither CLI nor MCP exists, skip AgentWiki publish silently. Do not fail ship.
+   - If AgentWiki exists but returns auth, permission, quota, or network errors, record the error in ship output and continue unless the user explicitly requested AgentWiki publish as mandatory.
+3. Don't wait for background journal completion — continue to next step immediately. If the note completes after PR creation, publish then and update final output with the document URL or ID when available.
 
 ## Step 9: Docs Update (conditional, background)
 

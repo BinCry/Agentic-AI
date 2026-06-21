@@ -77,6 +77,15 @@ test('hard-blocks ship verb when LOC threshold breached', () => {
   assert.match(out.reason, /code-simplifier/);
 });
 
+test('hard-blocks explicit ship commands while ignoring bare ship text', () => {
+  const dir = makeRepo();
+  writeBigFile(dir, 'big.ts', 600);
+  for (const prompt of ['/ck:ship', '/ship', 'ready to ship', 'please ship this']) {
+    const r = runHook({ cwd: dir, prompt });
+    assert.strictEqual(r.status, 2, `prompt should hard-block: ${prompt}`);
+  }
+});
+
 test('hard-blocks merge/pr/deploy/publish too', () => {
   const dir = makeRepo();
   writeBigFile(dir, 'big.ts', 600);
@@ -126,7 +135,10 @@ test('ignores false-positive prompts with negation or "ship on"', () => {
     'What ports does the API ship on?',
     'Check the relationship between X and Y',
     'Update the merger function',
-    'never ship a Friday hotfix'
+    'never ship a Friday hotfix',
+    'ship',
+    'Update the ship model entity',
+    'ship entity appears in product copy'
   ];
   for (const prompt of cases) {
     const r = runHook({ cwd: dir, prompt });

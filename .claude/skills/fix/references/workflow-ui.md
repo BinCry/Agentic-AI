@@ -54,7 +54,7 @@ Screenshot + `ck:ai-multimodal` analysis.
 
 ### Step 4: DevTools Check
 `TaskUpdate(T4, status="in_progress")`
-Use `ck:agent-browser`, Chrome MCP / `chrome-devtools-mcp`, or project-native browser tests.
+Use `ck:agent-browser`, `ck:chrome-profile`, Chrome MCP / `chrome-devtools-mcp`, or project-native browser tests.
 
 `TaskUpdate(T4, status="completed")`
 

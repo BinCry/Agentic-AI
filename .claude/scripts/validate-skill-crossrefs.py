@@ -40,8 +40,8 @@ SKIP_DIRS = frozenset({"_shared", "template-skill", "common", ".venv",
 # Note: test and journal are intentionally omitted from chains because they're
 # optional steps (--fast skips test, journal is terminal/post-hoc).
 EXPECTED_CHAINS = {
-    "development": ["ck-plan", "cook", "code-review", "ship"],
-    "bugfix": ["scout", "ck-debug", "fix", "code-review"],
+    "development": ["ck-plan", "cook", "ck-code-review", "ship"],
+    "bugfix": ["scout", "ck-debug", "fix", "ck-code-review"],
     "investigation": ["scout", "ck-debug", "brainstorm"],
 }
 

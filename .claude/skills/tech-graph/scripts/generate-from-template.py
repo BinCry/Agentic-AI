@@ -383,6 +383,16 @@ def normalize_text(value: object) -> str:
     return escape(str(value)) if value is not None else ""
 
 
+# Style 8 is AI-authored: the AI reads references/style-8-dark-luxury.md and hand-crafts
+# the SVG directly. It cannot be driven by this template generator.
+_AI_AUTHORED_STYLES: Dict[int, str] = {8: "Style 8 (Dark Luxury)"}
+_AI_AUTHORED_ALIASES = {"dark luxury", "dark-luxury"}
+_AI_AUTHORED_MSG = (
+    "{name} is an AI-authored style and cannot be used with generate-from-template.py. "
+    "Load references/style-8-dark-luxury.md for the full spec and hand-craft the SVG directly."
+)
+
+
 def parse_style(raw: object) -> Tuple[int, Dict[str, object]]:
     if raw is None:
         index = 1
@@ -393,8 +403,12 @@ def parse_style(raw: object) -> Tuple[int, Dict[str, object]]:
         if text.isdigit():
             index = int(text)
         else:
+            if text in _AI_AUTHORED_ALIASES:
+                raise ValueError(_AI_AUTHORED_MSG.format(name=_AI_AUTHORED_STYLES[8]))
             names = {profile["name"].lower(): key for key, profile in STYLE_PROFILES.items()}
             index = names.get(text, 1)
+    if index in _AI_AUTHORED_STYLES:
+        raise ValueError(_AI_AUTHORED_MSG.format(name=_AI_AUTHORED_STYLES[index]))
     if index not in STYLE_PROFILES:
         raise ValueError(f"Unsupported style: {raw}")
     return index, copy.deepcopy(STYLE_PROFILES[index])
@@ -777,6 +791,20 @@ def route_uses_lane(points: Sequence[Point], value: float, axis: str, tolerance:
     return any(abs(y - value) <= tolerance for _, y in points)
 
 
+def collision_count(points: Sequence[Point], obstacles: Sequence[Bounds]) -> int:
+    """Count how many (segment, obstacle) pairs collide."""
+    return sum(
+        1
+        for p1, p2 in zip(points, points[1:])
+        for obstacle in obstacles
+        if segment_hits_bounds(p1, p2, obstacle)
+    )
+
+
+def route_is_orthogonal(points: Sequence[Point]) -> bool:
+    return all(segment_axis(p1, p2) != "other" for p1, p2 in zip(points, points[1:]))
+
+
 def route_score(
     points: Sequence[Point],
     hint_x: Sequence[float],
@@ -826,11 +854,7 @@ def simplify_points(points: Sequence[Point]) -> List[Point]:
 
 
 def route_collides(points: Sequence[Point], obstacles: Sequence[Bounds]) -> bool:
-    for p1, p2 in zip(points, points[1:]):
-        for obstacle in obstacles:
-            if segment_hits_bounds(p1, p2, obstacle):
-                return True
-    return False
+    return collision_count(points, obstacles) > 0
 
 
 def build_orthogonal_route(
@@ -888,20 +912,41 @@ def build_orthogonal_route(
         for y in hint_y:
             candidates.append([start, inner_start, (x, ssy), (x, y), (eex, y), inner_end, end])
 
+    default_route = simplify_points([start, inner_start, (eex, ssy), inner_end, end])
+    default_coll = collision_count(default_route, expanded)
+    default_raw_coll = collision_count(default_route, obstacles)
+    default_length = route_length(default_route)
     best_route: Optional[List[Point]] = None
     best_score = float("inf")
+    best_fallback: Optional[List[Point]] = None
+    best_fb_coll = float("inf")
+    best_fb_score = float("inf")
     for candidate in candidates:
         simplified = simplify_points(candidate)
-        if route_collides(simplified, expanded):
-            continue
+        coll = collision_count(simplified, expanded)
         score = route_score(simplified, hint_x, hint_y, source_port, target_port)
-        if score < best_score:
-            best_score = score
-            best_route = simplified
+        if coll == 0:
+            if score < best_score:
+                best_score = score
+                best_route = simplified
+        elif route_is_orthogonal(simplified):
+            length = route_length(simplified)
+            raw_coll = collision_count(simplified, obstacles)
+            if (
+                coll < default_coll
+                and raw_coll <= default_raw_coll
+                and length <= default_length
+                and (coll < best_fb_coll or (coll == best_fb_coll and score < best_fb_score))
+            ):
+                best_fb_coll = coll
+                best_fb_score = score
+                best_fallback = simplified
 
     if best_route is not None:
         return best_route
-    return simplify_points([start, inner_start, (eex, ssy), inner_end, end])
+    if best_fallback is not None:
+        return best_fallback
+    return default_route
 
 
 def choose_label_position(points: Sequence[Point]) -> Point:
@@ -929,16 +974,15 @@ def marker_for_color(style: Dict[str, object], color: str, arrow_data: Dict[str,
     return "url(#arrowA)"
 
 
-def render_label_badge(x: float, y: float, text: str, style: Dict[str, object]) -> str:
+def render_label_badge(x: float, y: float, text: str, style: Dict[str, object], label_style: str = "offset") -> str:
     width = max(36, len(text) * 7 + 14)
-    bg = style_value(style, "arrow_label_bg")
-    opacity = style_value(style, "arrow_label_opacity")
-    return "\n".join(
-        [
-            f'  <rect x="{round(x - width / 2, 2)}" y="{round(y - 10, 2)}" width="{width}" height="20" rx="6" fill="{bg}" opacity="{opacity}"/>',
-            f'  <text x="{round(x, 2)}" y="{round(y + 4, 2)}" text-anchor="middle" class="arrow-label">{normalize_text(text)}</text>',
-        ]
-    )
+    parts: List[str] = []
+    if label_style == "badge":
+        bg = style_value(style, "arrow_label_bg")
+        opacity = style_value(style, "arrow_label_opacity")
+        parts.append(f'  <rect x="{round(x - width / 2, 2)}" y="{round(y - 10, 2)}" width="{width}" height="20" rx="6" fill="{bg}" opacity="{opacity}"/>')
+    parts.append(f'  <text x="{round(x, 2)}" y="{round(y + 4, 2)}" text-anchor="middle" class="arrow-label">{normalize_text(text)}</text>')
+    return "\n".join(parts)
 
 
 def rectangle_bounds(x: float, y: float, width: float, height: float) -> Bounds:
@@ -1388,7 +1432,7 @@ def render_arrow(
         label_x, label_y = choose_label_position_avoiding(route, label, label_obstacles)
         label_x += to_float(arrow.get("label_dx", 0))
         label_y += to_float(arrow.get("label_dy", -4))
-        label_svg = render_label_badge(label_x, label_y, label, style)
+        label_svg = render_label_badge(label_x, label_y, label, style, label_style=str(arrow.get("label_style", "badge")))
         label_bounds = estimate_label_bounds(label_x, label_y, label)
     return path, label_svg, label_bounds
 
@@ -1450,6 +1494,11 @@ def build_svg(template_type: str, data: Dict[str, object]) -> str:
     arrows_data = data.get("arrows", [])
     legend = data.get("legend", [])
 
+    # Assign auto_place y before building node maps so arrows route correctly.
+    for node_data in nodes_data:
+        if "y" not in node_data and node_data.get("auto_place"):
+            node_data["y"] = content_start_y + to_float(node_data.get("offset_y", 0))
+
     normalized_nodes = [normalize_node(node, f"node-{idx}") for idx, node in enumerate(nodes_data)]
     node_map = {node.node_id: node for node in normalized_nodes}
 
@@ -1500,8 +1549,6 @@ def build_svg(template_type: str, data: Dict[str, object]) -> str:
     lines.extend(path for path in arrow_paths if path)
 
     for node_data in nodes_data:
-        if "y" not in node_data and node_data.get("auto_place"):
-            node_data["y"] = content_start_y + to_float(node_data.get("offset_y", 0))
         lines.append(render_node(node_data, style))
 
     lines.extend(label for label in arrow_labels if label)
