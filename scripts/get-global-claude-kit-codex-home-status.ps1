@@ -104,6 +104,7 @@ $restartRequired = (
     ($doctorStatus.status -eq "mismatch")
 )
 $canRemoveLegacyHomeNow = $legacyExists -and ($normalizedConfiguredHome -eq $targetHome) -and $authExists -and ($codexProcessCount -eq 0)
+$legacyCleanupManagedByWatcher = $legacyExists -and ($cleanupWatcherStatus -eq "running")
 
 $nextStep = if (-not $targetExists) {
     "Run install-claude-kit-globally-to-codex-home.ps1 to create the target Codex home on D:."
@@ -148,6 +149,7 @@ $status = [pscustomobject]@{
     codexProcessCount = $codexProcessCount
     cleanupWatcherCount = $cleanupWatcherCount
     cleanupWatcherStatus = $cleanupWatcherStatus
+    legacyCleanupManagedByWatcher = $legacyCleanupManagedByWatcher
     doctorCheckStatus = $doctorStatus.status
     doctorCodexHome = $doctorStatus.codexHome
     doctorMatchesTarget = $doctorStatus.matchesTarget
@@ -176,6 +178,7 @@ Write-Host ("Legacy home exists: " + $status.legacyHomeExists)
 Write-Host ("Safe to remove legacy home now: " + $status.canRemoveLegacyHomeNow)
 Write-Host ("Codex processes: " + $status.codexProcessCount)
 Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
+Write-Host ("Watcher manages legacy cleanup: " + $status.legacyCleanupManagedByWatcher)
 Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
 if ($status.doctorConfigPath) {
     Write-Host ("Doctor config legacy subagent block: " + $status.doctorConfigHasLegacySubagentBlock)
