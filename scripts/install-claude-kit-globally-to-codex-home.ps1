@@ -287,6 +287,8 @@ if ($SkipEnvironmentUpdate) {
     Write-Host "Skipped CODEX_HOME environment update because -SkipEnvironmentUpdate was used."
 } else {
     Write-Host "Restart VS Code/Codex, then verify with: codex doctor"
+    Write-Host "Run the Claude-Kit verifier for static checks:"
+    Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "verify-global-claude-kit-codex-home.ps1") + " -TargetCodexHome " + $targetHome)
     Write-Host "When the new home looks correct, remove the old C drive home with:"
     Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "remove-legacy-codex-home-after-migration.ps1") + " -ExpectedCodexHome " + $targetHome)
     if ($StartCleanupWatcher) {

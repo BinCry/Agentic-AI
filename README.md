@@ -228,6 +228,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-t
 codex doctor
 ```
 
+You can also run the Claude-Kit verifier for the static wiring checks:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-global-claude-kit-codex-home.ps1 -TargetCodexHome D:\CodexHome
+```
+
 3. After `codex doctor` confirms `CODEX_HOME` is `D:\CodexHome`, remove the old home on `C:` to free disk space:
 
 ```powershell
