@@ -20,7 +20,12 @@ $filesToCopy = @(
     "config.toml",
     "AGENTS.md",
     "installation_id",
-    "cap_sid"
+    "cap_sid",
+    "models_cache.json",
+    "session_index.jsonl",
+    "version.json",
+    ".personality_migration",
+    ".sandbox_migration"
 )
 
 $dirsToCopy = @(
@@ -32,6 +37,20 @@ $dirsToCopy = @(
     "tmp",
     "vendor_imports"
 )
+
+if ($hasLegacyHome) {
+    $sqliteStateFiles = @(
+        Get-ChildItem -LiteralPath $legacyHome -File -Force -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -like "*.sqlite" -or
+                $_.Name -like "*.sqlite-shm" -or
+                $_.Name -like "*.sqlite-wal"
+            } |
+            ForEach-Object { $_.Name }
+    )
+
+    $filesToCopy = @($filesToCopy + $sqliteStateFiles | Sort-Object -Unique)
+}
 
 foreach ($relativePath in $filesToCopy) {
     if (-not $hasLegacyHome) {
@@ -72,7 +91,7 @@ $env:CODEX_HOME = $targetHome
 
 Write-Host "CODEX_HOME migrated to $targetHome" -ForegroundColor Green
 if ($hasLegacyHome) {
-    Write-Host "Important state copied: config, auth, plugins, cache, sessions."
+    Write-Host "Important state copied: config, auth, plugins, cache, sessions, SQLite state, and indexes."
 } else {
     Write-Host "No legacy Codex home found at $legacyHome. Initialized a fresh CODEX_HOME instead."
 }

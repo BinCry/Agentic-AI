@@ -210,6 +210,8 @@ Use this when you want:
 powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome
 ```
 
+The migration step preserves config/auth, session indexes, and top-level Codex SQLite state files when they already exist in the legacy home.
+
 If you also want the installer to start the cleanup watcher in the background immediately:
 
 ```powershell
@@ -271,6 +273,8 @@ Use this when you want `CODEX_HOME` on `D:` but only specific trusted projects s
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-home-on-d-drive.ps1 -TargetCodexHome D:\CodexHome
 ```
+
+This migration preserves config/auth, session indexes, and top-level Codex SQLite state files when they already exist in the legacy home.
 
 2. Attach Claude-Kit only to the project you choose
 
