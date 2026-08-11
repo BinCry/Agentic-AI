@@ -88,6 +88,7 @@ npx tsx cli.ts call-tool <server> <tool> '<json-args>'
 - **Stdin piping is mandatory for Gemini MCP tasks.** `--prompt` is fine for non-MCP tasks (research, analysis) but historically reports MCP init issues in headless mode.
 - **GEMINI.md is the response-format contract.** Don't bypass it — parseable JSON is what makes the output usable.
 - **Direct scripts are not optional infrastructure.** They are the only path when Gemini is unavailable, when MCP servers are stdio-only and not registered with Claude Code's own MCP layer, or when a task needs deterministic tool selection. Built-in `ListMcpResourcesTool` / `ReadMcpResourceTool` only see servers Claude Code itself has registered — different namespace from `.claude/.mcp.json`.
+- **Chrome DevTools MCP is profile-blind.** Before using Chrome DevTools MCP navigation, decide whether the task needs a specific real Chrome profile. If not, use the MCP tools normally for generic browser inspection. If it does, invoke `ck:chrome-profile` first. Use `chrome-profile open --json <key> <url>`, select the page whose URL contains the returned `bind_selector`, then use Chrome DevTools MCP only to inspect or operate on that selected page. Do not use raw `new_page` or `navigate_page` for profile-scoped work.
 - **`mcp-builder` is NOT a fallback for tool execution.** `mcp-builder` builds new MCP servers from templates; it does not consume existing ones. If a needed server is missing entirely, that's when `mcp-builder` applies.
 
 ## Anti-Pattern for MCP Tasks
