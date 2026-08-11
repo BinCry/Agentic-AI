@@ -192,3 +192,33 @@ Nếu bạn dùng bản copy trong project khác, nên cập nhật có chọn l
 
 - GitHub: `https://github.com/BinCry/Claude_Kit`
 
+## Windows Codex Setup On D Drive
+
+If you want Codex state on `D:` and do not want Claude-Kit to load in every project, use the local scripts in this repo instead of installing Claude-Kit globally.
+
+1. Move `CODEX_HOME` to `D:\CodexHome`
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-home-on-d-drive.ps1 -TargetCodexHome D:\CodexHome
+```
+
+2. Attach Claude-Kit only to the project you choose
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\attach-claude-kit-to-project.ps1 -ProjectPath D:\my-project
+```
+
+3. Detach it from that project when you no longer want it there
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\detach-claude-kit-from-project.ps1 -ProjectPath D:\my-project
+```
+
+4. After you restart Codex / VS Code and confirm `codex doctor` uses `D:\CodexHome`, remove the old home on `C:` to free disk space
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-after-migration.ps1 -ExpectedCodexHome D:\CodexHome
+```
+
+This keeps the global Codex home on `D:\CodexHome`, while Claude-Kit is loaded only in projects that you explicitly attach and trust.
+
