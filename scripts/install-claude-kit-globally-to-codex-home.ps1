@@ -23,7 +23,14 @@ function New-BackupSnapshot {
         [string]$CodexHomePath
     )
 
-    $backupDir = Join-Path $CodexHomePath ("claudekit-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+    $backupBaseName = "claudekit-backup-" + (Get-Date -Format "yyyyMMdd-HHmmss")
+    $backupDir = Join-Path $CodexHomePath $backupBaseName
+    $suffix = 1
+    while (Test-Path -LiteralPath $backupDir) {
+        $backupDir = Join-Path $CodexHomePath ($backupBaseName + "-" + $suffix.ToString("00"))
+        $suffix++
+    }
+
     Ensure-Directory -Path $backupDir
 
     foreach ($relativePath in @("config.toml", "hooks.json", "AGENTS.md")) {

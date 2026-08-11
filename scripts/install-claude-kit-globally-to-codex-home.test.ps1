@@ -79,7 +79,7 @@ model = "cx/gpt-5.5"
     Assert-True -Condition (-not $configText.Contains("[agents.subagent]")) -Message "Legacy [agents.subagent] block still exists."
     Assert-True -Condition $configText.Contains('default_subagent_model = "cx/gpt-5.5"') -Message "default_subagent_model was not normalized into config."
     Assert-True -Condition $configText.Contains('# --- ck-managed-agents-start ---') -Message "Managed Claude-Kit config block missing."
-    Assert-True -Condition ($backupDirs.Count -ge 1) -Message "Backup snapshot directory was not created."
+    Assert-True -Condition ($backupDirs.Count -eq 2) -Message "Expected 2 distinct backup snapshots after running installer twice."
 
     $hasBom = $hooksBytes.Length -ge 3 -and $hooksBytes[0] -eq 0xEF -and $hooksBytes[1] -eq 0xBB -and $hooksBytes[2] -eq 0xBF
     Assert-True -Condition (-not $hasBom) -Message "hooks.json was written with a UTF-8 BOM."
