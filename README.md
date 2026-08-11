@@ -194,7 +194,45 @@ Nếu bạn dùng bản copy trong project khác, nên cập nhật có chọn l
 
 ## Windows Codex Setup On D Drive
 
-If you want Codex state on `D:` and do not want Claude-Kit to load in every project, use the local scripts in this repo instead of installing Claude-Kit globally.
+You have 2 supported Windows setups depending on whether Claude-Kit should load in every Codex session or only in selected projects.
+
+### Option A: Global Claude-Kit for Every Project
+
+Use this when you want:
+
+- `CODEX_HOME` on `D:`
+- Claude-Kit skills, hooks, agents, and `AGENTS.md` loaded in every project
+- one shared Claude-Kit repo on disk instead of copying config into each project
+
+1. Install Claude-Kit globally into `D:\CodexHome`
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome
+```
+
+If `CODEX_HOME` was already moved earlier and you only want to refresh the global Claude-Kit wiring:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome -SkipStateMigration
+```
+
+2. Restart VS Code / Codex and verify:
+
+```powershell
+codex doctor
+```
+
+3. After `codex doctor` confirms `CODEX_HOME` is `D:\CodexHome`, remove the old home on `C:` to free disk space:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-after-migration.ps1 -ExpectedCodexHome D:\CodexHome
+```
+
+This mode preserves built-in Codex `.system` skills, keeps the writable Codex home on `D:\CodexHome`, and points global Claude-Kit skills/hooks/agents back to this repo so updates in `D:\Claude-Kit` are reused everywhere.
+
+### Option B: Project-Local Claude-Kit Only
+
+Use this when you want `CODEX_HOME` on `D:` but only specific trusted projects should load Claude-Kit.
 
 1. Move `CODEX_HOME` to `D:\CodexHome`
 

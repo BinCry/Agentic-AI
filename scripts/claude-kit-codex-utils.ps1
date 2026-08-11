@@ -89,7 +89,12 @@ function New-ManagedJunction {
 
     if (Test-Path -LiteralPath $TargetPath) {
         if (Test-IsReparsePoint -Path $TargetPath) {
-            Remove-Item -LiteralPath $TargetPath -Force
+            $existingReparsePoint = Get-Item -LiteralPath $TargetPath -Force
+            if ($existingReparsePoint.PSIsContainer) {
+                Remove-Item -LiteralPath $TargetPath -Force -Recurse
+            } else {
+                Remove-Item -LiteralPath $TargetPath -Force
+            }
         } elseif ($Force) {
             $existing = Get-Item -LiteralPath $TargetPath -Force
             if ($existing.PSIsContainer) {
@@ -160,5 +165,23 @@ function Save-JsonFile {
     )
 
     $json = $Data | ConvertTo-Json -Depth 8
-    Set-Content -LiteralPath $Path -Value $json -Encoding UTF8
+    Write-Utf8NoBomFile -Path $Path -Content $json
+}
+
+function Write-Utf8NoBomFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyString()]
+        [string]$Content
+    )
+
+    $targetParent = Split-Path -Parent $Path
+    if ($targetParent) {
+        Ensure-Directory -Path $targetParent
+    }
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
 }
