@@ -331,7 +331,7 @@ Build mobile apps with React Native, Flutter, Swift/SwiftUI, Kotlin/Jetpack Comp
 
 ### ðŸ“¦ ðŸ“š `shopify`
 
-Build Shopify apps, extensions, and themes with Shopify CLI, GraphQL Admin API, Polaris UI, Liquid, webhooks, billing, and app configuration workflows.
+Build Shopify apps, extensions, and themes with Shopify CLI. Use for GraphQL Admin API work, Polaris UI, Liquid storefronts, checkout customization, webhooks, billing, and app configuration workflows.
 
 **Location**: `.claude/skills/shopify/SKILL.md`
 

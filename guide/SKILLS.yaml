@@ -408,7 +408,7 @@ skills:
     keywords: ["react-native", "flutter", "swift", "kotlin", "ios"]
   - name: "shopify"
     path: "shopify/SKILL.md"
-    description: "Build Shopify apps, extensions, and themes with Shopify CLI, GraphQL Admin API, Polaris UI, Liquid, webhooks, billing, and app configuration workflows."
+    description: "Build Shopify apps, extensions, and themes with Shopify CLI. Use for GraphQL Admin API work, Polaris UI, Liquid storefronts, checkout customization, webhooks, billing, and app configuration workflows."
     category: "frameworks"
     has_scripts: true
     has_references: true

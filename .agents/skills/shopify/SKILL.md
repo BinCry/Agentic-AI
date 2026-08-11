@@ -1,6 +1,6 @@
 ---
 name: ck:shopify
-description: Build Shopify apps, extensions, and themes with Shopify CLI, GraphQL Admin API, Polaris UI, Liquid, webhooks, billing, and app configuration workflows.
+description: Build Shopify apps, extensions, and themes with Shopify CLI. Use for GraphQL Admin API work, Polaris UI, Liquid storefronts, checkout customization, webhooks, billing, and app configuration workflows.
 user-invocable: true
 when_to_use: "Invoke for Shopify apps, themes, extensions, or billing."
 category: frameworks
