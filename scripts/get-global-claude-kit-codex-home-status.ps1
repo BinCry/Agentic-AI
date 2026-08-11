@@ -7,6 +7,8 @@ param(
     [string]$ProcessCodexHome = "",
     [int]$CodexProcessCountOverride = -1,
     [int]$CleanupWatcherCountOverride = -1,
+    [switch]$RunCodexDoctor,
+    [string]$DoctorCodexHomeOverride = "",
     [switch]$PassThru
 )
 
@@ -17,14 +19,7 @@ if ([string]::IsNullOrWhiteSpace($ClaudeKitPath)) {
     $ClaudeKitPath = Join-Path $PSScriptRoot ".."
 }
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
-
-function Resolve-OptionalNormalizedPath {
-    param([string]$Path)
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return $null
-    }
-    return Resolve-NormalizedPath -Path $Path -AllowMissing
-}
+. (Join-Path $PSScriptRoot "claude-kit-codex-status-utils.ps1")
 
 function Test-LinkMatches {
     param(
@@ -69,41 +64,6 @@ function Test-ManagedHooksJson {
     }
 }
 
-function Get-BackupCount {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$CodexHomePath,
-        [Parameter(Mandatory = $true)]
-        [string]$Pattern
-    )
-    if (-not (Test-Path -LiteralPath $CodexHomePath)) {
-        return 0
-    }
-    return @(
-        Get-ChildItem -LiteralPath $CodexHomePath -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like $Pattern }
-    ).Count
-}
-
-function Get-CleanupWatcherCount {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$WatcherScriptName,
-        [int]$Override = -1
-    )
-    if ($Override -ge 0) {
-        return $Override
-    }
-    try {
-        return @(
-            Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction Stop |
-                Where-Object { $_.CommandLine -like ("*" + $WatcherScriptName + "*") }
-        ).Count
-    } catch {
-        return $null
-    }
-}
-
 $targetHome = Resolve-NormalizedPath -Path $TargetCodexHome -AllowMissing
 $legacyHome = Resolve-NormalizedPath -Path $LegacyCodexHome -AllowMissing
 $kitRoot = Resolve-NormalizedPath -Path $ClaudeKitPath
@@ -134,15 +94,21 @@ $uninstallBackupCount = Get-BackupCount -CodexHomePath $targetHome -Pattern "cla
 $codexProcessCount = if ($CodexProcessCountOverride -ge 0) { $CodexProcessCountOverride } else { @(Get-Process codex -ErrorAction SilentlyContinue).Count }
 $cleanupWatcherCount = Get-CleanupWatcherCount -WatcherScriptName "remove-legacy-codex-home-when-codex-exits.ps1" -Override $CleanupWatcherCountOverride
 $cleanupWatcherStatus = if ($null -eq $cleanupWatcherCount) { "unknown" } elseif ($cleanupWatcherCount -gt 0) { "running" } else { "not-running" }
+$doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
 
 $globalInstallHealthy = ($normalizedConfiguredHome -eq $targetHome) -and $targetExists -and $authExists -and $configHasManagedBlock -and $hooksCheck.isManaged -and $scoutCheck.matches -and $agentsCheck.matches -and $hooksDirCheck.matches -and $agentsFileInSync
-$restartRequired = ($null -ne $normalizedConfiguredHome) -and ($null -ne $normalizedProcessHome) -and ($normalizedConfiguredHome -ne $normalizedProcessHome)
+$restartRequired = (
+    (($null -ne $normalizedConfiguredHome) -and ($null -ne $normalizedProcessHome) -and ($normalizedConfiguredHome -ne $normalizedProcessHome)) -or
+    ($doctorStatus.status -eq "mismatch")
+)
 $canRemoveLegacyHomeNow = $legacyExists -and ($normalizedConfiguredHome -eq $targetHome) -and $authExists -and ($codexProcessCount -eq 0)
 
 $nextStep = if (-not $targetExists) {
     "Run install-claude-kit-globally-to-codex-home.ps1 to create the target Codex home on D:."
 } elseif ($normalizedConfiguredHome -ne $targetHome) {
     "Update user CODEX_HOME to $targetHome by rerunning the global installer."
+} elseif ($doctorStatus.status -eq "mismatch") {
+    "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome."
 } elseif ($restartRequired) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
 } elseif ($legacyExists -and $codexProcessCount -gt 0) {
@@ -174,6 +140,9 @@ $status = [pscustomobject]@{
     codexProcessCount = $codexProcessCount
     cleanupWatcherCount = $cleanupWatcherCount
     cleanupWatcherStatus = $cleanupWatcherStatus
+    doctorCheckStatus = $doctorStatus.status
+    doctorCodexHome = $doctorStatus.codexHome
+    doctorMatchesTarget = $doctorStatus.matchesTarget
     globalInstallHealthy = $globalInstallHealthy
     restartRequired = $restartRequired
     canRemoveLegacyHomeNow = $canRemoveLegacyHomeNow
@@ -194,6 +163,7 @@ Write-Host ("Legacy home exists: " + $status.legacyHomeExists)
 Write-Host ("Safe to remove legacy home now: " + $status.canRemoveLegacyHomeNow)
 Write-Host ("Codex processes: " + $status.codexProcessCount)
 Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
+Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
 Write-Host ("Install backups: " + $status.installBackupCount)
 Write-Host ("Uninstall backups: " + $status.uninstallBackupCount)
 Write-Host ("Next step: " + $status.nextStep) -ForegroundColor Yellow

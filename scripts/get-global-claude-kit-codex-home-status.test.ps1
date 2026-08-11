@@ -67,6 +67,23 @@ trust_level = "trusted"
     Assert-True -Condition $restartStatus.restartRequired -Message "Expected restartRequired when process CODEX_HOME still points to legacy home."
     Assert-True -Condition (-not $restartStatus.canRemoveLegacyHomeNow) -Message "Legacy home should not be removable while Codex is still considered running."
     Assert-True -Condition ($restartStatus.cleanupWatcherStatus -eq "not-running") -Message "Expected cleanup watcher status to report not-running."
+    Assert-True -Condition ($restartStatus.doctorCheckStatus -eq "not-run") -Message "Doctor check should stay opt-in by default."
+
+    $doctorMismatchStatus = & $statusPath `
+        -TargetCodexHome $targetHome `
+        -LegacyCodexHome $legacyHome `
+        -ClaudeKitPath $repoRoot `
+        -ConfiguredCodexHome $targetHome `
+        -ProcessCodexHome $targetHome `
+        -CodexProcessCountOverride 1 `
+        -CleanupWatcherCountOverride 0 `
+        -RunCodexDoctor `
+        -DoctorCodexHomeOverride $legacyHome `
+        -PassThru
+
+    Assert-True -Condition $doctorMismatchStatus.restartRequired -Message "Expected doctor mismatch to force restartRequired even when process CODEX_HOME matches target."
+    Assert-True -Condition ($doctorMismatchStatus.doctorCheckStatus -eq "mismatch") -Message "Expected doctor check to report mismatch."
+    Assert-True -Condition ($doctorMismatchStatus.doctorCodexHome -eq $legacyHome) -Message "Expected doctor check to report the legacy home path."
 
     $cleanupReadyStatus = & $statusPath `
         -TargetCodexHome $targetHome `
@@ -76,12 +93,16 @@ trust_level = "trusted"
         -ProcessCodexHome $targetHome `
         -CodexProcessCountOverride 0 `
         -CleanupWatcherCountOverride 1 `
+        -RunCodexDoctor `
+        -DoctorCodexHomeOverride $targetHome `
         -PassThru
 
     Assert-True -Condition $cleanupReadyStatus.globalInstallHealthy -Message "Expected healthy global install status before cleanup."
     Assert-True -Condition (-not $cleanupReadyStatus.restartRequired) -Message "Did not expect restartRequired once process CODEX_HOME matches target."
     Assert-True -Condition $cleanupReadyStatus.canRemoveLegacyHomeNow -Message "Expected legacy cleanup to be safe once Codex is no longer running."
     Assert-True -Condition ($cleanupReadyStatus.cleanupWatcherStatus -eq "running") -Message "Expected cleanup watcher status to report running."
+    Assert-True -Condition ($cleanupReadyStatus.doctorCheckStatus -eq "matched") -Message "Expected doctor check to report matched when doctor uses the target home."
+    Assert-True -Condition $cleanupReadyStatus.doctorMatchesTarget -Message "Expected doctor check to confirm the target home."
     Assert-True -Condition ($cleanupReadyStatus.installBackupCount -ge 1) -Message "Expected at least one install backup snapshot."
     Assert-True -Condition $cleanupReadyStatus.systemSkillsPreserved -Message "Expected built-in .system skills to remain present."
 
