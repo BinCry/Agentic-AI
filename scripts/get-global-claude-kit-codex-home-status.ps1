@@ -115,8 +115,8 @@ $restartRequired = (
     (($null -ne $normalizedConfiguredHome) -and ($null -ne $normalizedProcessHome) -and ($normalizedConfiguredHome -ne $normalizedProcessHome)) -or
     ($doctorStatus.status -eq "mismatch")
 )
-$canRemoveLegacyHomeNow = $legacyExists -and ($normalizedConfiguredHome -eq $targetHome) -and $authExists -and ($codexProcessCount -eq 0)
 $legacyCleanupManagedByWatcher = $legacyExists -and ($cleanupWatcherStatus -eq "running")
+$canRemoveLegacyHomeNow = $legacyExists -and ($normalizedConfiguredHome -eq $targetHome) -and $authExists -and ($codexProcessCount -eq 0) -and (-not $legacyCleanupManagedByWatcher)
 
 $nextStep = if (-not $targetExists) {
     "Run install-claude-kit-globally-to-codex-home.ps1 to create the target Codex home on D:."

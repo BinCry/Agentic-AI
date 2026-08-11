@@ -148,7 +148,7 @@ model = "cx/gpt-5.5"
 
     Assert-True -Condition $cleanupReadyStatus.globalInstallHealthy -Message "Expected healthy global install status before cleanup."
     Assert-True -Condition (-not $cleanupReadyStatus.restartRequired) -Message "Did not expect restartRequired once process CODEX_HOME matches target."
-    Assert-True -Condition $cleanupReadyStatus.canRemoveLegacyHomeNow -Message "Expected legacy cleanup to be safe once Codex is no longer running."
+    Assert-True -Condition (-not $cleanupReadyStatus.canRemoveLegacyHomeNow) -Message "Did not expect manual cleanup to be recommended once the cleanup watcher is already running."
     Assert-True -Condition ($cleanupReadyStatus.cleanupWatcherStatus -eq "running") -Message "Expected cleanup watcher status to report running."
     Assert-True -Condition $cleanupReadyStatus.legacyCleanupManagedByWatcher -Message "Expected watcher-managed cleanup flag while the cleanup watcher is still running."
     Assert-True -Condition ($cleanupReadyStatus.doctorCheckStatus -eq "matched") -Message "Expected doctor check to report matched when doctor uses the target home."
