@@ -234,6 +234,12 @@ You can also run the Claude-Kit verifier for the static wiring checks:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-global-claude-kit-codex-home.ps1 -TargetCodexHome D:\CodexHome
 ```
 
+If you want a one-screen status summary before cleanup or debugging:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\get-global-claude-kit-codex-home-status.ps1 -TargetCodexHome D:\CodexHome
+```
+
 If you want to remove the global Claude-Kit wiring later but keep `CODEX_HOME` itself on `D:`, run:
 
 ```powershell
