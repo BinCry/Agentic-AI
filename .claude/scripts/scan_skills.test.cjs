@@ -19,10 +19,10 @@ function test(name, fn) {
   try {
     fn();
     passed += 1;
-    console.log(`  ✓ ${name}`);
+    console.log(`  OK ${name}`);
   } catch (error) {
     failed += 1;
-    console.log(`  ✗ ${name}`);
+    console.log(`  FAIL ${name}`);
     console.log(`    Error: ${error.message}`);
   }
 }
@@ -35,9 +35,30 @@ function assertMatch(content, pattern, message) {
   assert(pattern.test(content), message);
 }
 
-console.log('\n📚 scan_skills.py Regression Tests');
+function resolvePythonCommand() {
+  const candidates = process.platform === 'win32'
+    ? ['py -3', 'python', 'python3']
+    : ['python3', 'python'];
 
-execSync(`python3 "${SCRIPT_PATH}"`, {
+  for (const candidate of candidates) {
+    try {
+      execSync(`${candidate} --version`, {
+        cwd: REPO_ROOT,
+        stdio: 'pipe',
+        encoding: 'utf-8',
+      });
+      return candidate;
+    } catch {
+      // Try the next available Python command.
+    }
+  }
+
+  throw new Error('No usable Python interpreter found for scan_skills.py');
+}
+
+console.log('\nscan_skills.py Regression Tests');
+
+execSync(`${resolvePythonCommand()} "${SCRIPT_PATH}"`, {
   cwd: REPO_ROOT,
   stdio: 'pipe',
   encoding: 'utf-8',
@@ -77,8 +98,8 @@ test('block frontmatter descriptions are flattened', () => {
 });
 
 if (failed > 0) {
-  console.log(`\n❌ Test Results: ${passed} passed, ${failed} failed`);
+  console.log(`\nTest Results: ${passed} passed, ${failed} failed`);
   process.exit(1);
 }
 
-console.log(`\n✅ Test Results: ${passed} passed, ${failed} failed`);
+console.log(`\nTest Results: ${passed} passed, ${failed} failed`);
