@@ -10,6 +10,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-codex-migration-utils.ps1")
 . (Join-Path $PSScriptRoot "claude-kit-codex-cleanup-status-utils.ps1")
 
 try {
@@ -54,12 +55,17 @@ try {
         return
     }
 
+    $finalSyncResult = Sync-CodexHomeState `
+        -LegacyCodexHomePath $legacyHome `
+        -TargetCodexHomePath $expectedHome
+
     Remove-Item -LiteralPath $legacyHome -Force -Recurse
     Set-CodexLegacyCleanupStatus `
         -ExpectedCodexHome $expectedHome `
         -LegacyCodexHome $legacyHome `
         -State "completed" `
-        -Message "Legacy Codex home was removed successfully." | Out-Null
+        -Message "Legacy Codex home was synced and removed successfully." | Out-Null
+    Write-Host ("Final state sync copied " + $finalSyncResult.files.Count + " file(s) and " + $finalSyncResult.directories.Count + " directorie(s).")
     Write-Host "Removed legacy Codex home: $legacyHome" -ForegroundColor Green
     Write-Host ("Cleanup status file: " + $statusPath)
 } catch {

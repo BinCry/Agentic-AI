@@ -264,6 +264,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-home-cleanup-watc
 
 The watcher now persists cleanup state in `D:\CodexHome\claudekit-legacy-codex-home-cleanup-status.json`, and `scripts/get-global-claude-kit-codex-home-status.ps1` will surface whether legacy-home cleanup is `waiting`, `completed`, or `failed`.
 
+When that cleanup runs after an older Codex session exits, it now performs one last state sync from the legacy home into `D:\CodexHome` before deleting `C:\Users\HP\.codex`, so the last pre-restart session data is preserved.
+
 This mode preserves built-in Codex `.system` skills, keeps the writable Codex home on `D:\CodexHome`, and points global Claude-Kit skills/hooks/agents back to this repo so updates in `D:\Claude-Kit` are reused everywhere.
 
 ### Option B: Project-Local Claude-Kit Only
