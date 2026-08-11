@@ -83,6 +83,15 @@ test('document skills stay under multimedia', () => {
   );
 });
 
+test('catalog paths stay portable across platforms', () => {
+  assert(!skillsData.includes('\\SKILL.md'), 'skills registry should use forward-slash paths');
+  assertMatch(
+    skillsData,
+    /path: "document-skills\/docx\/SKILL\.md"/,
+    'nested skill paths should use POSIX separators',
+  );
+});
+
 test('block frontmatter descriptions are flattened', () => {
   assert(!guideYaml.includes('description: ">-"'), 'guide catalog should not emit raw block markers');
   assertMatch(
