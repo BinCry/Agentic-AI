@@ -44,6 +44,33 @@ function Get-CleanupWatcherCount {
     }
 }
 
+function Get-CodexProcessInfo {
+    param(
+        [int]$CountOverride = -1,
+        [int[]]$IdsOverride = @()
+    )
+
+    if ($IdsOverride.Count -gt 0) {
+        return [pscustomobject]@{
+            count = $(if ($CountOverride -ge 0) { $CountOverride } else { $IdsOverride.Count })
+            ids = @($IdsOverride | Sort-Object)
+        }
+    }
+
+    if ($CountOverride -ge 0) {
+        return [pscustomobject]@{
+            count = $CountOverride
+            ids = @()
+        }
+    }
+
+    $codexProcesses = @(Get-Process codex -ErrorAction SilentlyContinue | Sort-Object Id)
+    return [pscustomobject]@{
+        count = $codexProcesses.Count
+        ids = @($codexProcesses | ForEach-Object { $_.Id })
+    }
+}
+
 function ConvertTo-PowerShellEncodedCommand {
     param(
         [Parameter(Mandatory = $true)]

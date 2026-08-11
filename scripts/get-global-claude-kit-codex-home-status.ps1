@@ -6,6 +6,7 @@ param(
     [string]$ConfiguredCodexHome = "",
     [string]$ProcessCodexHome = "",
     [int]$CodexProcessCountOverride = -1,
+    [int[]]$CodexProcessIdsOverride = @(),
     [int]$CleanupWatcherCountOverride = -1,
     [switch]$RunCodexDoctor,
     [string]$DoctorCodexHomeOverride = "",
@@ -92,7 +93,8 @@ $systemSkillsPreserved = Test-Path -LiteralPath (Join-Path $targetHome "skills\.
 
 $installBackupCount = Get-BackupCount -CodexHomePath $targetHome -Pattern "claudekit-backup-*"
 $uninstallBackupCount = Get-BackupCount -CodexHomePath $targetHome -Pattern "claudekit-uninstall-backup-*"
-$codexProcessCount = if ($CodexProcessCountOverride -ge 0) { $CodexProcessCountOverride } else { @(Get-Process codex -ErrorAction SilentlyContinue).Count }
+$codexProcessInfo = Get-CodexProcessInfo -CountOverride $CodexProcessCountOverride -IdsOverride $CodexProcessIdsOverride
+$codexProcessCount = $codexProcessInfo.count
 $cleanupWatcherCount = Get-CleanupWatcherCount -WatcherScriptName "remove-legacy-codex-home-when-codex-exits.ps1" -Override $CleanupWatcherCountOverride
 $cleanupWatcherStatus = if ($null -eq $cleanupWatcherCount) { "unknown" } elseif ($cleanupWatcherCount -gt 0) { "running" } else { "not-running" }
 $legacyCleanupStatus = Get-CodexLegacyCleanupStatus -ExpectedCodexHome $targetHome
@@ -167,6 +169,7 @@ $status = [pscustomobject]@{
     installBackupCount = $installBackupCount
     uninstallBackupCount = $uninstallBackupCount
     codexProcessCount = $codexProcessCount
+    codexProcessIds = $codexProcessInfo.ids
     cleanupWatcherCount = $cleanupWatcherCount
     cleanupWatcherStatus = $cleanupWatcherStatus
     legacyCleanupManagedByWatcher = $legacyCleanupManagedByWatcher
@@ -205,6 +208,9 @@ Write-Host ("Restart required: " + $status.restartRequired)
 Write-Host ("Legacy home exists: " + $status.legacyHomeExists)
 Write-Host ("Safe to remove legacy home now: " + $status.canRemoveLegacyHomeNow)
 Write-Host ("Codex processes: " + $status.codexProcessCount)
+if ($status.codexProcessIds.Count -gt 0) {
+    Write-Host ("Codex process IDs: " + ($status.codexProcessIds -join ", "))
+}
 Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
 Write-Host ("Watcher manages legacy cleanup: " + $status.legacyCleanupManagedByWatcher)
 Write-Host ("Legacy cleanup state: " + $status.legacyCleanupState)

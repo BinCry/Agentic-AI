@@ -67,12 +67,15 @@ model = "cx/gpt-5.5"
         -ConfiguredCodexHome $targetHome `
         -ProcessCodexHome $legacyHome `
         -CodexProcessCountOverride 1 `
+        -CodexProcessIdsOverride 4444 `
         -CleanupWatcherCountOverride 0 `
         -PassThru
 
     Assert-True -Condition $restartStatus.globalInstallHealthy -Message "Expected healthy global install status for installed fixture."
     Assert-True -Condition $restartStatus.restartRequired -Message "Expected restartRequired when process CODEX_HOME still points to legacy home."
     Assert-True -Condition (-not $restartStatus.canRemoveLegacyHomeNow) -Message "Legacy home should not be removable while Codex is still considered running."
+    Assert-True -Condition ($restartStatus.codexProcessIds.Count -eq 1) -Message "Expected one reported Codex PID when the override provides one."
+    Assert-True -Condition ($restartStatus.codexProcessIds[0] -eq 4444) -Message "Expected reported Codex PID to match the override."
     Assert-True -Condition ($restartStatus.cleanupWatcherStatus -eq "not-running") -Message "Expected cleanup watcher status to report not-running."
     Assert-True -Condition (-not $restartStatus.legacyCleanupManagedByWatcher) -Message "Did not expect watcher-managed cleanup when the watcher is not running."
     Assert-True -Condition ($restartStatus.legacyCleanupState -eq "absent") -Message "Did not expect a persisted cleanup status before the watcher was started."
