@@ -211,6 +211,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-t
 ```
 
 The migration step preserves config/auth, session indexes, and top-level Codex SQLite state files when they already exist in the legacy home.
+The installer also broadcasts the updated Windows environment after changing `CODEX_HOME`, so newly launched apps can pick up `D:\CodexHome` more reliably before you fully sign out.
 
 If you also want the installer to start the cleanup watcher in the background immediately:
 

@@ -60,6 +60,8 @@ trust_level = "trusted"
     Assert-True -Condition ($installResult.cleanupWatcherPid -is [int]) -Message "Installer did not return a cleanup watcher PID."
     Assert-True -Condition ($installResult.cleanupWatcherPid -gt 0) -Message "Installer returned an invalid cleanup watcher PID."
     Assert-True -Condition ([Environment]::GetEnvironmentVariable("CODEX_HOME", "User") -eq $targetHome) -Message "Installer did not update user CODEX_HOME to target home."
+    Assert-True -Condition ($installResult.environmentChangeSupported -eq $true) -Message "Global installer should report Windows environment broadcast support."
+    Assert-True -Condition ($installResult.environmentChangeBroadcasted -eq $true) -Message "Global installer did not report a successful environment broadcast."
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $targetHome "auth.json")) -Message "Migrated auth.json should remain in target home."
 
     New-Item -ItemType Directory -Path $invalidLegacyHome -Force | Out-Null

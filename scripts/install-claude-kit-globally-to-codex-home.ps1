@@ -21,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($ClaudeKitPath)) {
 }
 
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-windows-environment-utils.ps1")
 
 if ($CleanupWatcherPollIntervalSeconds -lt 1) {
     throw "CleanupWatcherPollIntervalSeconds must be at least 1."
@@ -269,9 +270,16 @@ $agentsFileMode = Set-ManagedGlobalAgentsFile -TargetPath (Join-Path $targetHome
 Save-JsonFile -Data (Get-ManagedGlobalHooksConfig -CodexHomePath $targetHome) -Path (Join-Path $targetHome "hooks.json")
 Merge-ManagedCodexConfig -TargetConfigPath (Join-Path $targetHome "config.toml") -ManagedConfigPath (Join-Path $kitRoot ".codex\config.toml")
 
+$environmentChangeResult = [pscustomobject]@{
+    supported = $false
+    broadcasted = $false
+    message = "Skipped Windows environment broadcast because -SkipEnvironmentUpdate was used."
+}
+
 if (-not $SkipEnvironmentUpdate) {
     [Environment]::SetEnvironmentVariable("CODEX_HOME", $targetHome, "User")
     $env:CODEX_HOME = $targetHome
+    $environmentChangeResult = Publish-WindowsEnvironmentChange
 }
 
 $watcherResult = $null
@@ -286,6 +294,11 @@ Write-Host "Global skills, hooks, and agents now point to $kitRoot"
 if ($SkipEnvironmentUpdate) {
     Write-Host "Skipped CODEX_HOME environment update because -SkipEnvironmentUpdate was used."
 } else {
+    if ($environmentChangeResult.broadcasted) {
+        Write-Host $environmentChangeResult.message
+    } else {
+        Write-Warning $environmentChangeResult.message
+    }
     Write-Host "Restart VS Code/Codex, then verify with: codex doctor"
     Write-Host "Run the Claude-Kit verifier for static checks:"
     Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "verify-global-claude-kit-codex-home.ps1") + " -TargetCodexHome " + $targetHome)
@@ -321,5 +334,8 @@ if ($PassThru) {
         cleanupWatcherPid = if ($watcherResult) { $watcherResult.pid } else { $null }
         skipStateMigration = [bool]$SkipStateMigration
         skipEnvironmentUpdate = [bool]$SkipEnvironmentUpdate
+        environmentChangeSupported = $environmentChangeResult.supported
+        environmentChangeBroadcasted = $environmentChangeResult.broadcasted
+        environmentChangeMessage = $environmentChangeResult.message
     }
 }

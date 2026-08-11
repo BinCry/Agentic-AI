@@ -53,10 +53,12 @@ try {
     "old-session" | Set-Content -LiteralPath (Join-Path $targetHome "sessions\stale.txt") -Encoding ASCII
     "old-goal-db" | Set-Content -LiteralPath (Join-Path $targetHome "goals_1.sqlite") -Encoding ASCII
 
-    & $scriptPath -TargetCodexHome $targetHome -LegacyCodexHome $legacyHome
+    $installResult = & $scriptPath -TargetCodexHome $targetHome -LegacyCodexHome $legacyHome -PassThru
 
     Assert-True -Condition ([Environment]::GetEnvironmentVariable("CODEX_HOME", "User") -eq $targetHome) -Message "User CODEX_HOME was not updated to the target home."
     Assert-True -Condition ($env:CODEX_HOME -eq $targetHome) -Message "Process CODEX_HOME was not updated to the target home."
+    Assert-True -Condition ($installResult.environmentChangeSupported -eq $true) -Message "Environment broadcast should be supported on Windows."
+    Assert-True -Condition ($installResult.environmentChangeBroadcasted -eq $true) -Message "Environment broadcast did not report success."
     Assert-True -Condition ((Get-Content -LiteralPath (Join-Path $targetHome "models_cache.json") -Raw).Trim() -eq "cache") -Message "models_cache.json was not copied."
     Assert-True -Condition ((Get-Content -LiteralPath (Join-Path $targetHome "session_index.jsonl") -Raw).Trim() -eq "index") -Message "session_index.jsonl was not copied."
     Assert-True -Condition ((Get-Content -LiteralPath (Join-Path $targetHome ".personality_migration") -Raw).Trim() -eq "personality") -Message ".personality_migration was not copied."

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$TargetCodexHome = "D:\CodexHome",
-    [string]$LegacyCodexHome = (Join-Path $HOME ".codex")
+    [string]$LegacyCodexHome = (Join-Path $HOME ".codex"),
+    [switch]$PassThru
 )
 
 Set-StrictMode -Version Latest
@@ -9,6 +10,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
 . (Join-Path $PSScriptRoot "claude-kit-codex-migration-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-windows-environment-utils.ps1")
 
 $targetHome = Resolve-NormalizedPath -Path $TargetCodexHome -AllowMissing
 $legacyHome = Resolve-NormalizedPath -Path $LegacyCodexHome -AllowMissing
@@ -20,6 +22,7 @@ $hasLegacyHome = $syncResult.legacyExists
 
 [Environment]::SetEnvironmentVariable("CODEX_HOME", $targetHome, "User")
 $env:CODEX_HOME = $targetHome
+$environmentChangeResult = Publish-WindowsEnvironmentChange
 
 Write-Host "CODEX_HOME migrated to $targetHome" -ForegroundColor Green
 if ($hasLegacyHome) {
@@ -27,6 +30,22 @@ if ($hasLegacyHome) {
 } else {
     Write-Host "No legacy Codex home found at $legacyHome. Initialized a fresh CODEX_HOME instead."
 }
+if ($environmentChangeResult.broadcasted) {
+    Write-Host $environmentChangeResult.message
+} else {
+    Write-Warning $environmentChangeResult.message
+}
 Write-Host "Claude-Kit skills are intentionally NOT copied into global CODEX_HOME."
 Write-Host "Close and reopen VS Code/Codex so new sessions stop using $legacyHome."
 Write-Host "After restart, verify with: codex doctor"
+
+if ($PassThru) {
+    [pscustomobject]@{
+        targetCodexHome = $targetHome
+        legacyCodexHome = $legacyHome
+        legacyHomeExisted = $hasLegacyHome
+        environmentChangeSupported = $environmentChangeResult.supported
+        environmentChangeBroadcasted = $environmentChangeResult.broadcasted
+        environmentChangeMessage = $environmentChangeResult.message
+    }
+}
