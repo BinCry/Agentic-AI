@@ -119,6 +119,7 @@ $restartRequired = (
 )
 $legacyCleanupManagedByWatcher = $legacyExists -and ($cleanupWatcherStatus -eq "running")
 $canRemoveLegacyHomeNow = $legacyExists -and ($normalizedConfiguredHome -eq $targetHome) -and $authExists -and ($codexProcessCount -eq 0) -and (-not $legacyCleanupManagedByWatcher)
+$codexProcessIdText = if ($codexProcessInfo.ids.Count -gt 0) { ($codexProcessInfo.ids -join ", ") } else { "" }
 
 $nextStep = if (-not $targetExists) {
     "Run install-claude-kit-globally-to-codex-home.ps1 to create the target Codex home on D:."
@@ -137,11 +138,11 @@ $nextStep = if (-not $targetExists) {
 } elseif ($legacyExists -and ($legacyCleanupStatus.state -eq "failed")) {
     "Review the cleanup failure in $($legacyCleanupStatus.path), then rerun start-codex-home-cleanup-watcher.ps1 or remove-legacy-codex-home-after-migration.ps1."
 } elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running") -and $codexProcessCount -gt 0) {
-    "Close Codex and let the running cleanup watcher remove the legacy home on C: automatically."
+    "Close Codex" + $(if ($codexProcessIdText) { " process ID(s): $codexProcessIdText" } else { "" }) + " and let the running cleanup watcher remove the legacy home on C: automatically."
 } elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running")) {
     "Wait for the running cleanup watcher to remove the legacy home on C: automatically."
 } elseif ($legacyExists -and $codexProcessCount -gt 0) {
-    "Close Codex or start the cleanup watcher before removing the legacy home on C:."
+    "Close Codex" + $(if ($codexProcessIdText) { " process ID(s): $codexProcessIdText" } else { "" }) + " or start the cleanup watcher before removing the legacy home on C:."
 } elseif ($legacyExists) {
     "Legacy home can be removed now with remove-legacy-codex-home-after-migration.ps1."
 } elseif ($legacyCleanupStatus.state -eq "completed") {

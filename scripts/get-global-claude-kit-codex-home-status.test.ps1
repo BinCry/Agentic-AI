@@ -162,6 +162,7 @@ echo CODEX_HOME %CODEX_HOME% (dir)
         -ConfiguredCodexHome $targetHome `
         -ProcessCodexHome $targetHome `
         -CodexProcessCountOverride 1 `
+        -CodexProcessIdsOverride 4444 `
         -CleanupWatcherCountOverride 1 `
         -PassThru
 
@@ -170,7 +171,7 @@ echo CODEX_HOME %CODEX_HOME% (dir)
     Assert-True -Condition $watcherWaitingStatus.legacyCleanupManagedByWatcher -Message "Expected watcher-managed cleanup flag while the cleanup watcher is running."
     Assert-True -Condition ($watcherWaitingStatus.legacyCleanupState -eq "waiting") -Message "Expected cleanup status to report waiting while the watcher is still active."
     Assert-True -Condition ($watcherWaitingStatus.legacyCleanupWatcherPid -eq 1234) -Message "Expected cleanup status to preserve the watcher PID."
-    Assert-True -Condition ($watcherWaitingStatus.nextStep -like "Close Codex and let the running cleanup watcher*") -Message "Expected next step to tell the user that the running watcher will remove the legacy home automatically."
+    Assert-True -Condition ($watcherWaitingStatus.nextStep -eq "Close Codex process ID(s): 4444 and let the running cleanup watcher remove the legacy home on C: automatically.") -Message "Expected next step to point the user at the blocking Codex PID while the watcher is waiting."
 
     $cleanupReadyStatus = & $statusPath `
         -TargetCodexHome $targetHome `
