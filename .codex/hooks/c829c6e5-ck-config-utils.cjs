@@ -10,9 +10,10 @@
 
 "use strict";
 
+const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
-const ORIGINAL_HOOK = "C:\\Users\\Siinn\\Downloads\\claudekit\\.codex\\hooks\\lib\\ck-config-utils.cjs";
+const ORIGINAL_HOOK = path.join(__dirname, "lib", "ck-config-utils.cjs");
 // Scrub rules baked in at generation time (from Codex capability table).
 // Shape: { [event]: { deleteFields: string[], allowedPermissionValues: string[] | null } }
 const SCRUB_RULES = {"PreToolUse":{"deleteFields":["additionalContext"],"allowedPermissionValues":["deny"]},"PermissionRequest":{"deleteFields":["additionalContext"],"allowedPermissionValues":["deny"]},"Stop":{"deleteFields":["additionalContext"],"allowedPermissionValues":null}};

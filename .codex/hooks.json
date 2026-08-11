@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:/Users/Siinn/Downloads/claudekit/.codex/hooks/6cbdb017-simplify-gate.cjs\"",
+            "command": "node -e \"const fs=require('node:fs'); const path=require('node:path'); const {spawnSync}=require('node:child_process'); const stdin=fs.readFileSync(0); let dir=process.cwd(); while (true) { const hookPath=path.join(dir,'.codex','hooks','6cbdb017-simplify-gate.cjs'); if (fs.existsSync(hookPath)) { const result=spawnSync(process.execPath,[hookPath],{input:stdin,encoding:'utf8'}); if (result.stdout) process.stdout.write(result.stdout); if (result.stderr) process.stderr.write(result.stderr); process.exit(result.status ?? 1); } const parent=path.dirname(dir); if (parent===dir) { console.error('Could not locate .codex/hooks/6cbdb017-simplify-gate.cjs'); process.exit(1); } dir=parent; }\"",
             "_origin": "engineer"
           }
         ]
