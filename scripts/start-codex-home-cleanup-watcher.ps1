@@ -10,6 +10,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-codex-cleanup-status-utils.ps1")
+
 if ($PollIntervalSeconds -lt 1) {
     throw "PollIntervalSeconds must be at least 1."
 }
@@ -38,11 +41,18 @@ if ($Force) {
 }
 
 $process = Start-Process -FilePath "powershell.exe" -ArgumentList $argumentList -WindowStyle Hidden -PassThru
+$statusFilePath = Set-CodexLegacyCleanupStatus `
+    -ExpectedCodexHome $ExpectedCodexHome `
+    -LegacyCodexHome $LegacyCodexHome `
+    -State "waiting" `
+    -Message "Cleanup watcher started and is waiting for Codex to exit before removing the legacy home." `
+    -WatcherPid $process.Id
 
 Write-Host "Started Codex cleanup watcher in the background." -ForegroundColor Green
 Write-Host ("PID: " + $process.Id)
 Write-Host ("Watcher script: " + $watcherScriptPath)
 Write-Host ("ExpectedCodexHome: " + $ExpectedCodexHome)
+Write-Host ("Cleanup status file: " + $statusFilePath)
 if (-not $SkipWait) {
     Write-Host "It will wait until Codex exits before removing the legacy home."
 }
@@ -52,6 +62,7 @@ if (-not $SkipWait) {
     watcherScript = $watcherScriptPath
     legacyCodexHome = $LegacyCodexHome
     expectedCodexHome = $ExpectedCodexHome
+    cleanupStatusFilePath = $statusFilePath
     skipWait = [bool]$SkipWait
     force = [bool]$Force
 }

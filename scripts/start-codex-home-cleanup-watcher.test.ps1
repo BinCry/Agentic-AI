@@ -9,6 +9,7 @@ $testRoot = Join-Path $repoRoot "tmp-codex-cleanup-launcher-test"
 $legacyHome = Join-Path $testRoot "legacy-home"
 $targetHome = Join-Path $testRoot "target-home"
 $launcherScript = Join-Path $PSScriptRoot "start-codex-home-cleanup-watcher.ps1"
+$cleanupStatusPath = Join-Path $targetHome "claudekit-legacy-codex-home-cleanup-status.json"
 
 function Assert-True {
     param(
@@ -47,6 +48,10 @@ try {
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $targetHome "auth.json")) -Message "Migrated auth.json should remain in target home."
     Assert-True -Condition ($launchResult.skipWait -eq $true) -Message "Launcher result did not preserve SkipWait flag."
     Assert-True -Condition ($launchResult.force -eq $true) -Message "Launcher result did not preserve Force flag."
+    Assert-True -Condition ($launchResult.cleanupStatusFilePath -eq $cleanupStatusPath) -Message "Launcher result did not return the cleanup status file path."
+    Assert-True -Condition (Test-Path -LiteralPath $cleanupStatusPath) -Message "Launcher-started cleanup watcher did not persist a cleanup status file."
+    $cleanupStatus = Get-Content -LiteralPath $cleanupStatusPath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($cleanupStatus.state -eq "completed") -Message "Launcher-started cleanup watcher did not record a completed cleanup status."
 
     Write-Host "start-codex-home-cleanup-watcher: PASS"
 } finally {

@@ -11,9 +11,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-codex-cleanup-status-utils.ps1")
+
 if ($PollIntervalSeconds -lt 1) {
     throw "PollIntervalSeconds must be at least 1."
 }
+
+Set-CodexLegacyCleanupStatus `
+    -ExpectedCodexHome $ExpectedCodexHome `
+    -LegacyCodexHome $LegacyCodexHome `
+    -State "waiting" `
+    -Message $(if ($SkipWait) { "Cleanup watcher is attempting immediate legacy home removal." } else { "Cleanup watcher is waiting for Codex to exit before removing the legacy home." }) `
+    -WatcherPid $PID | Out-Null
 
 if (-not $SkipWait) {
     while (Get-Process codex -ErrorAction SilentlyContinue) {

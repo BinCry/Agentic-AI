@@ -19,6 +19,7 @@ if ([string]::IsNullOrWhiteSpace($ClaudeKitPath)) {
     $ClaudeKitPath = Join-Path $PSScriptRoot ".."
 }
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-codex-cleanup-status-utils.ps1")
 . (Join-Path $PSScriptRoot "claude-kit-codex-status-utils.ps1")
 
 function Test-LinkMatches {
@@ -94,6 +95,17 @@ $uninstallBackupCount = Get-BackupCount -CodexHomePath $targetHome -Pattern "cla
 $codexProcessCount = if ($CodexProcessCountOverride -ge 0) { $CodexProcessCountOverride } else { @(Get-Process codex -ErrorAction SilentlyContinue).Count }
 $cleanupWatcherCount = Get-CleanupWatcherCount -WatcherScriptName "remove-legacy-codex-home-when-codex-exits.ps1" -Override $CleanupWatcherCountOverride
 $cleanupWatcherStatus = if ($null -eq $cleanupWatcherCount) { "unknown" } elseif ($cleanupWatcherCount -gt 0) { "running" } else { "not-running" }
+$legacyCleanupStatus = Get-CodexLegacyCleanupStatus -ExpectedCodexHome $targetHome
+if (($legacyCleanupStatus.state -eq "absent") -and $legacyExists -and ($cleanupWatcherStatus -eq "running")) {
+    $legacyCleanupStatus = [pscustomobject]@{
+        exists = $false
+        path = $legacyCleanupStatus.path
+        state = "waiting"
+        message = "Cleanup watcher is running, but no persisted cleanup status file exists yet."
+        updatedAtUtc = $null
+        watcherPid = $null
+    }
+}
 $doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
 $doctorConfigStatus = if ($doctorStatus.codexHome) { Get-CodexHomeConfigStatus -CodexHomePath $doctorStatus.codexHome } else { [pscustomobject]@{ exists = $false; configPath = $null; hasLegacySubagentBlock = $false } }
 $migrationGapStatus = if ($legacyExists -and $targetExists) { Get-CodexMigrationGapStatus -LegacyCodexHomePath $legacyHome -TargetCodexHomePath $targetHome } else { [pscustomobject]@{ checked = $false; missingArtifacts = @(); missingArtifactCount = 0 } }
@@ -116,6 +128,8 @@ $nextStep = if (-not $targetExists) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
 } elseif ($migrationGapStatus.missingArtifactCount -gt 0) {
     "Rerun the installer or migration script before cleanup because $targetHome is still missing legacy state artifacts: " + ($migrationGapStatus.missingArtifacts -join ", ")
+} elseif ($legacyExists -and ($legacyCleanupStatus.state -eq "failed")) {
+    "Review the cleanup failure in $($legacyCleanupStatus.path), then rerun start-codex-home-cleanup-watcher.ps1 or remove-legacy-codex-home-after-migration.ps1."
 } elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running") -and $codexProcessCount -gt 0) {
     "Close Codex and let the running cleanup watcher remove the legacy home on C: automatically."
 } elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running")) {
@@ -124,6 +138,8 @@ $nextStep = if (-not $targetExists) {
     "Close Codex or start the cleanup watcher before removing the legacy home on C:."
 } elseif ($legacyExists) {
     "Legacy home can be removed now with remove-legacy-codex-home-after-migration.ps1."
+} elseif ($legacyCleanupStatus.state -eq "completed") {
+    "Legacy home cleanup already completed. Global Claude-Kit on D: looks healthy."
 } else {
     "Global Claude-Kit on D: looks healthy."
 }
@@ -150,6 +166,12 @@ $status = [pscustomobject]@{
     cleanupWatcherCount = $cleanupWatcherCount
     cleanupWatcherStatus = $cleanupWatcherStatus
     legacyCleanupManagedByWatcher = $legacyCleanupManagedByWatcher
+    legacyCleanupStatusFilePath = $legacyCleanupStatus.path
+    legacyCleanupStatusExists = $legacyCleanupStatus.exists
+    legacyCleanupState = $legacyCleanupStatus.state
+    legacyCleanupMessage = $legacyCleanupStatus.message
+    legacyCleanupUpdatedAtUtc = $legacyCleanupStatus.updatedAtUtc
+    legacyCleanupWatcherPid = $legacyCleanupStatus.watcherPid
     doctorCheckStatus = $doctorStatus.status
     doctorCodexHome = $doctorStatus.codexHome
     doctorMatchesTarget = $doctorStatus.matchesTarget
@@ -179,6 +201,13 @@ Write-Host ("Safe to remove legacy home now: " + $status.canRemoveLegacyHomeNow)
 Write-Host ("Codex processes: " + $status.codexProcessCount)
 Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
 Write-Host ("Watcher manages legacy cleanup: " + $status.legacyCleanupManagedByWatcher)
+Write-Host ("Legacy cleanup state: " + $status.legacyCleanupState)
+if ($status.legacyCleanupUpdatedAtUtc) {
+    Write-Host ("Legacy cleanup updated: " + $status.legacyCleanupUpdatedAtUtc)
+}
+if ($status.legacyCleanupMessage) {
+    Write-Host ("Legacy cleanup message: " + $status.legacyCleanupMessage)
+}
 Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
 if ($status.doctorConfigPath) {
     Write-Host ("Doctor config legacy subagent block: " + $status.doctorConfigHasLegacySubagentBlock)

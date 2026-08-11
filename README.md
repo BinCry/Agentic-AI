@@ -262,6 +262,8 @@ If you want to start that cleanup watcher in the background right away, run:
 powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-home-cleanup-watcher.ps1 -ExpectedCodexHome D:\CodexHome
 ```
 
+The watcher now persists cleanup state in `D:\CodexHome\claudekit-legacy-codex-home-cleanup-status.json`, and `scripts/get-global-claude-kit-codex-home-status.ps1` will surface whether legacy-home cleanup is `waiting`, `completed`, or `failed`.
+
 This mode preserves built-in Codex `.system` skills, keeps the writable Codex home on `D:\CodexHome`, and points global Claude-Kit skills/hooks/agents back to this repo so updates in `D:\Claude-Kit` are reused everywhere.
 
 ### Option B: Project-Local Claude-Kit Only

@@ -9,6 +9,7 @@ $testRoot = Join-Path $repoRoot "tmp-codex-cleanup-test"
 $legacyHome = Join-Path $testRoot "legacy-home"
 $targetHome = Join-Path $testRoot "target-home"
 $cleanupScript = Join-Path $PSScriptRoot "remove-legacy-codex-home-when-codex-exits.ps1"
+$cleanupStatusPath = Join-Path $targetHome "claudekit-legacy-codex-home-cleanup-status.json"
 
 function Assert-True {
     param(
@@ -42,6 +43,9 @@ try {
 
     Assert-True -Condition (-not (Test-Path -LiteralPath $legacyHome)) -Message "Legacy Codex home was not removed."
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $targetHome "auth.json")) -Message "Migrated auth.json should remain in target home."
+    Assert-True -Condition (Test-Path -LiteralPath $cleanupStatusPath) -Message "Cleanup watcher did not persist a cleanup status file."
+    $cleanupStatus = Get-Content -LiteralPath $cleanupStatusPath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($cleanupStatus.state -eq "completed") -Message "Cleanup watcher did not record a completed cleanup status."
 
     Write-Host "remove-legacy-codex-home-when-codex-exits: PASS"
 } finally {
