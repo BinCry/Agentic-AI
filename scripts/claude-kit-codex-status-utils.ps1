@@ -95,3 +95,64 @@ function Get-CodexHomeConfigStatus {
         hasLegacySubagentBlock = $configText.Contains("[agents.subagent]")
     }
 }
+
+function Get-CodexMigrationGapStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LegacyCodexHomePath,
+        [Parameter(Mandatory = $true)]
+        [string]$TargetCodexHomePath
+    )
+
+    $baseFiles = @(
+        "auth.json",
+        "config.toml",
+        "AGENTS.md",
+        "installation_id",
+        "cap_sid",
+        "models_cache.json",
+        "session_index.jsonl",
+        "version.json",
+        ".personality_migration",
+        ".sandbox_migration"
+    )
+
+    $baseDirs = @(
+        "attachments",
+        "cache",
+        "mcp-oauth-locks",
+        "plugins",
+        "sessions",
+        "tmp",
+        "vendor_imports"
+    )
+
+    $legacyStateFiles = @(
+        Get-ChildItem -LiteralPath $LegacyCodexHomePath -File -Force -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -like "*.sqlite" -or
+                $_.Name -like "*.sqlite-shm" -or
+                $_.Name -like "*.sqlite-wal"
+            } |
+            ForEach-Object { $_.Name }
+    )
+
+    $missingArtifacts = New-Object System.Collections.Generic.List[string]
+    foreach ($name in @($baseFiles + $legacyStateFiles | Sort-Object -Unique)) {
+        if ((Test-Path -LiteralPath (Join-Path $LegacyCodexHomePath $name)) -and -not (Test-Path -LiteralPath (Join-Path $TargetCodexHomePath $name))) {
+            $missingArtifacts.Add($name) | Out-Null
+        }
+    }
+
+    foreach ($name in $baseDirs) {
+        if ((Test-Path -LiteralPath (Join-Path $LegacyCodexHomePath $name)) -and -not (Test-Path -LiteralPath (Join-Path $TargetCodexHomePath $name))) {
+            $missingArtifacts.Add($name + "\") | Out-Null
+        }
+    }
+
+    [pscustomobject]@{
+        checked = $true
+        missingArtifacts = @($missingArtifacts)
+        missingArtifactCount = $missingArtifacts.Count
+    }
+}

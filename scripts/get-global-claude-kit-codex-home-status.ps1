@@ -96,6 +96,7 @@ $cleanupWatcherCount = Get-CleanupWatcherCount -WatcherScriptName "remove-legacy
 $cleanupWatcherStatus = if ($null -eq $cleanupWatcherCount) { "unknown" } elseif ($cleanupWatcherCount -gt 0) { "running" } else { "not-running" }
 $doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
 $doctorConfigStatus = if ($doctorStatus.codexHome) { Get-CodexHomeConfigStatus -CodexHomePath $doctorStatus.codexHome } else { [pscustomobject]@{ exists = $false; configPath = $null; hasLegacySubagentBlock = $false } }
+$migrationGapStatus = if ($legacyExists -and $targetExists) { Get-CodexMigrationGapStatus -LegacyCodexHomePath $legacyHome -TargetCodexHomePath $targetHome } else { [pscustomobject]@{ checked = $false; missingArtifacts = @(); missingArtifactCount = 0 } }
 
 $globalInstallHealthy = ($normalizedConfiguredHome -eq $targetHome) -and $targetExists -and $authExists -and $configHasManagedBlock -and $hooksCheck.isManaged -and $scoutCheck.matches -and $agentsCheck.matches -and $hooksDirCheck.matches -and $agentsFileInSync
 $restartRequired = (
@@ -112,6 +113,8 @@ $nextStep = if (-not $targetExists) {
     "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome." + $(if ($doctorConfigStatus.hasLegacySubagentBlock) { " The current codex doctor warning is likely coming from $($doctorConfigStatus.configPath) still containing [agents.subagent]." } else { "" })
 } elseif ($restartRequired) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
+} elseif ($migrationGapStatus.missingArtifactCount -gt 0) {
+    "Rerun the installer or migration script before cleanup because $targetHome is still missing legacy state artifacts: " + ($migrationGapStatus.missingArtifacts -join ", ")
 } elseif ($legacyExists -and $codexProcessCount -gt 0) {
     "Close Codex or start the cleanup watcher before removing the legacy home on C:."
 } elseif ($legacyExists) {
@@ -146,6 +149,9 @@ $status = [pscustomobject]@{
     doctorMatchesTarget = $doctorStatus.matchesTarget
     doctorConfigPath = $doctorConfigStatus.configPath
     doctorConfigHasLegacySubagentBlock = $doctorConfigStatus.hasLegacySubagentBlock
+    migrationGapChecked = $migrationGapStatus.checked
+    migrationMissingArtifacts = $migrationGapStatus.missingArtifacts
+    migrationMissingArtifactCount = $migrationGapStatus.missingArtifactCount
     globalInstallHealthy = $globalInstallHealthy
     restartRequired = $restartRequired
     canRemoveLegacyHomeNow = $canRemoveLegacyHomeNow
@@ -169,6 +175,10 @@ Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
 Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
 if ($status.doctorConfigPath) {
     Write-Host ("Doctor config legacy subagent block: " + $status.doctorConfigHasLegacySubagentBlock)
+}
+Write-Host ("Missing migrated artifacts: " + $status.migrationMissingArtifactCount)
+if ($status.migrationMissingArtifactCount -gt 0) {
+    Write-Host ("Missing artifact names: " + ($status.migrationMissingArtifacts -join ", "))
 }
 Write-Host ("Install backups: " + $status.installBackupCount)
 Write-Host ("Uninstall backups: " + $status.uninstallBackupCount)

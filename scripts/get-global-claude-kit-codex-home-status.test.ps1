@@ -45,6 +45,7 @@ model = "cx/gpt-5.5"
     '{"ok":true}' | Set-Content -LiteralPath (Join-Path $legacyHome "auth.json") -Encoding ASCII
     "legacy-agents" | Set-Content -LiteralPath (Join-Path $legacyHome "AGENTS.md") -Encoding ASCII
     "keep-system" | Set-Content -LiteralPath (Join-Path $legacyHome "skills\.system\marker.txt") -Encoding ASCII
+    "legacy-index" | Set-Content -LiteralPath (Join-Path $legacyHome "session_index.jsonl") -Encoding ASCII
 
     Copy-Item -LiteralPath (Join-Path $legacyHome "config.toml") -Destination (Join-Path $targetHome "config.toml") -Force
     Copy-Item -LiteralPath (Join-Path $legacyHome "auth.json") -Destination (Join-Path $targetHome "auth.json") -Force
@@ -71,6 +72,8 @@ model = "cx/gpt-5.5"
     Assert-True -Condition (-not $restartStatus.canRemoveLegacyHomeNow) -Message "Legacy home should not be removable while Codex is still considered running."
     Assert-True -Condition ($restartStatus.cleanupWatcherStatus -eq "not-running") -Message "Expected cleanup watcher status to report not-running."
     Assert-True -Condition ($restartStatus.doctorCheckStatus -eq "not-run") -Message "Doctor check should stay opt-in by default."
+    Assert-True -Condition ($restartStatus.migrationMissingArtifactCount -eq 1) -Message "Expected one missing migrated artifact before rerunning migration."
+    Assert-True -Condition ($restartStatus.migrationMissingArtifacts -contains "session_index.jsonl") -Message "Expected missing migrated artifact list to include session_index.jsonl."
 
     $doctorMismatchStatus = & $statusPath `
         -TargetCodexHome $targetHome `
@@ -108,6 +111,7 @@ model = "cx/gpt-5.5"
     Assert-True -Condition ($cleanupReadyStatus.doctorCheckStatus -eq "matched") -Message "Expected doctor check to report matched when doctor uses the target home."
     Assert-True -Condition $cleanupReadyStatus.doctorMatchesTarget -Message "Expected doctor check to confirm the target home."
     Assert-True -Condition (-not $cleanupReadyStatus.doctorConfigHasLegacySubagentBlock) -Message "Did not expect the normalized target config to keep the legacy [agents.subagent] block."
+    Assert-True -Condition ($cleanupReadyStatus.migrationMissingArtifactCount -eq 1) -Message "Expected migration gap to remain visible when the fixture skipped state migration."
     Assert-True -Condition ($cleanupReadyStatus.installBackupCount -ge 1) -Message "Expected at least one install backup snapshot."
     Assert-True -Condition $cleanupReadyStatus.systemSkillsPreserved -Message "Expected built-in .system skills to remain present."
 
