@@ -76,3 +76,22 @@ function Get-CodexDoctorStatus {
         matchesTarget = ($reportedHome -eq $TargetHome)
     }
 }
+
+function Get-CodexHomeConfigStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CodexHomePath
+    )
+
+    $configPath = Join-Path $CodexHomePath "config.toml"
+    if (-not (Test-Path -LiteralPath $configPath)) {
+        return [pscustomobject]@{ exists = $false; configPath = $configPath; hasLegacySubagentBlock = $false }
+    }
+
+    $configText = Get-Content -LiteralPath $configPath -Raw
+    return [pscustomobject]@{
+        exists = $true
+        configPath = $configPath
+        hasLegacySubagentBlock = $configText.Contains("[agents.subagent]")
+    }
+}

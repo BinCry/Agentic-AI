@@ -95,6 +95,7 @@ $codexProcessCount = if ($CodexProcessCountOverride -ge 0) { $CodexProcessCountO
 $cleanupWatcherCount = Get-CleanupWatcherCount -WatcherScriptName "remove-legacy-codex-home-when-codex-exits.ps1" -Override $CleanupWatcherCountOverride
 $cleanupWatcherStatus = if ($null -eq $cleanupWatcherCount) { "unknown" } elseif ($cleanupWatcherCount -gt 0) { "running" } else { "not-running" }
 $doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
+$doctorConfigStatus = if ($doctorStatus.codexHome) { Get-CodexHomeConfigStatus -CodexHomePath $doctorStatus.codexHome } else { [pscustomobject]@{ exists = $false; configPath = $null; hasLegacySubagentBlock = $false } }
 
 $globalInstallHealthy = ($normalizedConfiguredHome -eq $targetHome) -and $targetExists -and $authExists -and $configHasManagedBlock -and $hooksCheck.isManaged -and $scoutCheck.matches -and $agentsCheck.matches -and $hooksDirCheck.matches -and $agentsFileInSync
 $restartRequired = (
@@ -108,7 +109,7 @@ $nextStep = if (-not $targetExists) {
 } elseif ($normalizedConfiguredHome -ne $targetHome) {
     "Update user CODEX_HOME to $targetHome by rerunning the global installer."
 } elseif ($doctorStatus.status -eq "mismatch") {
-    "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome."
+    "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome." + $(if ($doctorConfigStatus.hasLegacySubagentBlock) { " The current codex doctor warning is likely coming from $($doctorConfigStatus.configPath) still containing [agents.subagent]." } else { "" })
 } elseif ($restartRequired) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
 } elseif ($legacyExists -and $codexProcessCount -gt 0) {
@@ -143,6 +144,8 @@ $status = [pscustomobject]@{
     doctorCheckStatus = $doctorStatus.status
     doctorCodexHome = $doctorStatus.codexHome
     doctorMatchesTarget = $doctorStatus.matchesTarget
+    doctorConfigPath = $doctorConfigStatus.configPath
+    doctorConfigHasLegacySubagentBlock = $doctorConfigStatus.hasLegacySubagentBlock
     globalInstallHealthy = $globalInstallHealthy
     restartRequired = $restartRequired
     canRemoveLegacyHomeNow = $canRemoveLegacyHomeNow
@@ -164,6 +167,9 @@ Write-Host ("Safe to remove legacy home now: " + $status.canRemoveLegacyHomeNow)
 Write-Host ("Codex processes: " + $status.codexProcessCount)
 Write-Host ("Cleanup watcher: " + $status.cleanupWatcherStatus)
 Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
+if ($status.doctorConfigPath) {
+    Write-Host ("Doctor config legacy subagent block: " + $status.doctorConfigHasLegacySubagentBlock)
+}
 Write-Host ("Install backups: " + $status.installBackupCount)
 Write-Host ("Uninstall backups: " + $status.uninstallBackupCount)
 Write-Host ("Next step: " + $status.nextStep) -ForegroundColor Yellow

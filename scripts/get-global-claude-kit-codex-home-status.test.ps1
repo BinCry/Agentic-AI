@@ -37,6 +37,9 @@ model = "gpt-5.4"
 
 [projects."d:\demo"]
 trust_level = "trusted"
+
+[agents.subagent]
+model = "cx/gpt-5.5"
 '@ | Set-Content -LiteralPath (Join-Path $legacyHome "config.toml") -Encoding ASCII
 
     '{"ok":true}' | Set-Content -LiteralPath (Join-Path $legacyHome "auth.json") -Encoding ASCII
@@ -84,6 +87,7 @@ trust_level = "trusted"
     Assert-True -Condition $doctorMismatchStatus.restartRequired -Message "Expected doctor mismatch to force restartRequired even when process CODEX_HOME matches target."
     Assert-True -Condition ($doctorMismatchStatus.doctorCheckStatus -eq "mismatch") -Message "Expected doctor check to report mismatch."
     Assert-True -Condition ($doctorMismatchStatus.doctorCodexHome -eq $legacyHome) -Message "Expected doctor check to report the legacy home path."
+    Assert-True -Condition $doctorMismatchStatus.doctorConfigHasLegacySubagentBlock -Message "Expected doctor config check to detect the legacy [agents.subagent] block."
 
     $cleanupReadyStatus = & $statusPath `
         -TargetCodexHome $targetHome `
@@ -103,6 +107,7 @@ trust_level = "trusted"
     Assert-True -Condition ($cleanupReadyStatus.cleanupWatcherStatus -eq "running") -Message "Expected cleanup watcher status to report running."
     Assert-True -Condition ($cleanupReadyStatus.doctorCheckStatus -eq "matched") -Message "Expected doctor check to report matched when doctor uses the target home."
     Assert-True -Condition $cleanupReadyStatus.doctorMatchesTarget -Message "Expected doctor check to confirm the target home."
+    Assert-True -Condition (-not $cleanupReadyStatus.doctorConfigHasLegacySubagentBlock) -Message "Did not expect the normalized target config to keep the legacy [agents.subagent] block."
     Assert-True -Condition ($cleanupReadyStatus.installBackupCount -ge 1) -Message "Expected at least one install backup snapshot."
     Assert-True -Condition $cleanupReadyStatus.systemSkillsPreserved -Message "Expected built-in .system skills to remain present."
 
