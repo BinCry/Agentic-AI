@@ -96,6 +96,41 @@ model = "cx/gpt-5.5"
     Assert-True -Condition ($doctorMismatchStatus.doctorCheckStatus -eq "mismatch") -Message "Expected doctor check to report mismatch."
     Assert-True -Condition ($doctorMismatchStatus.doctorCodexHome -eq $legacyHome) -Message "Expected doctor check to report the legacy home path."
     Assert-True -Condition $doctorMismatchStatus.doctorConfigHasLegacySubagentBlock -Message "Expected doctor config check to detect the legacy [agents.subagent] block."
+    Assert-True -Condition ($doctorMismatchStatus.doctorLaunchMode -eq "override") -Message "Expected doctor override mode when DoctorCodexHomeOverride is supplied."
+
+    $fakeCodexBin = Join-Path $testRoot "fake-codex-bin"
+    New-Item -ItemType Directory -Path $fakeCodexBin -Force | Out-Null
+    @'
+@echo off
+echo CODEX_HOME %CODEX_HOME% (dir)
+'@ | Set-Content -LiteralPath (Join-Path $fakeCodexBin "codex.cmd") -Encoding ASCII
+
+    $originalPath = $env:PATH
+    $originalProcessCodexHome = $env:CODEX_HOME
+    try {
+        $env:PATH = $fakeCodexBin + ";" + $originalPath
+        $env:CODEX_HOME = $legacyHome
+
+        $doctorFreshLaunchStatus = & $statusPath `
+            -TargetCodexHome $targetHome `
+            -LegacyCodexHome $legacyHome `
+            -ClaudeKitPath $repoRoot `
+            -ConfiguredCodexHome $targetHome `
+            -ProcessCodexHome $legacyHome `
+            -CodexProcessCountOverride 1 `
+            -CleanupWatcherCountOverride 0 `
+            -RunCodexDoctor `
+            -PassThru
+
+        Assert-True -Condition ($doctorFreshLaunchStatus.doctorCheckStatus -eq "matched") -Message "Expected RunCodexDoctor to use the configured CODEX_HOME for a fresh doctor launch."
+        Assert-True -Condition ($doctorFreshLaunchStatus.doctorCodexHome -eq $targetHome) -Message "Expected fresh doctor launch to report the target home even when the ambient process env is stale."
+        Assert-True -Condition ($doctorFreshLaunchStatus.doctorRequestedHome -eq $targetHome) -Message "Expected fresh doctor launch to request the configured target home."
+        Assert-True -Condition ($doctorFreshLaunchStatus.doctorLaunchMode -eq "requested-home") -Message "Expected RunCodexDoctor to use requested-home launch mode."
+        Assert-True -Condition ($doctorFreshLaunchStatus.nextStep -like "Restart VS Code/Codex so the current process stops using*") -Message "Expected next step to focus on the stale current process once fresh doctor launch already matches the target home."
+    } finally {
+        $env:PATH = $originalPath
+        $env:CODEX_HOME = $originalProcessCodexHome
+    }
 
     $watcherInferredStatus = & $statusPath `
         -TargetCodexHome $targetHome `

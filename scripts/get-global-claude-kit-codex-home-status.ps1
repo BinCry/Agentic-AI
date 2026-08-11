@@ -106,7 +106,7 @@ if (($legacyCleanupStatus.state -eq "absent") -and $legacyExists -and ($cleanupW
         watcherPid = $null
     }
 }
-$doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
+$doctorStatus = Get-CodexDoctorStatus -TargetHome $targetHome -RequestedHome $resolvedConfiguredHome -DoctorHomeOverride $DoctorCodexHomeOverride -RunDoctor:$RunCodexDoctor
 $doctorConfigStatus = if ($doctorStatus.codexHome) { Get-CodexHomeConfigStatus -CodexHomePath $doctorStatus.codexHome } else { [pscustomobject]@{ exists = $false; configPath = $null; hasLegacySubagentBlock = $false } }
 $migrationGapStatus = if ($legacyExists -and $targetExists) { Get-CodexMigrationGapStatus -LegacyCodexHomePath $legacyHome -TargetCodexHomePath $targetHome } else { [pscustomobject]@{ checked = $false; missingArtifacts = @(); missingArtifactCount = 0 } }
 
@@ -123,7 +123,11 @@ $nextStep = if (-not $targetExists) {
 } elseif ($normalizedConfiguredHome -ne $targetHome) {
     "Update user CODEX_HOME to $targetHome by rerunning the global installer."
 } elseif ($doctorStatus.status -eq "mismatch") {
-    "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome." + $(if ($doctorConfigStatus.hasLegacySubagentBlock) { " The current codex doctor warning is likely coming from $($doctorConfigStatus.configPath) still containing [agents.subagent]." } else { "" })
+    $(if (($doctorStatus.launchMode -eq "requested-home") -and ($doctorStatus.requestedHome -eq $targetHome)) {
+        "codex doctor still reported $($doctorStatus.codexHome) even when launched with requested CODEX_HOME $targetHome. Rerun the global installer or inspect Codex wrappers/config files before cleanup."
+    } else {
+        "Restart VS Code/Codex or open a fresh shell so codex doctor stops using $($doctorStatus.codexHome) and picks up $targetHome." + $(if ($doctorConfigStatus.hasLegacySubagentBlock) { " The current codex doctor warning is likely coming from $($doctorConfigStatus.configPath) still containing [agents.subagent]." } else { "" })
+    })
 } elseif ($restartRequired) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
 } elseif ($migrationGapStatus.missingArtifactCount -gt 0) {
@@ -175,6 +179,8 @@ $status = [pscustomobject]@{
     doctorCheckStatus = $doctorStatus.status
     doctorCodexHome = $doctorStatus.codexHome
     doctorMatchesTarget = $doctorStatus.matchesTarget
+    doctorRequestedHome = $doctorStatus.requestedHome
+    doctorLaunchMode = $doctorStatus.launchMode
     doctorConfigPath = $doctorConfigStatus.configPath
     doctorConfigHasLegacySubagentBlock = $doctorConfigStatus.hasLegacySubagentBlock
     migrationGapChecked = $migrationGapStatus.checked
@@ -209,6 +215,9 @@ if ($status.legacyCleanupMessage) {
     Write-Host ("Legacy cleanup message: " + $status.legacyCleanupMessage)
 }
 Write-Host ("Codex doctor: " + $status.doctorCheckStatus + $(if ($status.doctorCodexHome) { " (" + $status.doctorCodexHome + ")" } else { "" }))
+if ($status.doctorLaunchMode -and ($status.doctorLaunchMode -ne "not-run")) {
+    Write-Host ("Codex doctor launch mode: " + $status.doctorLaunchMode + $(if ($status.doctorRequestedHome) { " (" + $status.doctorRequestedHome + ")" } else { "" }))
+}
 if ($status.doctorConfigPath) {
     Write-Host ("Doctor config legacy subagent block: " + $status.doctorConfigHasLegacySubagentBlock)
 }

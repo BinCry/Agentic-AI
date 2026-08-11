@@ -243,7 +243,7 @@ If you want a one-screen status summary before cleanup or debugging:
 powershell -ExecutionPolicy Bypass -File .\scripts\get-global-claude-kit-codex-home-status.ps1 -TargetCodexHome D:\CodexHome
 ```
 
-Add `-RunCodexDoctor` when you also want the status script to confirm which `CODEX_HOME` a fresh `codex` invocation would use in the current session.
+Add `-RunCodexDoctor` when you also want the status script to confirm which `CODEX_HOME` a fresh `codex` launch would use when started from the configured user home.
 
 If you want to remove the global Claude-Kit wiring later but keep `CODEX_HOME` itself on `D:`, run:
 

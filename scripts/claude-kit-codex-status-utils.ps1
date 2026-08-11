@@ -44,28 +44,64 @@ function Get-CleanupWatcherCount {
     }
 }
 
+function ConvertTo-PowerShellEncodedCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptText
+    )
+
+    return [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($ScriptText))
+}
+
+function Invoke-CodexDoctorWithHome {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CodexHome
+    )
+
+    $escapedHome = $CodexHome.Replace("'", "''")
+    $scriptText = @"
+`$env:CODEX_HOME = '$escapedHome'
+& codex doctor 2>&1 | Out-String
+"@
+
+    $encodedCommand = ConvertTo-PowerShellEncodedCommand -ScriptText $scriptText
+    return & powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encodedCommand 2>&1 | Out-String
+}
+
 function Get-CodexDoctorStatus {
     param(
         [Parameter(Mandatory = $true)]
         [string]$TargetHome,
+        [string]$RequestedHome = "",
         [string]$DoctorHomeOverride = "",
         [switch]$RunDoctor
     )
 
     if ([string]::IsNullOrWhiteSpace($DoctorHomeOverride) -and -not $RunDoctor) {
-        return [pscustomobject]@{ status = "not-run"; codexHome = $null; matchesTarget = $false }
+        return [pscustomobject]@{ status = "not-run"; codexHome = $null; matchesTarget = $false; requestedHome = $null; launchMode = "not-run" }
     }
 
     $reportedHome = $null
+    $normalizedRequestedHome = Resolve-OptionalNormalizedPath -Path $RequestedHome
     if (-not [string]::IsNullOrWhiteSpace($DoctorHomeOverride)) {
         $reportedHome = Resolve-OptionalNormalizedPath -Path $DoctorHomeOverride
+        return [pscustomobject]@{
+            status = $(if ($reportedHome -eq $TargetHome) { "matched" } else { "mismatch" })
+            codexHome = $reportedHome
+            matchesTarget = ($reportedHome -eq $TargetHome)
+            requestedHome = $normalizedRequestedHome
+            launchMode = "override"
+        }
     } elseif (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-        return [pscustomobject]@{ status = "command-missing"; codexHome = $null; matchesTarget = $false }
+        return [pscustomobject]@{ status = "command-missing"; codexHome = $null; matchesTarget = $false; requestedHome = $normalizedRequestedHome; launchMode = "requested-home" }
+    } elseif ($null -eq $normalizedRequestedHome) {
+        return [pscustomobject]@{ status = "requested-home-empty"; codexHome = $null; matchesTarget = $false; requestedHome = $null; launchMode = "requested-home" }
     } else {
-        $doctorOutput = & codex doctor 2>&1 | Out-String
+        $doctorOutput = Invoke-CodexDoctorWithHome -CodexHome $normalizedRequestedHome
         $doctorMatch = [regex]::Match($doctorOutput, '(?m)^\s*CODEX_HOME\s+(?<path>.+?)\s+\((dir|missing)\)\s*$')
         if (-not $doctorMatch.Success) {
-            return [pscustomobject]@{ status = "parse-failed"; codexHome = $null; matchesTarget = $false }
+            return [pscustomobject]@{ status = "parse-failed"; codexHome = $null; matchesTarget = $false; requestedHome = $normalizedRequestedHome; launchMode = "requested-home" }
         }
         $reportedHome = Resolve-OptionalNormalizedPath -Path $doctorMatch.Groups["path"].Value
     }
@@ -74,6 +110,8 @@ function Get-CodexDoctorStatus {
         status = $(if ($reportedHome -eq $TargetHome) { "matched" } else { "mismatch" })
         codexHome = $reportedHome
         matchesTarget = ($reportedHome -eq $TargetHome)
+        requestedHome = $normalizedRequestedHome
+        launchMode = "requested-home"
     }
 }
 
