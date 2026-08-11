@@ -181,6 +181,30 @@ model = "cx/gpt-5.5"
     Assert-True -Condition ($cleanupCompletedStatus.legacyCleanupState -eq "completed") -Message "Expected cleanup status to report completed once the legacy home was removed."
     Assert-True -Condition ($cleanupCompletedStatus.nextStep -eq "Legacy home cleanup already completed. Global Claude-Kit on D: looks healthy.") -Message "Expected next step to confirm completed legacy cleanup."
 
+    New-Item -ItemType Directory -Path $legacyHome -Force | Out-Null
+    "failed-state" | Set-Content -LiteralPath (Join-Path $legacyHome "marker.txt") -Encoding ASCII
+    Set-CodexLegacyCleanupStatus `
+        -ExpectedCodexHome $targetHome `
+        -LegacyCodexHome $legacyHome `
+        -State "failed" `
+        -Message "Legacy cleanup failed: simulated cleanup error." `
+        -WatcherPid 5678 | Out-Null
+
+    $cleanupFailedStatus = & $statusPath `
+        -TargetCodexHome $targetHome `
+        -LegacyCodexHome $legacyHome `
+        -ClaudeKitPath $repoRoot `
+        -ConfiguredCodexHome $targetHome `
+        -ProcessCodexHome $targetHome `
+        -CodexProcessCountOverride 0 `
+        -CleanupWatcherCountOverride 0 `
+        -PassThru
+
+    Assert-True -Condition $cleanupFailedStatus.legacyHomeExists -Message "Expected legacy home to still exist for the failed cleanup scenario."
+    Assert-True -Condition ($cleanupFailedStatus.legacyCleanupState -eq "failed") -Message "Expected cleanup status to report failed for the simulated cleanup error."
+    Assert-True -Condition ($cleanupFailedStatus.legacyCleanupWatcherPid -eq 5678) -Message "Expected failed cleanup status to preserve the persisted watcher PID."
+    Assert-True -Condition ($cleanupFailedStatus.nextStep -eq ("Review the cleanup failure in " + $cleanupFailedStatus.legacyCleanupStatusFilePath + ", then rerun start-codex-home-cleanup-watcher.ps1 or remove-legacy-codex-home-after-migration.ps1.")) -Message "Expected next step to point the user at the persisted cleanup failure status file."
+
     Write-Host "get-global-claude-kit-codex-home-status: PASS"
 } finally {
     if (Test-Path -LiteralPath $testRoot) {
