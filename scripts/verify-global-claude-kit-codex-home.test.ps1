@@ -65,6 +65,36 @@ model = "cx/gpt-5.5"
     Assert-True -Condition $verifyResult.allPassed -Message "Verification script did not pass against a valid global install fixture."
     Assert-True -Condition ($verifyResult.failedChecks.Count -eq 0) -Message "Verification script reported failing checks for a valid fixture."
 
+    $fakeCodexBin = Join-Path $testRoot "fake-codex-bin"
+    New-Item -ItemType Directory -Path $fakeCodexBin -Force | Out-Null
+    @'
+@echo off
+echo CODEX_HOME %CODEX_HOME% (dir)
+'@ | Set-Content -LiteralPath (Join-Path $fakeCodexBin "codex.cmd") -Encoding ASCII
+
+    $originalPath = $env:PATH
+    $originalProcessCodexHome = $env:CODEX_HOME
+    try {
+        $env:PATH = $fakeCodexBin + ";" + $originalPath
+        $env:CODEX_HOME = $legacyHome
+
+        $doctorVerifyResult = & $verifyPath `
+            -TargetCodexHome $targetHome `
+            -ClaudeKitPath $repoRoot `
+            -ConfiguredCodexHome $targetHome `
+            -RunCodexDoctor `
+            -PassThru
+
+        Assert-True -Condition $doctorVerifyResult.allPassed -Message "Verification script should pass when RunCodexDoctor launches Codex with the configured target home."
+        Assert-True -Condition ($doctorVerifyResult.doctorCheckStatus -eq "matched") -Message "Expected RunCodexDoctor to report a matched CODEX_HOME."
+        Assert-True -Condition ($doctorVerifyResult.doctorCodexHome -eq $targetHome) -Message "Expected RunCodexDoctor to report the target CODEX_HOME even when the ambient process env is stale."
+        Assert-True -Condition ($doctorVerifyResult.doctorRequestedHome -eq $targetHome) -Message "Expected RunCodexDoctor to request the configured target home."
+        Assert-True -Condition ($doctorVerifyResult.doctorLaunchMode -eq "requested-home") -Message "Expected RunCodexDoctor to use requested-home launch mode."
+    } finally {
+        $env:PATH = $originalPath
+        $env:CODEX_HOME = $originalProcessCodexHome
+    }
+
     $mismatchResult = & $verifyPath `
         -TargetCodexHome $targetHome `
         -ClaudeKitPath $repoRoot `

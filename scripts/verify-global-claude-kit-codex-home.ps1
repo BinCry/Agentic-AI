@@ -15,6 +15,7 @@ if ([string]::IsNullOrWhiteSpace($ClaudeKitPath)) {
 }
 
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+. (Join-Path $PSScriptRoot "claude-kit-codex-status-utils.ps1")
 
 $targetHome = Resolve-NormalizedPath -Path $TargetCodexHome -AllowMissing
 $kitRoot = Resolve-NormalizedPath -Path $ClaudeKitPath
@@ -93,6 +94,8 @@ if ([string]::IsNullOrWhiteSpace($resolvedConfiguredHome)) {
     }
 }
 
+$normalizedRequestedHome = Resolve-OptionalNormalizedPath -Path $resolvedConfiguredHome
+
 if (Test-Path -LiteralPath $targetHome) {
     Add-CheckResult -Name "target-home-exists" -Status "pass" -Detail "Found $targetHome"
 } else {
@@ -169,22 +172,36 @@ if ((Test-Path -LiteralPath $targetAgentsPath) -and (Test-Path -LiteralPath $sou
 }
 
 if ($RunCodexDoctor) {
-    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
-        Add-CheckResult -Name "codex-doctor" -Status "fail" -Detail "codex command was not found on PATH."
-    } else {
-        $previousProcessCodexHome = $env:CODEX_HOME
-        try {
-            $env:CODEX_HOME = $targetHome
-            $doctorOutput = & codex doctor 2>&1 | Out-String
-            if ($LASTEXITCODE -eq 0 -and $doctorOutput -match ('CODEX_HOME\s+' + [regex]::Escape($targetHome))) {
-                Add-CheckResult -Name "codex-doctor" -Status "pass" -Detail "codex doctor reported CODEX_HOME = $targetHome"
-            } else {
-                Add-CheckResult -Name "codex-doctor" -Status "fail" -Detail "codex doctor did not confirm the expected CODEX_HOME."
-            }
-        } finally {
-            $env:CODEX_HOME = $previousProcessCodexHome
+    $doctorStatus = Get-CodexDoctorStatus `
+        -TargetHome $targetHome `
+        -RequestedHome $resolvedConfiguredHome `
+        -RunDoctor
+
+    $doctorDetail = switch ($doctorStatus.status) {
+        "matched" {
+            "codex doctor reported CODEX_HOME = $($doctorStatus.codexHome) from $($doctorStatus.launchMode) launch."
+        }
+        "mismatch" {
+            "codex doctor reported CODEX_HOME = $($doctorStatus.codexHome) instead of $targetHome from $($doctorStatus.launchMode) launch."
+        }
+        "command-missing" {
+            "codex command was not found on PATH."
+        }
+        "requested-home-empty" {
+            "Cannot run codex doctor because the requested CODEX_HOME was empty."
+        }
+        "parse-failed" {
+            "codex doctor output could not be parsed for CODEX_HOME."
+        }
+        default {
+            "codex doctor check failed with status '$($doctorStatus.status)'."
         }
     }
+
+    Add-CheckResult `
+        -Name "codex-doctor" `
+        -Status $(if ($doctorStatus.matchesTarget) { "pass" } else { "fail" }) `
+        -Detail $doctorDetail
 }
 
 $failedChecks = @($results | Where-Object { $_.status -eq "fail" })
@@ -201,6 +218,10 @@ $summary = [pscustomobject]@{
     allPassed = ($failedChecks.Count -eq 0)
     targetCodexHome = $targetHome
     configuredCodexHome = $resolvedConfiguredHome
+    doctorRequestedHome = $normalizedRequestedHome
+    doctorCheckStatus = $(if ($RunCodexDoctor) { $doctorStatus.status } else { "not-run" })
+    doctorCodexHome = $(if ($RunCodexDoctor) { $doctorStatus.codexHome } else { $null })
+    doctorLaunchMode = $(if ($RunCodexDoctor) { $doctorStatus.launchMode } else { "not-run" })
     failedChecks = $failedChecks
     results = $results
 }
