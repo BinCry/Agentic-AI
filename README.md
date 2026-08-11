@@ -210,6 +210,12 @@ Use this when you want:
 powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome
 ```
 
+If you also want the installer to start the cleanup watcher in the background immediately:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome -StartCleanupWatcher
+```
+
 If `CODEX_HOME` was already moved earlier and you only want to refresh the global Claude-Kit wiring:
 
 ```powershell

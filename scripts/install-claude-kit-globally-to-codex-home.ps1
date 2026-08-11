@@ -5,6 +5,11 @@ param(
     [string]$ClaudeKitPath = "",
     [switch]$SkipStateMigration,
     [switch]$SkipEnvironmentUpdate,
+    [switch]$StartCleanupWatcher,
+    [int]$CleanupWatcherPollIntervalSeconds = 5,
+    [switch]$CleanupWatcherSkipWait,
+    [switch]$CleanupWatcherForce,
+    [switch]$PassThru,
     [switch]$Force
 )
 
@@ -16,6 +21,14 @@ if ([string]::IsNullOrWhiteSpace($ClaudeKitPath)) {
 }
 
 . (Join-Path $PSScriptRoot "claude-kit-codex-utils.ps1")
+
+if ($CleanupWatcherPollIntervalSeconds -lt 1) {
+    throw "CleanupWatcherPollIntervalSeconds must be at least 1."
+}
+
+if ($StartCleanupWatcher -and $SkipEnvironmentUpdate) {
+    throw "Cannot use -StartCleanupWatcher together with -SkipEnvironmentUpdate."
+}
 
 function New-BackupSnapshot {
     param(
@@ -261,6 +274,8 @@ if (-not $SkipEnvironmentUpdate) {
     $env:CODEX_HOME = $targetHome
 }
 
+$watcherResult = $null
+
 Write-Host "Claude-Kit installed globally into $targetHome" -ForegroundColor Green
 Write-Host "Backup snapshot: $backupDir"
 if ($systemSkillsPath) {
@@ -274,6 +289,33 @@ if ($SkipEnvironmentUpdate) {
     Write-Host "Restart VS Code/Codex, then verify with: codex doctor"
     Write-Host "When the new home looks correct, remove the old C drive home with:"
     Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "remove-legacy-codex-home-after-migration.ps1") + " -ExpectedCodexHome " + $targetHome)
-    Write-Host "If you want to start that cleanup watcher in the background now, run:"
-    Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "start-codex-home-cleanup-watcher.ps1") + " -ExpectedCodexHome " + $targetHome)
+    if ($StartCleanupWatcher) {
+        $watcherLaunchArgs = @{
+            LegacyCodexHome = $legacyHome
+            ExpectedCodexHome = $targetHome
+            PollIntervalSeconds = $CleanupWatcherPollIntervalSeconds
+            SkipWait = $CleanupWatcherSkipWait
+            Force = $CleanupWatcherForce
+        }
+        $watcherResult = & (Join-Path $PSScriptRoot "start-codex-home-cleanup-watcher.ps1") @watcherLaunchArgs
+        Write-Host ("Cleanup watcher launched from installer (PID: " + $watcherResult.pid + ").")
+    } else {
+        Write-Host "If you want to start that cleanup watcher in the background now, run:"
+        Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "start-codex-home-cleanup-watcher.ps1") + " -ExpectedCodexHome " + $targetHome)
+    }
+}
+
+if ($PassThru) {
+    [pscustomobject]@{
+        targetCodexHome = $targetHome
+        legacyCodexHome = $legacyHome
+        backupDir = $backupDir
+        systemSkillsPath = $systemSkillsPath
+        agentsFileMode = $agentsFileMode
+        startCleanupWatcher = [bool]$StartCleanupWatcher
+        cleanupWatcherStarted = ($null -ne $watcherResult)
+        cleanupWatcherPid = if ($watcherResult) { $watcherResult.pid } else { $null }
+        skipStateMigration = [bool]$SkipStateMigration
+        skipEnvironmentUpdate = [bool]$SkipEnvironmentUpdate
+    }
 }
