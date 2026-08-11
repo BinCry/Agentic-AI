@@ -2,6 +2,7 @@
 param(
     [string]$LegacyCodexHome = (Join-Path $HOME ".codex"),
     [string]$ExpectedCodexHome = "D:\CodexHome",
+    [string]$ConfiguredCodexHome = "",
     [switch]$Force
 )
 
@@ -12,15 +13,20 @@ $ErrorActionPreference = "Stop"
 
 $legacyHome = Resolve-NormalizedPath -Path $LegacyCodexHome -AllowMissing
 $expectedHome = Resolve-NormalizedPath -Path $ExpectedCodexHome
-$configuredHome = [Environment]::GetEnvironmentVariable("CODEX_HOME", "User")
+
+if ([string]::IsNullOrWhiteSpace($ConfiguredCodexHome)) {
+    $configuredHome = [Environment]::GetEnvironmentVariable("CODEX_HOME", "User")
+} else {
+    $configuredHome = $ConfiguredCodexHome
+}
 
 if ([string]::IsNullOrWhiteSpace($configuredHome)) {
-    throw "User-level CODEX_HOME is not set. Migration is not complete yet."
+    throw "Configured CODEX_HOME is empty. Migration is not complete yet."
 }
 
 $normalizedConfiguredHome = Resolve-NormalizedPath -Path $configuredHome
 if ($normalizedConfiguredHome -ne $expectedHome) {
-    throw "User-level CODEX_HOME points to $normalizedConfiguredHome, not $expectedHome."
+    throw "Configured CODEX_HOME points to $normalizedConfiguredHome, not $expectedHome."
 }
 
 if (-not $Force) {

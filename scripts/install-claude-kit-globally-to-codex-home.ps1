@@ -274,6 +274,6 @@ if ($SkipEnvironmentUpdate) {
     Write-Host "Restart VS Code/Codex, then verify with: codex doctor"
     Write-Host "When the new home looks correct, remove the old C drive home with:"
     Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "remove-legacy-codex-home-after-migration.ps1") + " -ExpectedCodexHome " + $targetHome)
-    Write-Host "If you want cleanup to wait automatically until Codex closes, run:"
-    Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "remove-legacy-codex-home-when-codex-exits.ps1") + " -ExpectedCodexHome " + $targetHome)
+    Write-Host "If you want to start that cleanup watcher in the background now, run:"
+    Write-Host ("powershell -ExecutionPolicy Bypass -File " + (Join-Path $PSScriptRoot "start-codex-home-cleanup-watcher.ps1") + " -ExpectedCodexHome " + $targetHome)
 }

@@ -228,10 +228,10 @@ codex doctor
 powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-after-migration.ps1 -ExpectedCodexHome D:\CodexHome
 ```
 
-If you want that cleanup to wait automatically until you close Codex / VS Code, run this watcher instead:
+If you want to start that cleanup watcher in the background right away, run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-when-codex-exits.ps1 -ExpectedCodexHome D:\CodexHome
+powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-home-cleanup-watcher.ps1 -ExpectedCodexHome D:\CodexHome
 ```
 
 This mode preserves built-in Codex `.system` skills, keeps the writable Codex home on `D:\CodexHome`, and points global Claude-Kit skills/hooks/agents back to this repo so updates in `D:\Claude-Kit` are reused everywhere.

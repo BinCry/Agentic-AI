@@ -9,7 +9,6 @@ $testRoot = Join-Path $repoRoot "tmp-codex-cleanup-test"
 $legacyHome = Join-Path $testRoot "legacy-home"
 $targetHome = Join-Path $testRoot "target-home"
 $cleanupScript = Join-Path $PSScriptRoot "remove-legacy-codex-home-when-codex-exits.ps1"
-$originalCodexHome = [Environment]::GetEnvironmentVariable("CODEX_HOME", "User")
 
 function Assert-True {
     param(
@@ -34,11 +33,10 @@ try {
     "old-state" | Set-Content -LiteralPath (Join-Path $legacyHome "marker.txt") -Encoding ASCII
     '{"ok":true}' | Set-Content -LiteralPath (Join-Path $targetHome "auth.json") -Encoding ASCII
 
-    [Environment]::SetEnvironmentVariable("CODEX_HOME", $targetHome, "User")
-
     & $cleanupScript `
         -LegacyCodexHome $legacyHome `
         -ExpectedCodexHome $targetHome `
+        -ConfiguredCodexHome $targetHome `
         -SkipWait `
         -Force
 
@@ -47,7 +45,6 @@ try {
 
     Write-Host "remove-legacy-codex-home-when-codex-exits: PASS"
 } finally {
-    [Environment]::SetEnvironmentVariable("CODEX_HOME", $originalCodexHome, "User")
     if (Test-Path -LiteralPath $testRoot) {
         Remove-Item -LiteralPath $testRoot -Force -Recurse
     }

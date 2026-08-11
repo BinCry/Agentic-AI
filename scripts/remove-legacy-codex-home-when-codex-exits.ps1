@@ -2,6 +2,7 @@
 param(
     [string]$LegacyCodexHome = (Join-Path $HOME ".codex"),
     [string]$ExpectedCodexHome = "D:\CodexHome",
+    [string]$ConfiguredCodexHome = "",
     [int]$PollIntervalSeconds = 5,
     [switch]$SkipWait,
     [switch]$Force
@@ -24,4 +25,5 @@ if (-not $SkipWait) {
 & (Join-Path $PSScriptRoot "remove-legacy-codex-home-after-migration.ps1") `
     -LegacyCodexHome $LegacyCodexHome `
     -ExpectedCodexHome $ExpectedCodexHome `
+    -ConfiguredCodexHome $ConfiguredCodexHome `
     -Force:$Force
