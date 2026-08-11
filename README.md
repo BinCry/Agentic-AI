@@ -234,6 +234,12 @@ You can also run the Claude-Kit verifier for the static wiring checks:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-global-claude-kit-codex-home.ps1 -TargetCodexHome D:\CodexHome
 ```
 
+If you want to remove the global Claude-Kit wiring later but keep `CODEX_HOME` itself on `D:`, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-claude-kit-globally-from-codex-home.ps1 -TargetCodexHome D:\CodexHome
+```
+
 3. After `codex doctor` confirms `CODEX_HOME` is `D:\CodexHome`, remove the old home on `C:` to free disk space:
 
 ```powershell
