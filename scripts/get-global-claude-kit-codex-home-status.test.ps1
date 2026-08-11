@@ -92,6 +92,22 @@ model = "cx/gpt-5.5"
     Assert-True -Condition ($doctorMismatchStatus.doctorCodexHome -eq $legacyHome) -Message "Expected doctor check to report the legacy home path."
     Assert-True -Condition $doctorMismatchStatus.doctorConfigHasLegacySubagentBlock -Message "Expected doctor config check to detect the legacy [agents.subagent] block."
 
+    Copy-Item -LiteralPath (Join-Path $legacyHome "session_index.jsonl") -Destination (Join-Path $targetHome "session_index.jsonl") -Force
+
+    $watcherWaitingStatus = & $statusPath `
+        -TargetCodexHome $targetHome `
+        -LegacyCodexHome $legacyHome `
+        -ClaudeKitPath $repoRoot `
+        -ConfiguredCodexHome $targetHome `
+        -ProcessCodexHome $targetHome `
+        -CodexProcessCountOverride 1 `
+        -CleanupWatcherCountOverride 1 `
+        -PassThru
+
+    Assert-True -Condition (-not $watcherWaitingStatus.canRemoveLegacyHomeNow) -Message "Did not expect manual cleanup to be safe while Codex is still running."
+    Assert-True -Condition ($watcherWaitingStatus.cleanupWatcherStatus -eq "running") -Message "Expected cleanup watcher status to report running while waiting for Codex to exit."
+    Assert-True -Condition ($watcherWaitingStatus.nextStep -like "Close Codex and let the running cleanup watcher*") -Message "Expected next step to tell the user that the running watcher will remove the legacy home automatically."
+
     $cleanupReadyStatus = & $statusPath `
         -TargetCodexHome $targetHome `
         -LegacyCodexHome $legacyHome `
@@ -111,9 +127,10 @@ model = "cx/gpt-5.5"
     Assert-True -Condition ($cleanupReadyStatus.doctorCheckStatus -eq "matched") -Message "Expected doctor check to report matched when doctor uses the target home."
     Assert-True -Condition $cleanupReadyStatus.doctorMatchesTarget -Message "Expected doctor check to confirm the target home."
     Assert-True -Condition (-not $cleanupReadyStatus.doctorConfigHasLegacySubagentBlock) -Message "Did not expect the normalized target config to keep the legacy [agents.subagent] block."
-    Assert-True -Condition ($cleanupReadyStatus.migrationMissingArtifactCount -eq 1) -Message "Expected migration gap to remain visible when the fixture skipped state migration."
+    Assert-True -Condition ($cleanupReadyStatus.migrationMissingArtifactCount -eq 0) -Message "Did not expect a migration gap once the missing session index was copied into the target home."
     Assert-True -Condition ($cleanupReadyStatus.installBackupCount -ge 1) -Message "Expected at least one install backup snapshot."
     Assert-True -Condition $cleanupReadyStatus.systemSkillsPreserved -Message "Expected built-in .system skills to remain present."
+    Assert-True -Condition ($cleanupReadyStatus.nextStep -like "Wait for the running cleanup watcher*") -Message "Expected next step to prefer waiting for the running cleanup watcher once Codex is no longer running."
 
     Write-Host "get-global-claude-kit-codex-home-status: PASS"
 } finally {

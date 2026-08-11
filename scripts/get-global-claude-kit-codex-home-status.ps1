@@ -115,6 +115,10 @@ $nextStep = if (-not $targetExists) {
     "Restart VS Code/Codex so the current process stops using $normalizedProcessHome and picks up $targetHome."
 } elseif ($migrationGapStatus.missingArtifactCount -gt 0) {
     "Rerun the installer or migration script before cleanup because $targetHome is still missing legacy state artifacts: " + ($migrationGapStatus.missingArtifacts -join ", ")
+} elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running") -and $codexProcessCount -gt 0) {
+    "Close Codex and let the running cleanup watcher remove the legacy home on C: automatically."
+} elseif ($legacyExists -and ($cleanupWatcherStatus -eq "running")) {
+    "Wait for the running cleanup watcher to remove the legacy home on C: automatically."
 } elseif ($legacyExists -and $codexProcessCount -gt 0) {
     "Close Codex or start the cleanup watcher before removing the legacy home on C:."
 } elseif ($legacyExists) {
