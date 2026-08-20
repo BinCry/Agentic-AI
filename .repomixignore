@@ -1,13 +1,9 @@
-docs/*
-plans/*
 assets/*
 dist/*
 coverage/*
 build/*
 ios/*
 android/*
-tests/*
-__tests__/*
 __pycache__/*
 node_modules/*
 
