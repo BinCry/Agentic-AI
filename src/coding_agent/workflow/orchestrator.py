@@ -17,6 +17,7 @@ from ..models.decisions import (
 from ..models.task_state import CodingTaskState
 from ..tools.contracts import ToolRequest, ToolResult
 from ..tools.executor import ToolExecutor
+from ..skills.router import SkillRouter
 from .engine import TransitionPreconditionError, WorkflowEngine
 from .context import ContextCompactor, ContextProjector
 from .status import WorkflowStatus
@@ -75,6 +76,7 @@ class CodingWorkflowOrchestrator:
         approval_handler: Callable[[CodingTaskState, ToolRequest], bool] | None = None,
         save_state: Callable[[CodingTaskState], Any] | None = None,
         prompt_assembler: PromptAssembler | None = None,
+        skill_router: SkillRouter | None = None,
     ) -> None:
         if maximum_steps < 1:
             raise ValueError("maximum_steps must be positive")
@@ -85,6 +87,8 @@ class CodingWorkflowOrchestrator:
         self.approval_handler = approval_handler
         self.save_state = save_state
         self.prompts = prompt_assembler or PromptAssembler()
+        self.skill_router = skill_router
+        self.skill_workspace = executor.policy.paths.workspace_root
         self.structured = StructuredOutputService(provider, maximum_retries=structured_retries)
 
     def run(self) -> OrchestrationResult:
@@ -95,6 +99,7 @@ class CodingWorkflowOrchestrator:
             status = self.state.current_status
             if status is WorkflowStatus.WAITING_APPROVAL:
                 return OrchestrationResult(status, steps, "approval is required before continuing")
+            self._select_skill(status)
             steps += 1
             if status is WorkflowStatus.ANALYZING:
                 self._analyze()
@@ -199,7 +204,28 @@ class CodingWorkflowOrchestrator:
             self._transition(WorkflowStatus.FAILED, completion.summary)
             return
         self.state.final_summary = completion.summary
+        self.state.final_citations = list(completion.citations)
+        self.state.pr_summary = completion.pr_summary or self._build_pr_summary(completion.summary)
+        diff_request = ToolRequest(
+            request_id=f"diff-{self.state.current_iteration + 1}",
+            task_id=self.state.task_id,
+            tool_name="git.diff",
+            arguments={},
+            workflow_state=self.state.current_status.value,
+        )
+        diff_result = self.executor.request_execution(self.state, diff_request)
+        if diff_result.success and isinstance(diff_result.output, str) and diff_result.output.strip():
+            self.state.final_diff = diff_result.output
+        else:
+            self.state.final_diff = "\n".join(item.patch for item in self.state.patches if item.applied)
+        if not self.state.final_diff.strip():
+            raise OrchestrationError("final diff is unavailable")
         self._transition(WorkflowStatus.COMPLETED, "completion invariants satisfied")
+
+    def _build_pr_summary(self, summary: str) -> str:
+        files = ", ".join(self.state.modified_files) or "none"
+        citations = ", ".join(self.state.final_citations) or "none"
+        return f"{summary}\nModified files: {files}\nCitations: {citations}"
 
     def _decide(self, model_type: type[Any]) -> Any:
         result = self.structured.generate(
@@ -212,10 +238,21 @@ class CodingWorkflowOrchestrator:
         return bool(self.approval_handler and self.approval_handler(self.state, request))
 
     def _transition(self, target: WorkflowStatus, reason: str) -> None:
-        result = WorkflowEngine(self.state).transition(target, reason)
+        result = WorkflowEngine(self.state).transition(
+            target, reason, active_skill=self.state.active_skill
+        )
         if result.forced_failure:
             raise OrchestrationError(self.state.errors[-1].message)
 
     def _save(self) -> None:
         if self.save_state:
             self.save_state(self.state)
+
+    def _select_skill(self, status: WorkflowStatus) -> None:
+        if self.skill_router is None:
+            return
+        definition = self.skill_router.select(status)
+        self.state.active_skill = self.skill_router.as_active_skill(
+            definition, self.skill_workspace
+        )
+        self.state.touch()

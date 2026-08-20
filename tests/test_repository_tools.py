@@ -30,6 +30,12 @@ class RepositoryToolTests(WorkspaceTestCase):
         with self.assertRaises(RepositoryToolError):
             service.read_file("large.txt")
 
+    def test_list_files_returns_workspace_relative_posix_paths(self) -> None:
+        (self.test_root / "src").mkdir()
+        (self.test_root / "src" / "module.py").write_text("value = 1\n", encoding="utf-8")
+        files = RepositoryReadService(self.make_paths()).list_files("src")
+        self.assertEqual(files, ["src/module.py"])
+
     def test_patch_requires_matching_digest_and_applies_atomically(self) -> None:
         target = self.test_root / "module.py"
         original = "a = 1\nb = 2\n"

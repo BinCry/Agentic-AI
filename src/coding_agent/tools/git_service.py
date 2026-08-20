@@ -25,6 +25,10 @@ class ReadOnlyGitService:
         command.extend(self._relative_path(item) for item in (paths or []))
         return self._run(command)
 
+    def changed_files(self) -> list[str]:
+        output = self._run(["diff", "--name-only", "HEAD", "--"])
+        return [line.replace("\\", "/") for line in output.splitlines() if line.strip()]
+
     def _run(self, git_arguments: list[str]) -> str:
         started = time.perf_counter()
         result = run_bounded(

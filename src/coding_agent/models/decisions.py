@@ -177,6 +177,7 @@ class TaskCompletionResult:
     tests_passed: bool
     citations: list[str]
     unresolved_findings: list[str]
+    pr_summary: str = ""
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "TaskCompletionResult":
@@ -195,6 +196,7 @@ class TaskCompletionResult:
             tests_passed=tests_passed,
             citations=require_string_list(data, "citations"),
             unresolved_findings=unresolved,
+            pr_summary=(data.get("pr_summary", "") if isinstance(data.get("pr_summary", ""), str) else ""),
         )
 
     def to_dict(self) -> dict[str, Any]:

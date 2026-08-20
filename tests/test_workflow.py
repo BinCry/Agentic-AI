@@ -53,6 +53,9 @@ class WorkflowEngineTests(unittest.TestCase):
         engine.transition(WorkflowStatus.REVIEWING, "test")
         engine.transition(WorkflowStatus.FINALIZING, "test")
         engine.state.final_summary = "Completed safely"
+        engine.state.final_diff = "diff --git a/src/app.py b/src/app.py"
+        engine.state.pr_summary = "Completed safely"
+        engine.state.final_citations = ["src/app.py:L1-L1"]
         self.add_completion_evidence(engine)
         engine.transition(WorkflowStatus.COMPLETED, "test")
         self.assertEqual(engine.state.current_status, WorkflowStatus.COMPLETED)

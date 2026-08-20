@@ -34,22 +34,34 @@ class PolicyDecision:
 
 
 READ_STATES = frozenset(
-    {"ANALYZING", "RETRIEVING", "PLANNING", "EDITING", "TESTING", "DEBUGGING", "REVIEWING"}
+    {
+        "ANALYZING",
+        "RETRIEVING",
+        "PLANNING",
+        "EDITING",
+        "TESTING",
+        "DEBUGGING",
+        "REVIEWING",
+        "FINALIZING",
+    }
 )
 EDIT_STATES = frozenset({"EDITING", "DEBUGGING"})
 TEST_STATES = frozenset({"TESTING", "DEBUGGING"})
 
 
 DEFAULT_TOOL_SPECS = (
+    ToolSpec("repo.list_files", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.read_file", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.search_text", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.find_symbols", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.retrieve", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.apply_patch", ToolCategory.MUTATION, False, True, EDIT_STATES),
     ToolSpec("repo.create_file", ToolCategory.MUTATION, False, True, EDIT_STATES),
+    ToolSpec("test.detect_framework", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("test.run", ToolCategory.TEST, False, True, TEST_STATES, timeout_seconds=60.0),
     ToolSpec("git.status", ToolCategory.GIT, True, False, READ_STATES),
     ToolSpec("git.diff", ToolCategory.GIT, True, False, READ_STATES),
+    ToolSpec("git.changed_files", ToolCategory.GIT, True, False, READ_STATES),
 )
 
 
@@ -85,29 +97,35 @@ class ToolPermissionPolicy:
 
     def _validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> None:
         allowed: dict[str, set[str]] = {
+            "repo.list_files": {"path", "maximum_files"},
             "repo.read_file": {"path"},
             "repo.search_text": {"query", "path", "regular_expression", "maximum_matches"},
             "repo.find_symbols": {"path"},
             "repo.retrieve": {"query", "top_k"},
             "repo.apply_patch": {"path", "patch", "expected_sha256"},
             "repo.create_file": {"path", "content"},
+            "test.detect_framework": set(),
             "test.run": {"profile"},
             "git.status": set(),
             "git.diff": {"paths"},
+            "git.changed_files": set(),
         }
         unknown = set(arguments) - allowed[tool_name]
         if unknown:
             raise ToolArgumentError(f"unexpected arguments for {tool_name}: {sorted(unknown)}")
         required: dict[str, tuple[str, ...]] = {
+            "repo.list_files": (),
             "repo.read_file": ("path",),
             "repo.search_text": ("query",),
             "repo.find_symbols": ("path",),
             "repo.retrieve": ("query",),
             "repo.apply_patch": ("path", "patch", "expected_sha256"),
             "repo.create_file": ("path", "content"),
+            "test.detect_framework": (),
             "test.run": ("profile",),
             "git.status": (),
             "git.diff": (),
+            "git.changed_files": (),
         }
         missing = [key for key in required[tool_name] if key not in arguments]
         if missing:
@@ -121,6 +139,10 @@ class ToolPermissionPolicy:
             value = arguments["maximum_matches"]
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 200:
                 raise ToolArgumentError("maximum_matches must be an integer between 1 and 200")
+        if "maximum_files" in arguments:
+            value = arguments["maximum_files"]
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 2_000:
+                raise ToolArgumentError("maximum_files must be an integer between 1 and 2000")
         if "top_k" in arguments:
             value = arguments["top_k"]
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 100:

@@ -27,10 +27,20 @@ Observed output summary:
 | Coding-agent task samples | 0 |
 
 The zero coding-agent sample count is intentional: no persisted task IDs were
-passed to this retrieval-only run. Completion, repair, regression and tool
-failure rates were emitted as `null`, not estimated.
+passed to this retrieval-only run. Completion, issue-resolution, repair,
+average-repair-attempt, test, regression, tool-failure and invalid-tool-call
+rates were emitted as `null`, not estimated.
+
+The benchmark cases now carry the issue, expected files, acceptance criteria
+and expected tests needed to connect retrieval evidence to an auditable coding
+task. Task-state reports also enforce final diff, PR summary and final citation
+fields before `COMPLETED`.
 
 ## Failure analysis
+
+The repository-wide regression run after the checklist additions passed 83 tests;
+2 Windows symlink tests were skipped because the current account lacks symlink
+privilege.
 
 Each benchmark case reports retrieved paths, relevant paths, latency and a
 failure object. The Phase 6 verification run had no missing-relevant or

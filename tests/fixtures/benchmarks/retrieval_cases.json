@@ -5,17 +5,29 @@
     {
       "case_id": "orchestrator-symbol",
       "query": "CodingWorkflowOrchestrator",
-      "relevant_paths": ["src/coding_agent/workflow/orchestrator.py"]
+      "issue": "Trace the bounded coding workflow orchestrator",
+      "relevant_paths": ["src/coding_agent/workflow/orchestrator.py"],
+      "expected_files": ["src/coding_agent/workflow/orchestrator.py"],
+      "acceptance_criteria": ["The orchestrator routes each workflow phase safely"],
+      "expected_tests": ["tests/test_orchestrator.py"]
     },
     {
       "case_id": "grounded-patch",
       "query": "ToolExecutor",
-      "relevant_paths": ["src/coding_agent/tools/executor.py"]
+      "issue": "Trace controlled tool dispatch and grounded patching",
+      "relevant_paths": ["src/coding_agent/tools/executor.py"],
+      "expected_files": ["src/coding_agent/tools/executor.py"],
+      "acceptance_criteria": ["Mutations require grounded evidence and approval"],
+      "expected_tests": ["tests/test_tool_executor.py"]
     },
     {
       "case_id": "checkpoint-recovery",
       "query": "CheckpointStore",
-      "relevant_paths": ["src/coding_agent/storage/checkpoint_store.py"]
+      "issue": "Trace crash-safe checkpoint recovery",
+      "relevant_paths": ["src/coding_agent/storage/checkpoint_store.py"],
+      "expected_files": ["src/coding_agent/storage/checkpoint_store.py"],
+      "acceptance_criteria": ["Recovery restores durable task state and files"],
+      "expected_tests": ["tests/test_recovery.py"]
     }
   ]
 }

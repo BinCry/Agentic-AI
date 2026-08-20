@@ -38,6 +38,10 @@ path, line range and file digest.
   repair-iteration and retrieval-retry limits still apply.
 - Review must approve before finalization. Completion requires acceptance
   criteria, repository evidence, modified-file evidence and passing tests.
+- Finalization records the read-only Git diff (or the applied patch fallback
+  for a non-Git fixture), a PR summary and final citations before `COMPLETED`.
+  These fields are persisted in the task state and enforced by the model and
+  transition engine.
 
 ## Deterministic verification
 
@@ -55,6 +59,5 @@ $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The Phase 4 verification run completed with 71 tests passing; two Windows
-symlink tests were skipped because the current account does not have symlink
-privilege.
+The current full verification passed 83 tests; two Windows symlink tests were
+skipped because the current account does not have symlink privilege.

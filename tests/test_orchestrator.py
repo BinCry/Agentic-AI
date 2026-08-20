@@ -11,6 +11,8 @@ from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.workspace import WorkspacePaths
 from coding_agent.tools.executor import ToolExecutor
 from coding_agent.tools.policy import ToolPermissionPolicy
+from coding_agent.skills.catalog import SkillCatalog
+from coding_agent.skills.router import SkillRouter
 from coding_agent.workflow.orchestrator import CodingWorkflowOrchestrator
 from coding_agent.workflow.status import WorkflowStatus
 
@@ -32,6 +34,8 @@ class FixtureProvider:
 
 class OrchestratorTests(WorkspaceTestCase):
     def test_end_to_end_fixture_completes_with_grounded_diff_and_test(self) -> None:
+        for skill in ("fix", "scout", "ck-plan", "cook", "test", "code-review", "git"):
+            self.write_skill(skill)
         fixture = self.test_root / "tests" / "fixtures" / "sample_repo"
         fixture.mkdir(parents=True)
         app = fixture / "app.py"
@@ -66,6 +70,7 @@ class OrchestratorTests(WorkspaceTestCase):
         state.validate()
         paths = WorkspacePaths.create(self.test_root).ensure()
         executor = ToolExecutor(ToolPermissionPolicy(paths))
+        router = SkillRouter(SkillCatalog(self.test_root / ".claude" / "skills").load())
         provider = FixtureProvider(
             [
                 {
@@ -118,12 +123,14 @@ class OrchestratorTests(WorkspaceTestCase):
             executor,
             maximum_steps=12,
             approval_handler=lambda current_state, request: True,
+            skill_router=router,
         ).run()
         self.assertEqual(result.status, WorkflowStatus.COMPLETED)
         self.assertEqual(state.current_status, WorkflowStatus.COMPLETED)
         self.assertEqual(state.modified_files, ["tests/fixtures/sample_repo/app.py"])
         self.assertTrue(state.retrieved_evidence)
         self.assertEqual(state.test_results[-1].target, "fixture")
+        self.assertEqual(state.active_skill.name, "git")
         self.assertIn("Return the fixture greeting", app.read_text(encoding="utf-8"))
 
 

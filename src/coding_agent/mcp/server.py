@@ -135,15 +135,18 @@ class McpToolServer:
     @staticmethod
     def _schema_for(name: str) -> dict[str, Any]:
         schemas: dict[str, dict[str, Any]] = {
+            "repo.list_files": {"type": "object", "properties": {"path": {"type": "string"}, "maximum_files": {"type": "integer", "minimum": 1, "maximum": 2000}}},
             "repo.read_file": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}},
             "repo.search_text": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"}, "path": {"type": "string"}}},
             "repo.find_symbols": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}},
             "repo.retrieve": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"}, "top_k": {"type": "integer", "minimum": 1, "maximum": 100}}},
             "repo.apply_patch": {"type": "object", "required": ["path", "patch", "expected_sha256"], "properties": {"path": {"type": "string"}, "patch": {"type": "string"}, "expected_sha256": {"type": "string"}}},
             "repo.create_file": {"type": "object", "required": ["path", "content"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
+            "test.detect_framework": {"type": "object", "properties": {}},
             "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit", "fixture"]}}},
             "git.status": {"type": "object", "properties": {}},
             "git.diff": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}},
+            "git.changed_files": {"type": "object", "properties": {}},
         }
         return schemas[name]
 

@@ -36,7 +36,10 @@ durable approval ledger and failure-injection coverage. See
 [Reliability and Recovery](reliability-and-recovery.md).
 
 Phase 6 adds versioned benchmark fixtures, retrieval/coding-agent metrics,
-machine-readable failure analysis and explicit null handling for missing samples.
+issue-resolution/test/repair/invalid-tool rates, machine-readable failure
+analysis and explicit null handling for missing samples. Repository content is
+treated as untrusted evidence, including comments and documentation that may
+contain prompt-injection text.
 See [Evaluation and Benchmarking](evaluation.md).
 
 ## Coverage hành vi
@@ -54,8 +57,8 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The latest Phase 5 full verification run passed 74 tests; 2 symlink tests were
-skipped because the current Windows account lacks symlink privilege.
+The latest full verification passed 83 tests; 2 symlink tests were skipped
+because the current Windows account lacks symlink privilege.
 
 ## Artifact policy
 

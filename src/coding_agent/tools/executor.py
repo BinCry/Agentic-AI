@@ -48,7 +48,14 @@ class ToolExecutor:
         reason: str = "tool execution requires approval",
     ) -> ToolResult:
         self._check_task_and_state(state, request)
-        decision = self.policy.evaluate(request)
+        try:
+            decision = self.policy.evaluate(request)
+        except ToolPolicyError as exc:
+            result = ToolResult.failure(request.tool_name, "TOOL_REQUEST_INVALID", str(exc))
+            self._trace(state, request, result, 0)
+            state.touch()
+            state.validate()
+            return result
         if decision.requires_approval:
             if state.pending_tool_call is not None:
                 raise ToolExecutionError("another tool approval is already pending")
@@ -154,6 +161,12 @@ class ToolExecutor:
         decision: PolicyDecision,
     ) -> ToolResult:
         arguments = decision.normalized_arguments
+        if request.tool_name == "repo.list_files":
+            files = self.repository.list_files(
+                arguments.get("path", "."),
+                maximum_files=arguments.get("maximum_files", 500),
+            )
+            return ToolResult(request.tool_name, True, files, metadata={"files": len(files)})
         if request.tool_name == "repo.read_file":
             content = self.repository.read_file(arguments["path"])
             return ToolResult(request.tool_name, True, content, metadata={"bytes": len(content.encode())})
@@ -204,6 +217,8 @@ class ToolExecutor:
             self._record_modified_file(state, record.path)
             state.patches.append(record)
             return ToolResult(request.tool_name, True, asdict(record))
+        if request.tool_name == "test.detect_framework":
+            return ToolResult(request.tool_name, True, self.tests.detect_framework())
         if request.tool_name == "repo.apply_patch":
             if not any(
                 self._same_workspace_path(evidence.path, arguments["path"])
@@ -229,6 +244,8 @@ class ToolExecutor:
             return ToolResult(request.tool_name, True, self.git.status())
         if request.tool_name == "git.diff":
             return ToolResult(request.tool_name, True, self.git.diff(arguments.get("paths")))
+        if request.tool_name == "git.changed_files":
+            return ToolResult(request.tool_name, True, self.git.changed_files())
         raise ToolExecutionError(f"no handler is registered for {request.tool_name}")
 
     @staticmethod

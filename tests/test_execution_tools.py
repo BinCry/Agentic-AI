@@ -19,6 +19,17 @@ class ExecutionToolTests(WorkspaceTestCase):
         with self.assertRaises(TestProfileNotFoundError):
             AllowlistedTestRunner(self.make_paths()).run("arbitrary-command")
 
+    def test_detect_framework_reports_unittest_fixture(self) -> None:
+        tests = self.test_root / "tests"
+        tests.mkdir()
+        (tests / "test_sample.py").write_text(
+            "import unittest\nclass Sample(unittest.TestCase):\n    pass\n",
+            encoding="utf-8",
+        )
+        detected = AllowlistedTestRunner(self.make_paths()).detect_framework()
+        self.assertEqual(detected["frameworks"], ["unittest"])
+        self.assertEqual(detected["test_roots"], ["tests"])
+
     def test_bounded_process_times_out_and_caps_output(self) -> None:
         paths = self.make_paths()
         result = run_bounded(
@@ -38,6 +49,11 @@ class ExecutionToolTests(WorkspaceTestCase):
         self.assertIn("##", service.status())
         with self.assertRaises(GitToolError):
             service.diff(["../outside.txt"])
+
+    def test_changed_files_is_read_only(self) -> None:
+        paths = WorkspacePaths.create("D:/HK5/AGENTIC").ensure()
+        changed = ReadOnlyGitService(paths).changed_files()
+        self.assertIsInstance(changed, list)
 
 
 if __name__ == "__main__":

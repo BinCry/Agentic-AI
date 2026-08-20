@@ -56,6 +56,7 @@ class ContextProjector:
             "issue": state.original_issue,
             "problem": state.normalized_problem_statement,
             "status": state.current_status.value,
+            "active_skill": asdict(state.active_skill) if state.active_skill else None,
             "acceptance_criteria": state.acceptance_criteria,
             "retrieval_queries": state.retrieval_queries[-8:],
             "evidence": [

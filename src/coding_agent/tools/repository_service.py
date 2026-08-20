@@ -52,6 +52,16 @@ class RepositoryReadService:
         except OSError as exc:
             raise RepositoryToolError(f"cannot read file {path}: {exc}") from exc
 
+    def list_files(self, path: str = ".", *, maximum_files: int = 500) -> list[str]:
+        if maximum_files < 1 or maximum_files > 2_000:
+            raise RepositoryToolError("maximum_files must be between 1 and 2000")
+        root = self.paths.resolve_workspace_path(path, must_exist=True)
+        files = [root] if root.is_file() else self._iter_files(root)
+        return [
+            str(item.relative_to(self.paths.workspace_root)).replace("\\", "/")
+            for item in files[:maximum_files]
+        ]
+
     def search_text(
         self,
         query: str,

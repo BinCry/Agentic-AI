@@ -59,6 +59,9 @@ class CodingTaskState:
     approval_decisions: list[ApprovalDecisionRecord] = field(default_factory=list)
     tool_execution_trace: list[ToolTraceRecord] = field(default_factory=list)
     final_summary: str = ""
+    final_diff: str = ""
+    pr_summary: str = ""
+    final_citations: list[str] = field(default_factory=list)
     approval_return_status: WorkflowStatus | None = None
     pending_tool_call: PendingToolCall | None = None
     schema_version: int = 1
@@ -133,6 +136,7 @@ class CodingTaskState:
             (self.acceptance_criteria, "acceptance_criteria"),
             (self.retrieval_queries, "retrieval_queries"),
             (self.modified_files, "modified_files"),
+            (self.final_citations, "final_citations"),
         ):
             if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
                 errors.append(f"{label} must be a list of strings")
@@ -217,6 +221,12 @@ class CodingTaskState:
         if self.current_status is WorkflowStatus.COMPLETED:
             if not self.final_summary.strip():
                 errors.append("COMPLETED requires final_summary")
+            if not self.final_diff.strip():
+                errors.append("COMPLETED requires final_diff")
+            if not self.pr_summary.strip():
+                errors.append("COMPLETED requires pr_summary")
+            if not self.final_citations:
+                errors.append("COMPLETED requires final_citations")
             if not any(item.strip() for item in self.acceptance_criteria):
                 errors.append("COMPLETED requires acceptance_criteria")
             if not self.retrieved_evidence:

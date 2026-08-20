@@ -8,15 +8,18 @@ remain owned by the controller.
 
 | Tool | Purpose | Approval | Allowed states |
 |---|---|---:|---|
+| `repo.list_files` | List bounded workspace-relative files | No | Same read states |
 | `repo.read_file` | Read one bounded UTF-8 file | No | Analysis, retrieval, planning, editing, testing, debugging, review |
 | `repo.search_text` | Exact or explicitly requested regex line search | No | Same read states |
 | `repo.find_symbols` | Python AST class/function listing | No | Same read states |
 | `repo.retrieve` | Grounded hybrid retrieval with line citations | No | Same read states |
 | `repo.create_file` | Create a new file without overwrite | Yes | `EDITING`, `DEBUGGING` |
 | `repo.apply_patch` | Apply a single-file unified patch | Yes | `EDITING`, `DEBUGGING` |
+| `test.detect_framework` | Detect bounded Python test conventions | No | Same read states |
 | `test.run` | Run the named `unit` profile | Yes | `TESTING`, `DEBUGGING` |
 | `git.status` | Read-only short status | No | Read states |
 | `git.diff` | Read-only diff, optionally scoped to paths | No | Read states |
+| `git.changed_files` | List files changed from `HEAD` | No | Read states |
 
 There is no arbitrary shell tool. Git mutation, network commands, credential
 access and destructive commands are outside the Phase 2 surface.
@@ -81,5 +84,7 @@ $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s (Join-Path $repo 'tests') -p 'test_*.py' -v
 ```
 
-The autonomous LLM loop, durable approval history and checkpoint recovery
-remain in later phases.
+The autonomous LLM loop is delivered by Phase 4. Durable approval history,
+checkpoint recovery, bounded repair and finalization evidence are delivered by
+Phase 5 and Phase 6. During finalization the controller records the final diff,
+PR summary and citations before allowing `COMPLETED`.

@@ -34,6 +34,9 @@ class McpServerTests(WorkspaceTestCase):
         listed = server.handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         names = {item["name"] for item in listed["result"]["tools"]}
         self.assertIn("repo.read_file", names)
+        self.assertIn("repo.list_files", names)
+        self.assertIn("test.detect_framework", names)
+        self.assertIn("git.changed_files", names)
         self.assertIn("repo.apply_patch", names)
         self.assertNotIn("shell.exec", names)
 

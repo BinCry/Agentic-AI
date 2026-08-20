@@ -23,6 +23,10 @@ class RetrievalBenchmarkCase:
     case_id: str
     query: str
     relevant_paths: tuple[str, ...]
+    issue: str = ""
+    expected_files: tuple[str, ...] = ()
+    acceptance_criteria: tuple[str, ...] = ()
+    expected_tests: tuple[str, ...] = ()
 
     @classmethod
     def from_dict(cls, payload: object) -> "RetrievalBenchmarkCase":
@@ -31,6 +35,10 @@ class RetrievalBenchmarkCase:
         case_id = payload.get("case_id")
         query = payload.get("query")
         relevant = payload.get("relevant_paths")
+        issue = payload.get("issue")
+        expected_files = payload.get("expected_files")
+        acceptance_criteria = payload.get("acceptance_criteria")
+        expected_tests = payload.get("expected_tests")
         if (
             not isinstance(case_id, str)
             or not case_id.strip()
@@ -39,11 +47,25 @@ class RetrievalBenchmarkCase:
             or not isinstance(relevant, list)
             or not relevant
             or any(not isinstance(item, str) or not item.strip() for item in relevant)
+            or not isinstance(issue, str)
+            or not issue.strip()
+            or not _valid_string_list(expected_files, minimum=1)
+            or not _valid_string_list(acceptance_criteria, minimum=1)
+            or not _valid_string_list(expected_tests, minimum=0)
         ):
             raise BenchmarkSchemaError(
-                "case requires non-empty case_id, query and relevant_paths"
+                "case requires case_id, query, issue, relevant_paths, expected_files, "
+                "acceptance_criteria and expected_tests"
             )
-        return cls(case_id.strip(), query.strip(), tuple(item.strip() for item in relevant))
+        return cls(
+            case_id.strip(),
+            query.strip(),
+            tuple(item.strip() for item in relevant),
+            issue.strip(),
+            tuple(item.strip() for item in expected_files),
+            tuple(item.strip() for item in acceptance_criteria),
+            tuple(item.strip() for item in expected_tests),
+        )
 
 
 @dataclass(slots=True, frozen=True)
@@ -105,6 +127,10 @@ class EvaluationRunner:
                 {
                     "case_id": case.case_id,
                     "query": case.query,
+                    "issue": case.issue,
+                    "expected_files": list(case.expected_files),
+                    "acceptance_criteria": list(case.acceptance_criteria),
+                    "expected_tests": list(case.expected_tests),
                     "retrieved_paths": paths,
                     "relevant_paths": sorted(relevant),
                     "recall_at_k": len(set(paths) & relevant) / len(relevant),
@@ -147,6 +173,14 @@ def _average(values: Iterable[object]) -> float | None:
     return statistics.fmean(numbers) if numbers else None
 
 
+def _valid_string_list(value: object, *, minimum: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= minimum
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
 def _canonical_path(paths: WorkspacePaths, value: str) -> str:
     resolved = paths.resolve_workspace_path(value, must_exist=True)
     return resolved.relative_to(paths.workspace_root).as_posix()
@@ -173,14 +207,28 @@ def _task_metrics(states: list[CodingTaskState], index: RepositoryIndex) -> dict
         return {
             "sample_count": 0,
             "completion_rate": None,
+            "issue_resolution_rate": None,
             "repair_rate": None,
+            "average_repair_attempts": None,
+            "test_pass_rate": None,
             "regression_pass_rate": None,
             "tool_failure_rate": None,
+            "invalid_tool_call_rate": None,
             "citation_correctness": None,
             "failure_analysis": [],
         }
     completed = sum(state.current_status.value == "COMPLETED" for state in states)
     repaired = sum(state.current_repair_iteration > 0 for state in states)
+    test_states = [
+        state for state in states if state.test_results[state.test_run_start_index :]
+    ]
+    test_passed = sum(
+        all(
+            item.exit_code == 0 and item.failed_count == 0 and not item.timed_out
+            for item in state.test_results[state.test_run_start_index :]
+        )
+        for state in test_states
+    )
     unit_states = [
         state for state in states if any(item.target == "unit" for item in state.test_results)
     ]
@@ -195,6 +243,10 @@ def _task_metrics(states: list[CodingTaskState], index: RepositoryIndex) -> dict
         for state in unit_states
     )
     traces = [trace for state in states for trace in state.tool_execution_trace]
+    invalid_tool_errors = {
+        "TOOL_REQUEST_INVALID",
+        "TOOL_GROUNDING_REQUIRED",
+    }
     evidence = [item for state in states for item in state.retrieved_evidence]
     failures = [
         {
@@ -208,10 +260,24 @@ def _task_metrics(states: list[CodingTaskState], index: RepositoryIndex) -> dict
     return {
         "sample_count": len(states),
         "completion_rate": completed / len(states),
+        "issue_resolution_rate": completed / len(states),
         "repair_rate": repaired / len(states),
+        "average_repair_attempts": statistics.fmean(
+            state.current_repair_iteration for state in states
+        ),
+        "test_pass_rate": test_passed / len(test_states) if test_states else None,
         "regression_pass_rate": unit_passed / len(unit_states) if unit_states else None,
         "tool_failure_rate": (
             sum(not trace.success for trace in traces) / len(traces) if traces else None
+        ),
+        "invalid_tool_call_rate": (
+            sum(
+                trace.result_metadata.get("error_code") in invalid_tool_errors
+                for trace in traces
+            )
+            / len(traces)
+            if traces
+            else None
         ),
         "citation_correctness": (
             sum(index.verify_evidence(item) for item in evidence) / len(evidence)

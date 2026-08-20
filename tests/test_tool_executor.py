@@ -98,6 +98,22 @@ class ToolExecutorTests(WorkspaceTestCase):
         self.assertEqual(result.output, "value = 1\n")
         self.assertEqual(state.current_status, WorkflowStatus.EDITING)
 
+    def test_invalid_tool_call_is_rejected_and_traced(self) -> None:
+        state = self.make_state()
+        result = self.make_executor().request_execution(
+            state,
+            ToolRequest(
+                "invalid-1",
+                state.task_id,
+                "shell.exec",
+                {},
+                WorkflowStatus.EDITING.value,
+            ),
+        )
+        self.assertFalse(result.success)
+        self.assertEqual(result.error_code, "TOOL_REQUEST_INVALID")
+        self.assertEqual(state.tool_execution_trace[-1].result_metadata["error_code"], "TOOL_REQUEST_INVALID")
+
     def test_grounded_retrieval_updates_state_with_citation(self) -> None:
         target = self.test_root / "module.py"
         target.write_text("def run():\n    return 'needle'\n", encoding="utf-8")

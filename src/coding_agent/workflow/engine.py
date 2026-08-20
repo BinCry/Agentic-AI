@@ -198,6 +198,12 @@ class WorkflowEngine:
             errors.append(f"blocking review findings must be resolved before {target.value}")
         if target is WorkflowStatus.COMPLETED and not self.state.final_summary.strip():
             errors.append("final summary is required before COMPLETED")
+        if target is WorkflowStatus.COMPLETED and not self.state.final_diff.strip():
+            errors.append("final diff is required before COMPLETED")
+        if target is WorkflowStatus.COMPLETED and not self.state.pr_summary.strip():
+            errors.append("PR summary is required before COMPLETED")
+        if target is WorkflowStatus.COMPLETED and not self.state.final_citations:
+            errors.append("final citations are required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.acceptance_criteria:
             errors.append("acceptance criteria are required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.retrieved_evidence:

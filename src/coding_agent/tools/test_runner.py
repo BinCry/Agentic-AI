@@ -73,6 +73,30 @@ class AllowlistedTestRunner:
             timed_out=result.timed_out,
         )
 
+    def detect_framework(self) -> dict[str, object]:
+        """Detect only known Python test conventions using bounded source reads."""
+        frameworks: set[str] = set()
+        roots: set[str] = set()
+        files = sorted(self.paths.workspace_root.rglob("*.py"))
+        for path in files[:2_000]:
+            if path.is_relative_to(self.paths.runtime_root) or any(
+                part in {".git", "__pycache__", ".venv", "node_modules"}
+                for part in path.parts
+            ):
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")[:100_000]
+            except (OSError, UnicodeDecodeError):
+                continue
+            relative = str(path.relative_to(self.paths.workspace_root)).replace("\\", "/")
+            if "unittest" in source or "TestCase" in source:
+                frameworks.add("unittest")
+            if "pytest" in source or "import pytest" in source:
+                frameworks.add("pytest")
+            if relative.startswith("tests/"):
+                roots.add("tests")
+        return {"frameworks": sorted(frameworks), "test_roots": sorted(roots)}
+
 
 def _first_int(pattern: str, text: str) -> int | None:
     match = re.search(pattern, text, flags=re.IGNORECASE)
