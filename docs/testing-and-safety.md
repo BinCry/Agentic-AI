@@ -31,6 +31,10 @@ Phase 4 adds orchestrator E2E coverage for analysis, retrieval, structured plan,
 approval, grounded patch, fixture tests, review, finalization and bounded repair
 routing. See [End-to-End Coding Workflow](end-to-end-workflow.md).
 
+Phase 5 adds valid-JSON context compaction, atomic checkpoint/file rollback,
+durable approval ledger and failure-injection coverage. See
+[Reliability and Recovery](reliability-and-recovery.md).
+
 ## Coverage hành vi
 
 Bộ test Phase 1 bao phủ:
@@ -46,8 +50,8 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The Phase 4 full verification run passed 71 tests; 2 symlink tests were skipped
-because the current Windows account lacks symlink privilege.
+The latest Phase 5 full verification run passed 74 tests; 2 symlink tests were
+skipped because the current Windows account lacks symlink privilege.
 
 ## Artifact policy
 

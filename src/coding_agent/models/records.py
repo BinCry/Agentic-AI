@@ -155,6 +155,35 @@ class CheckpointRecord:
 
 
 @dataclass(slots=True)
+class ApprovalDecisionRecord:
+    request_id: str
+    task_id: str
+    tool_name: str
+    arguments_hash: str
+    decision: str
+    workflow_state: str
+    reason: str
+    created_at: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ApprovalDecisionRecord":
+        payload = require_mapping(data, "approval_decision")
+        decision = require_string(payload, "decision")
+        if decision not in {"approved", "rejected"}:
+            raise ModelValidationError(["approval decision must be approved or rejected"])
+        return cls(
+            request_id=require_string(payload, "request_id"),
+            task_id=require_string(payload, "task_id"),
+            tool_name=require_string(payload, "tool_name"),
+            arguments_hash=require_string(payload, "arguments_hash"),
+            decision=decision,
+            workflow_state=require_string(payload, "workflow_state"),
+            reason=require_string(payload, "reason"),
+            created_at=require_string(payload, "created_at"),
+        )
+
+
+@dataclass(slots=True)
 class ToolTraceRecord:
     event_id: str
     timestamp: str

@@ -11,6 +11,7 @@ from uuid import uuid4
 from .decisions import ImplementationPlan, ReviewFinding
 from .records import (
     ActiveSkill,
+    ApprovalDecisionRecord,
     CheckpointRecord,
     ErrorRecord,
     PatchRecord,
@@ -55,6 +56,7 @@ class CodingTaskState:
     review_findings: list[ReviewFinding] = field(default_factory=list)
     errors: list[ErrorRecord] = field(default_factory=list)
     checkpoints: list[CheckpointRecord] = field(default_factory=list)
+    approval_decisions: list[ApprovalDecisionRecord] = field(default_factory=list)
     tool_execution_trace: list[ToolTraceRecord] = field(default_factory=list)
     final_summary: str = ""
     approval_return_status: WorkflowStatus | None = None
@@ -141,6 +143,7 @@ class CodingTaskState:
             (self.review_findings, ReviewFinding, "review_findings"),
             (self.errors, ErrorRecord, "errors"),
             (self.checkpoints, CheckpointRecord, "checkpoints"),
+            (self.approval_decisions, ApprovalDecisionRecord, "approval_decisions"),
             (self.tool_execution_trace, ToolTraceRecord, "tool_execution_trace"),
         )
         for values, expected_type, label in nested_groups:
@@ -242,6 +245,7 @@ class CodingTaskState:
         data["review_findings"] = [asdict(item) for item in self.review_findings]
         data["errors"] = records_to_dict(self.errors)
         data["checkpoints"] = records_to_dict(self.checkpoints)
+        data["approval_decisions"] = records_to_dict(self.approval_decisions)
         data["tool_execution_trace"] = records_to_dict(self.tool_execution_trace)
         data["pending_tool_call"] = (
             asdict(self.pending_tool_call) if self.pending_tool_call else None
@@ -271,6 +275,10 @@ class CodingTaskState:
         payload["errors"] = [ErrorRecord.from_dict(item) for item in payload.get("errors", [])]
         payload["checkpoints"] = [
             CheckpointRecord.from_dict(item) for item in payload.get("checkpoints", [])
+        ]
+        payload["approval_decisions"] = [
+            ApprovalDecisionRecord.from_dict(item)
+            for item in payload.get("approval_decisions", [])
         ]
         payload["tool_execution_trace"] = [
             ToolTraceRecord.from_dict(item) for item in payload.get("tool_execution_trace", [])

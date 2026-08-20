@@ -6,18 +6,21 @@ import time
 from dataclasses import asdict
 from uuid import uuid4
 
-from ..models.records import ToolTraceRecord
+from ..models.records import ApprovalDecisionRecord, ToolTraceRecord
 from ..models.task_state import CodingTaskState, utc_now
 from ..storage.workspace import WorkspacePolicyError
 from ..workflow.engine import InvalidTransitionError, WorkflowEngine
 from ..workflow.status import WorkflowStatus
 from .contracts import PendingToolCall, ToolRequest, ToolResult
+from .contracts import ToolCategory
 from .git_service import GitToolError, ReadOnlyGitService
 from .patch_service import PatchToolError, PatchService
 from .policy import PolicyDecision, ToolPermissionPolicy, ToolPolicyError
 from .repository_service import RepositoryReadService, RepositoryToolError
 from .test_runner import AllowlistedTestRunner, TestRunnerError
 from ..rag.index import RepositoryIndex, StaleEvidenceError
+from ..storage.approval_store import ApprovalLedger
+from ..storage.checkpoint_store import CheckpointStore
 
 
 class ToolExecutionError(ValueError):
@@ -34,6 +37,8 @@ class ToolExecutor:
         self.patch = PatchService(policy.paths)
         self.tests = AllowlistedTestRunner(policy.paths)
         self.git = ReadOnlyGitService(policy.paths)
+        self.checkpoints = CheckpointStore(policy.paths)
+        self.approvals = ApprovalLedger(policy.paths)
 
     def request_execution(
         self,
@@ -47,6 +52,17 @@ class ToolExecutor:
         if decision.requires_approval:
             if state.pending_tool_call is not None:
                 raise ToolExecutionError("another tool approval is already pending")
+            if decision.spec.category in {ToolCategory.MUTATION, ToolCategory.TEST}:
+                file_paths = (
+                    (str(request.arguments["path"]),)
+                    if decision.spec.category is ToolCategory.MUTATION and "path" in request.arguments
+                    else ()
+                )
+                self.checkpoints.create(
+                    state,
+                    f"before approval-gated {request.tool_name}",
+                    file_paths=file_paths,
+                )
             state.pending_tool_call = PendingToolCall(
                 request_id=request.request_id,
                 task_id=request.task_id,
@@ -88,6 +104,18 @@ class ToolExecutor:
         if not decision.requires_approval:
             raise ToolExecutionError("pending request is no longer approval-gated")
         WorkflowEngine(state).approve("tool execution approved")
+        approval = ApprovalDecisionRecord(
+            request_id=request.request_id,
+            task_id=request.task_id,
+            tool_name=request.tool_name,
+            arguments_hash=request.arguments_hash(),
+            decision="approved",
+            workflow_state=pending.workflow_state,
+            reason="tool execution approved",
+            created_at=utc_now(),
+        )
+        self.approvals.append(approval)
+        state.approval_decisions.append(approval)
         state.pending_tool_call = None
         state.touch()
         resumed_request = ToolRequest(

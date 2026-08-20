@@ -6,7 +6,7 @@
 
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Hiện trạng: Phase 0 đến Phase 4 đã hoàn thành, gồm controlled MCP tools, repository RAG với grounded citations và vòng coding end-to-end có approval, test, repair và review.
+Hiện trạng: Phase 0 đến Phase 5 đã hoàn thành, gồm controlled MCP tools, repository RAG, vòng coding end-to-end và recovery crash-safe với checkpoint/rollback, approval ledger và context compaction.
 
 ## An toàn ổ đĩa
 
@@ -37,6 +37,9 @@ Phase 2 tool surface, policy, approval flow và cách chạy MCP được mô t�
 
 Vòng coding end-to-end, grounding, approval và fixture verification được mô tả
 trong [End-to-End Coding Workflow](docs/end-to-end-workflow.md).
+
+Checkpoint, rollback, context compaction và approval audit được mô tả trong
+[Reliability and Recovery](docs/reliability-and-recovery.md).
 
 ## Chạy test chỉ trên ổ D
 
@@ -85,4 +88,4 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 
 ## Giới hạn hiện tại
 
-Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery; Phase 4 kết nối các thành phần thành bounded coding loop có structured decisions, repair, review và completion invariants. Reliability/recovery nâng cao và benchmark vẫn thuộc Phase 5–6.
+Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery; Phase 4 kết nối các thành phần thành bounded coding loop có structured decisions, repair, review và completion invariants; Phase 5 bổ sung checkpoint/rollback, durable approvals và bounded context. Benchmark/evaluation vẫn thuộc Phase 6.

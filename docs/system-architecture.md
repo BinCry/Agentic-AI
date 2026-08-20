@@ -46,6 +46,11 @@ Mọi trạng thái đang chạy có thể chuyển sang `FAILED` theo transitio
 
 Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 đã bổ sung repository index/retrieval có citation, grounding và bounded stale recovery. Phase 4 đã kết nối structured LLM decisions, retriever và MCP thành agent loop bounded qua `CodingWorkflowOrchestrator`; mutation/test vẫn do controller và approval gate sở hữu.
 
+Phase 5 bổ sung `ContextProjector`/`ContextCompactor`, `CheckpointStore` và
+`ApprovalLedger`. Checkpoint được ghi trước operation rủi ro, có snapshot file
+bytes để rollback, còn approval ledger độc lập với task JSON để chịu được gián
+đoạn tiến trình.
+
 ## Phase 4 orchestration boundary
 
 ```mermaid

@@ -16,6 +16,7 @@ from .observability.trace import JsonlTraceWriter, TraceEvent
 from .skills.catalog import SkillCatalog
 from .skills.router import SkillRouter
 from .storage.task_store import JsonTaskStore
+from .storage.checkpoint_store import CheckpointStore
 from .storage.workspace import WorkspacePaths
 from .workflow.engine import TransitionResult, WorkflowEngine
 from .workflow.status import WorkflowStatus
@@ -39,6 +40,17 @@ def _parser() -> argparse.ArgumentParser:
 
     show_parser = subparsers.add_parser("show", help="Show persisted task state")
     show_parser.add_argument("--task-id", required=True)
+
+    checkpoints_parser = subparsers.add_parser(
+        "checkpoints", help="List durable checkpoints for a task"
+    )
+    checkpoints_parser.add_argument("--task-id", required=True)
+
+    recover_parser = subparsers.add_parser(
+        "recover", help="Restore a task from its latest or selected checkpoint"
+    )
+    recover_parser.add_argument("--task-id", required=True)
+    recover_parser.add_argument("--checkpoint-id")
 
     transition_parser = subparsers.add_parser("transition", help="Apply one explicit workflow transition")
     transition_parser.add_argument("--task-id", required=True)
@@ -126,6 +138,32 @@ def _init(args: argparse.Namespace) -> int:
 def _show(args: argparse.Namespace) -> int:
     _, store, _ = _runtime(args)
     _write_json(store.load(args.task_id).to_dict())
+    return 0
+
+
+def _checkpoints(args: argparse.Namespace) -> int:
+    paths, _, _ = _runtime(args)
+    records = CheckpointStore(paths).list_records(args.task_id)
+    _write_json([asdict(item) for item in records])
+    return 0
+
+
+def _recover(args: argparse.Namespace) -> int:
+    paths, store, trace = _runtime(args)
+    state = CheckpointStore(paths).restore(args.task_id, args.checkpoint_id)
+    store.save(state)
+    trace.append(
+        TraceEvent(
+            task_id=state.task_id,
+            workflow_state=state.current_status.value,
+            action="workflow.recover",
+            success=True,
+            latency_ms=0,
+            input_metadata={"checkpoint_id": args.checkpoint_id or "latest"},
+            result_metadata={"recovered": True},
+        )
+    )
+    _write_json(state.to_dict())
     return 0
 
 
@@ -276,6 +314,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     handlers = {
         "init": _init,
         "show": _show,
+        "checkpoints": _checkpoints,
+        "recover": _recover,
         "transition": _transition,
         "request-approval": _request_approval,
         "approve": _approve,

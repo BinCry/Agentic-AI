@@ -7,7 +7,7 @@
 ## Overview
 
 - **Priority:** medium
-- **Status:** pending
+- **Status:** completed
 - **Description:** Extend the Phase 1 bounds with durable approval records, checkpoint recovery, failure injection, and context compaction.
 
 ## Requirements
@@ -19,14 +19,27 @@
 
 ## Todo
 
-- [ ] Implement context projection and compaction.
-- [ ] Implement checkpoint store and recovery.
-- [ ] Persist approval decisions and recovery-safe limit state.
-- [ ] Add failure-injection tests.
+- [x] Implement bounded context projection and compaction.
+- [x] Implement atomic checkpoint store with state/file recovery.
+- [x] Persist approval decisions and recovery-safe limit state.
+- [x] Add failure-injection and rollback tests.
 
 ## Success Criteria
 
-- Recovery and limit exhaustion produce deterministic task outcomes.
+- Recovery and limit exhaustion produce deterministic task outcomes without
+  resetting iteration, repair or retrieval counters.
+
+## Delivered
+
+- `workflow/context.py`: context projection and valid-JSON compaction.
+- `storage/checkpoint_store.py`: atomic snapshots, file bytes and rollback.
+- `storage/approval_store.py`: independent approval decision ledger.
+- `coding-agent checkpoints` and `coding-agent recover` CLI commands.
+
+## Verification
+
+- Full suite: 74 tests passed, 2 Windows symlink tests skipped because symlink
+  privilege is unavailable to the current account.
 
 ## Risk Assessment
 

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from ..llm.provider import LLMMessage, LLMProvider
@@ -19,6 +18,7 @@ from ..models.task_state import CodingTaskState
 from ..tools.contracts import ToolRequest, ToolResult
 from ..tools.executor import ToolExecutor
 from .engine import TransitionPreconditionError, WorkflowEngine
+from .context import ContextCompactor, ContextProjector
 from .status import WorkflowStatus
 
 
@@ -37,34 +37,10 @@ class PromptAssembler:
     """Build bounded, source-grounded prompts without leaking raw large state."""
 
     def __init__(self, *, maximum_context_chars: int = 24_000) -> None:
-        self.maximum_context_chars = maximum_context_chars
+        self.projector = ContextProjector(ContextCompactor(maximum_context_chars))
 
     def assemble(self, state: CodingTaskState, decision_name: str) -> list[LLMMessage]:
-        evidence = [
-            {
-                "chunk_id": item.chunk_id,
-                "path": item.path,
-                "lines": [item.start_line, item.end_line],
-                "digest": item.file_digest,
-                "content": item.content[:6_000],
-            }
-            for item in state.retrieved_evidence[-8:]
-        ]
-        payload = {
-            "decision": decision_name,
-            "task_id": state.task_id,
-            "issue": state.original_issue,
-            "problem": state.normalized_problem_statement,
-            "status": state.current_status.value,
-            "acceptance_criteria": state.acceptance_criteria,
-            "retrieval_queries": state.retrieval_queries[-8:],
-            "evidence": evidence,
-            "plan": asdict(state.implementation_plan) if state.implementation_plan else None,
-            "modified_files": state.modified_files,
-            "recent_errors": [asdict(item) for item in state.errors[-4:]],
-            "recent_tools": [asdict(item) for item in state.tool_execution_trace[-6:]],
-        }
-        content = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        content = self.projector.project(state, decision_name)
         return [
             LLMMessage(
                 role="system",
@@ -73,7 +49,7 @@ class PromptAssembler:
                     "object. Use exact repository evidence, never invent paths, and keep actions minimal."
                 ),
             ),
-            LLMMessage(role="user", content=content[: self.maximum_context_chars]),
+            LLMMessage(role="user", content=content),
         ]
 
 
