@@ -1,0 +1,245 @@
+"""Command-line entry point for Phase 1 task and workflow operations."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+from typing import Sequence
+
+from .models.records import ActiveSkill
+from .models.task_state import CodingTaskState
+from .observability.trace import JsonlTraceWriter, TraceEvent
+from .skills.catalog import SkillCatalog
+from .skills.router import SkillRouter
+from .storage.task_store import JsonTaskStore
+from .storage.workspace import WorkspacePaths
+from .workflow.engine import TransitionResult, WorkflowEngine
+from .workflow.status import WorkflowStatus
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="coding-agent", description="Skill-based coding agent runtime")
+    parser.add_argument("--workspace", default=".", help="Workspace root; writable state stays inside it")
+    parser.add_argument("--runtime-dir", default=".coding-agent", help="Workspace-relative runtime directory")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init_parser = subparsers.add_parser("init", help="Create a persisted coding task")
+    init_parser.add_argument("--issue", required=True)
+    init_parser.add_argument("--repository")
+    init_parser.add_argument("--task-id")
+    init_parser.add_argument("--skill-root", default=".claude/skills")
+
+    show_parser = subparsers.add_parser("show", help="Show persisted task state")
+    show_parser.add_argument("--task-id", required=True)
+
+    transition_parser = subparsers.add_parser("transition", help="Apply one explicit workflow transition")
+    transition_parser.add_argument("--task-id", required=True)
+    transition_parser.add_argument("--to", required=True, choices=[item.value for item in WorkflowStatus])
+    transition_parser.add_argument("--reason", required=True)
+    transition_parser.add_argument("--skill-root", default=".claude/skills")
+
+    approval_parser = subparsers.add_parser(
+        "request-approval", help="Enter WAITING_APPROVAL with an explicit resume state"
+    )
+    approval_parser.add_argument("--task-id", required=True)
+    approval_parser.add_argument(
+        "--resume-to",
+        required=True,
+        choices=[WorkflowStatus.EDITING.value, WorkflowStatus.FINALIZING.value],
+    )
+    approval_parser.add_argument("--reason", required=True)
+    approval_parser.add_argument("--skill-root", default=".claude/skills")
+
+    approve_parser = subparsers.add_parser("approve", help="Resume a task after approval")
+    approve_parser.add_argument("--task-id", required=True)
+    approve_parser.add_argument("--reason", default="approval granted")
+    approve_parser.add_argument("--skill-root", default=".claude/skills")
+
+    skills_parser = subparsers.add_parser("skills", help="List reusable skills by workflow state")
+    skills_parser.add_argument("--skill-root", default=".claude/skills")
+    return parser
+
+
+def _runtime(args: argparse.Namespace) -> tuple[WorkspacePaths, JsonTaskStore, JsonlTraceWriter]:
+    paths = WorkspacePaths.create(args.workspace, args.runtime_dir).ensure()
+    return paths, JsonTaskStore(paths), JsonlTraceWriter(paths)
+
+
+def _catalog(paths: WorkspacePaths, skill_root: str) -> tuple[SkillCatalog, SkillRouter]:
+    root = paths.resolve_workspace_path(skill_root, must_exist=True)
+    catalog = SkillCatalog(root).load()
+    return catalog, SkillRouter(catalog)
+
+
+def _write_json(payload: object) -> None:
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
+    sys.stdout.write("\n")
+
+
+def _init(args: argparse.Namespace) -> int:
+    started = time.perf_counter()
+    paths, store, trace = _runtime(args)
+    _, router = _catalog(paths, args.skill_root)
+    repository = args.repository or paths.workspace_root.name
+    state = CodingTaskState.create(args.issue, repository, task_id=args.task_id)
+    definition = router.select(WorkflowStatus.ANALYZING)
+    active_skill = router.as_active_skill(definition, paths.workspace_root)
+    WorkflowEngine(state).transition(
+        WorkflowStatus.ANALYZING,
+        "task initialized and ready for issue analysis",
+        active_skill=active_skill,
+    )
+    state_path = store.save(state)
+    trace.append(
+        TraceEvent(
+            task_id=state.task_id,
+            workflow_state=state.current_status.value,
+            action="task.init",
+            success=True,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            skill=active_skill.name,
+            result_metadata={"state_path": str(state_path.relative_to(paths.workspace_root))},
+        )
+    )
+    _write_json(state.to_dict())
+    return 0
+
+
+def _show(args: argparse.Namespace) -> int:
+    _, store, _ = _runtime(args)
+    _write_json(store.load(args.task_id).to_dict())
+    return 0
+
+
+def _transition(args: argparse.Namespace) -> int:
+    started = time.perf_counter()
+    paths, store, trace = _runtime(args)
+    _, router = _catalog(paths, args.skill_root)
+    state = store.load(args.task_id)
+    target = WorkflowStatus(args.to)
+    candidates = router.candidates(target)
+    active_skill = router.as_active_skill(candidates[0], paths.workspace_root) if candidates else None
+    result = WorkflowEngine(state).transition(target, args.reason, active_skill=active_skill)
+    return _finish_transition(
+        store, trace, state, result, started, "workflow.transition", target, active_skill
+    )
+
+
+def _request_approval(args: argparse.Namespace) -> int:
+    started = time.perf_counter()
+    paths, store, trace = _runtime(args)
+    _, router = _catalog(paths, args.skill_root)
+    state = store.load(args.task_id)
+    resume_target = WorkflowStatus(args.resume_to)
+    candidates = router.candidates(WorkflowStatus.WAITING_APPROVAL)
+    active_skill = router.as_active_skill(candidates[0], paths.workspace_root) if candidates else None
+    result = WorkflowEngine(state).request_approval(
+        resume_target, args.reason, active_skill=active_skill
+    )
+    return _finish_transition(
+        store,
+        trace,
+        state,
+        result,
+        started,
+        "workflow.request_approval",
+        WorkflowStatus.WAITING_APPROVAL,
+        active_skill,
+        {"resume_to": resume_target.value},
+    )
+
+
+def _approve(args: argparse.Namespace) -> int:
+    started = time.perf_counter()
+    paths, store, trace = _runtime(args)
+    _, router = _catalog(paths, args.skill_root)
+    state = store.load(args.task_id)
+    target = state.approval_return_status
+    if target is None:
+        raise ValueError("approval return status is missing")
+    candidates = router.candidates(target)
+    active_skill = router.as_active_skill(candidates[0], paths.workspace_root) if candidates else None
+    result = WorkflowEngine(state).approve(args.reason, active_skill=active_skill)
+    return _finish_transition(
+        store, trace, state, result, started, "workflow.approve", target, active_skill
+    )
+
+
+def _finish_transition(
+    store: JsonTaskStore,
+    trace: JsonlTraceWriter,
+    state: CodingTaskState,
+    result: TransitionResult,
+    started: float,
+    action: str,
+    requested_target: WorkflowStatus,
+    active_skill: ActiveSkill | None,
+    extra_metadata: dict[str, object] | None = None,
+) -> int:
+    forced_failure = result.forced_failure
+    previous = result.previous
+    current = result.current
+    store.save(state)
+    input_metadata = {"from": previous.value, "to": requested_target.value}
+    if extra_metadata:
+        input_metadata.update(extra_metadata)
+    trace.append(
+        TraceEvent(
+            task_id=state.task_id,
+            workflow_state=state.current_status.value,
+            action=action,
+            success=not forced_failure,
+            latency_ms=int((time.perf_counter() - started) * 1000),
+            skill=active_skill.name if active_skill else None,
+            input_metadata=input_metadata,
+            result_metadata={
+                "forced_failure": forced_failure,
+                "actual_status": current.value,
+            },
+            error=(state.errors[-1].message if forced_failure and state.errors else None),
+        )
+    )
+    _write_json(state.to_dict())
+    return 2 if forced_failure else 0
+
+
+def _skills(args: argparse.Namespace) -> int:
+    paths, _, _ = _runtime(args)
+    catalog, router = _catalog(paths, args.skill_root)
+    payload = {
+        "skill_root": str(catalog.skill_root),
+        "skill_count": len(catalog.all()),
+        "routes": {
+            status.value: [item.declared_name for item in router.candidates(status)]
+            for status in WorkflowStatus
+            if router.candidates(status)
+        },
+    }
+    _write_json(payload)
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    handlers = {
+        "init": _init,
+        "show": _show,
+        "transition": _transition,
+        "request-approval": _request_approval,
+        "approve": _approve,
+        "skills": _skills,
+    }
+    try:
+        return handlers[args.command](args)
+    except Exception as exc:
+        json.dump({"error": type(exc).__name__, "message": str(exc)}, sys.stderr)
+        sys.stderr.write("\n")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
