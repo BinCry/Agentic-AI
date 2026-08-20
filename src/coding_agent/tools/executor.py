@@ -16,6 +16,7 @@ from .patch_service import PatchToolError, PatchService
 from .policy import PolicyDecision, ToolPermissionPolicy, ToolPolicyError
 from .repository_service import RepositoryReadService, RepositoryToolError
 from .test_runner import AllowlistedTestRunner, TestRunnerError
+from ..rag.index import RepositoryIndex, StaleEvidenceError
 
 
 class ToolExecutionError(ValueError):
@@ -28,6 +29,7 @@ class ToolExecutor:
     def __init__(self, policy: ToolPermissionPolicy) -> None:
         self.policy = policy
         self.repository = RepositoryReadService(policy.paths)
+        self.rag = RepositoryIndex(policy.paths)
         self.patch = PatchService(policy.paths)
         self.tests = AllowlistedTestRunner(policy.paths)
         self.git = ReadOnlyGitService(policy.paths)
@@ -105,8 +107,10 @@ class ToolExecutor:
         started = time.perf_counter()
         try:
             result = self._dispatch(state, request, decision)
-        except (RepositoryToolError, PatchToolError, TestRunnerError, GitToolError, ToolPolicyError) as exc:
+        except (RepositoryToolError, PatchToolError, TestRunnerError, GitToolError, ToolPolicyError, StaleEvidenceError) as exc:
             result = ToolResult.failure(request.tool_name, "TOOL_REJECTED", str(exc))
+        except ToolExecutionError as exc:
+            result = ToolResult.failure(request.tool_name, "TOOL_GROUNDING_REQUIRED", str(exc))
         except OSError as exc:
             result = ToolResult.failure(request.tool_name, "TOOL_IO_ERROR", str(exc))
         self._trace(state, request, result, int((time.perf_counter() - started) * 1000))
@@ -140,12 +144,45 @@ class ToolExecutor:
         if request.tool_name == "repo.find_symbols":
             symbols = self.repository.find_symbols(arguments["path"])
             return ToolResult(request.tool_name, True, [asdict(item) for item in symbols])
+        if request.tool_name == "repo.retrieve":
+            retrieval = self.rag.retrieve_grounded_with_metrics(
+                arguments["query"],
+                top_k=arguments.get("top_k", 8),
+                maximum_retries=state.maximum_retrieval_retries,
+            )
+            hits = list(retrieval.hits)
+            for hit in hits:
+                if not any(item.chunk_id == hit.evidence.chunk_id for item in state.retrieved_evidence):
+                    state.retrieved_evidence.append(hit.evidence)
+            if arguments["query"] not in state.retrieval_queries:
+                state.retrieval_queries.append(arguments["query"])
+            return ToolResult(
+                request.tool_name,
+                True,
+                [
+                    {
+                        **asdict(hit.evidence),
+                        "lexical_score": hit.lexical_score,
+                        "vector_score": hit.vector_score,
+                        "symbol_score": hit.symbol_score,
+                    }
+                    for hit in hits
+                ],
+                metadata={"matches": len(hits), "retrieval_metrics": asdict(retrieval.metrics)},
+            )
         if request.tool_name == "repo.create_file":
             record = self.patch.create_file(arguments["path"], arguments["content"])
             self._record_modified_file(state, record.path)
             state.patches.append(record)
             return ToolResult(request.tool_name, True, asdict(record))
         if request.tool_name == "repo.apply_patch":
+            if not any(
+                evidence.path == arguments["path"] and self.rag.verify_evidence(evidence)
+                for evidence in state.retrieved_evidence
+            ):
+                raise ToolExecutionError(
+                    f"current grounded repository evidence is required before patching {arguments['path']}"
+                )
             record = self.patch.apply_unified_patch(
                 arguments["path"],
                 arguments["patch"],

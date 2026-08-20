@@ -44,6 +44,7 @@ DEFAULT_TOOL_SPECS = (
     ToolSpec("repo.read_file", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.search_text", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.find_symbols", ToolCategory.READ, True, False, READ_STATES),
+    ToolSpec("repo.retrieve", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.apply_patch", ToolCategory.MUTATION, False, True, EDIT_STATES),
     ToolSpec("repo.create_file", ToolCategory.MUTATION, False, True, EDIT_STATES),
     ToolSpec("test.run", ToolCategory.TEST, False, True, TEST_STATES, timeout_seconds=60.0),
@@ -87,6 +88,7 @@ class ToolPermissionPolicy:
             "repo.read_file": {"path"},
             "repo.search_text": {"query", "path", "regular_expression", "maximum_matches"},
             "repo.find_symbols": {"path"},
+            "repo.retrieve": {"query", "top_k"},
             "repo.apply_patch": {"path", "patch", "expected_sha256"},
             "repo.create_file": {"path", "content"},
             "test.run": {"profile"},
@@ -100,6 +102,7 @@ class ToolPermissionPolicy:
             "repo.read_file": ("path",),
             "repo.search_text": ("query",),
             "repo.find_symbols": ("path",),
+            "repo.retrieve": ("query",),
             "repo.apply_patch": ("path", "patch", "expected_sha256"),
             "repo.create_file": ("path", "content"),
             "test.run": ("profile",),
@@ -118,6 +121,10 @@ class ToolPermissionPolicy:
             value = arguments["maximum_matches"]
             if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 200:
                 raise ToolArgumentError("maximum_matches must be an integer between 1 and 200")
+        if "top_k" in arguments:
+            value = arguments["top_k"]
+            if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 100:
+                raise ToolArgumentError("top_k must be an integer between 1 and 100")
         if "expected_sha256" in arguments and not re.fullmatch(r"[0-9a-fA-F]{64}", arguments["expected_sha256"]):
             raise ToolArgumentError("expected_sha256 must be a SHA-256 hex digest")
         if "paths" in arguments:

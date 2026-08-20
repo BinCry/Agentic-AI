@@ -138,6 +138,7 @@ class McpToolServer:
             "repo.read_file": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}},
             "repo.search_text": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"}, "path": {"type": "string"}}},
             "repo.find_symbols": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}}},
+            "repo.retrieve": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"}, "top_k": {"type": "integer", "minimum": 1, "maximum": 100}}},
             "repo.apply_patch": {"type": "object", "required": ["path", "patch", "expected_sha256"], "properties": {"path": {"type": "string"}, "patch": {"type": "string"}, "expected_sha256": {"type": "string"}}},
             "repo.create_file": {"type": "object", "required": ["path", "content"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
             "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit"]}}},

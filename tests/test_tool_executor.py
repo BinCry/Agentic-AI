@@ -45,6 +45,7 @@ class ToolExecutorTests(WorkspaceTestCase):
             WorkflowStatus.EDITING.value,
         )
         executor = self.make_executor()
+        state.retrieved_evidence.append(executor.rag.retrieve_grounded("value = 1")[0].evidence)
         pending = executor.request_execution(state, request)
         self.assertEqual(pending.error_code, "APPROVAL_REQUIRED")
         self.assertEqual(state.current_status, WorkflowStatus.WAITING_APPROVAL)
@@ -96,6 +97,28 @@ class ToolExecutorTests(WorkspaceTestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.output, "value = 1\n")
         self.assertEqual(state.current_status, WorkflowStatus.EDITING)
+
+    def test_grounded_retrieval_updates_state_with_citation(self) -> None:
+        target = self.test_root / "module.py"
+        target.write_text("def run():\n    return 'needle'\n", encoding="utf-8")
+        state = self.make_state()
+        state.current_status = WorkflowStatus.RETRIEVING
+        state.validate()
+        result = self.make_executor().request_execution(
+            state,
+            ToolRequest(
+                "retrieve-1",
+                state.task_id,
+                "repo.retrieve",
+                {"query": "needle", "top_k": 3},
+                WorkflowStatus.RETRIEVING.value,
+            ),
+        )
+        self.assertTrue(result.success)
+        self.assertEqual(state.retrieval_queries, ["needle"])
+        self.assertTrue(state.retrieved_evidence)
+        self.assertEqual(state.retrieved_evidence[0].path, "module.py")
+        self.assertEqual(len(state.retrieved_evidence[0].file_digest), 64)
 
 
 if __name__ == "__main__":

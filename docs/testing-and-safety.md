@@ -23,6 +23,10 @@ Phase 2 adds policy, repository, patch, bounded subprocess, Git, executor and
 MCP contract coverage. The complete Phase 2 tool contract is documented in
 [Controlled MCP Tools](controlled-mcp-tools.md).
 
+Phase 3 adds AST/Markdown chunking, ingestion filters, persistent SQLite
+indexing, hybrid retrieval, grounded citations, stale recovery and retrieval
+metrics. See [Repository RAG](repository-rag.md).
+
 ## Coverage hành vi
 
 Bộ test Phase 1 bao phủ:

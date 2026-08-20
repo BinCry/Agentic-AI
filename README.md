@@ -6,7 +6,7 @@
 
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Hiện trạng: Phase 0, Phase 1 và Phase 2 (controlled MCP tools + approval policy) đã hoàn thành. Repository RAG và vòng chạy coding end-to-end thuộc các phase tiếp theo, chưa được quảng cáo là đã triển khai.
+Hiện trạng: Phase 0, Phase 1, Phase 2 (controlled MCP tools + approval policy) và Phase 3 (repository RAG + grounded citations) đã hoàn thành. Vòng chạy coding end-to-end thuộc phase tiếp theo.
 
 ## An toàn ổ đĩa
 
@@ -17,16 +17,16 @@ Hiện trạng: Phase 0, Phase 1 và Phase 2 (controlled MCP tools + approval po
 
 ## Chạy nhanh trên Windows
 
-Từ PowerShell trong `D:\HK5\AGENTIC`:
+Từ PowerShell trong `D:\Agentic-AI`:
 
 ```powershell
-$env:PYTHONPATH = 'D:\HK5\AGENTIC\src'
-python -B -m coding_agent --workspace D:\HK5\AGENTIC skills
-python -B -m coding_agent --workspace D:\HK5\AGENTIC init `
+$env:PYTHONPATH = 'D:\Agentic-AI\src'
+python -B -m coding_agent --workspace D:\Agentic-AI skills
+python -B -m coding_agent --workspace D:\Agentic-AI init `
   --task-id demo-01 `
   --issue 'Kiểm tra workflow coding agent' `
   --repository Agentic-AI
-python -B -m coding_agent --workspace D:\HK5\AGENTIC show --task-id demo-01
+python -B -m coding_agent --workspace D:\Agentic-AI show --task-id demo-01
 ```
 
 Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyên tử và ghi trace JSONL đã che các trường nhạy cảm.
@@ -76,9 +76,10 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 - [Chuẩn code](docs/code-standards.md)
 - [Kiểm thử và an toàn](docs/testing-and-safety.md)
 - [Controlled MCP Tools](docs/controlled-mcp-tools.md)
+- [Repository RAG](docs/repository-rag.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 
 ## Giới hạn hiện tại
 
-Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test. CLI chưa gọi LLM thật và chưa có repository index/vector search. Các khả năng đó chỉ được thêm khi phase tương ứng có test, policy và approval gate hoàn chỉnh.
+Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery. CLI chưa gọi LLM thật và chưa có autonomous coding loop; các khả năng đó thuộc Phase 4.

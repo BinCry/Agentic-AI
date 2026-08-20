@@ -11,6 +11,7 @@ remain owned by the controller.
 | `repo.read_file` | Read one bounded UTF-8 file | No | Analysis, retrieval, planning, editing, testing, debugging, review |
 | `repo.search_text` | Exact or explicitly requested regex line search | No | Same read states |
 | `repo.find_symbols` | Python AST class/function listing | No | Same read states |
+| `repo.retrieve` | Grounded hybrid retrieval with line citations | No | Same read states |
 | `repo.create_file` | Create a new file without overwrite | Yes | `EDITING`, `DEBUGGING` |
 | `repo.apply_patch` | Apply a single-file unified patch | Yes | `EDITING`, `DEBUGGING` |
 | `test.run` | Run the named `unit` profile | Yes | `TESTING`, `DEBUGGING` |
@@ -39,7 +40,7 @@ access and destructive commands are outside the Phase 2 surface.
 ## Running the stdio server
 
 ```powershell
-$repo = 'D:\HK5\AGENTIC'
+$repo = 'D:\Agentic-AI'
 $env:PYTHONPATH = Join-Path $repo 'src'
 python -B -m coding_agent `
   --workspace $repo `
@@ -73,12 +74,12 @@ Phase 2 is covered by unit, security, executor, MCP contract and CLI tests.
 Run the complete suite with:
 
 ```powershell
-$repo = 'D:\HK5\AGENTIC'
+$repo = 'D:\Agentic-AI'
 $env:PYTHONPATH = Join-Path $repo 'src'
 $env:CODING_AGENT_TEST_TMP = Join-Path $repo '.tmp'
 $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s (Join-Path $repo 'tests') -p 'test_*.py' -v
 ```
 
-Repository RAG, semantic retrieval, the autonomous LLM loop, durable approval
-history and checkpoint recovery remain in later phases.
+The autonomous LLM loop, durable approval history and checkpoint recovery
+remain in later phases.

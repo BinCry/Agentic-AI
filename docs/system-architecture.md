@@ -44,4 +44,4 @@ Mọi trạng thái đang chạy có thể chuyển sang `FAILED` theo transitio
 
 ## Hướng mở rộng
 
-Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 bổ sung repository index/retrieval có citation. Phase 4 mới kết nối LLM, retriever và MCP thành agent loop hoàn chỉnh.
+Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 đã bổ sung repository index/retrieval có citation, grounding và bounded stale recovery. Phase 4 mới kết nối LLM, retriever và MCP thành agent loop hoàn chỉnh.

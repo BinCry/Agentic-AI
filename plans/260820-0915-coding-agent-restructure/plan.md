@@ -22,7 +22,7 @@ Restructure the current Claude-Kit distribution into a lean academic Coding Agen
 | 0 | Repository audit and safe restructure | completed | [phase-00-repository-audit-and-restructure.md](./phase-00-repository-audit-and-restructure.md) |
 | 1 | Core task state and workflow | completed | [phase-01-core-task-state-and-workflow.md](./phase-01-core-task-state-and-workflow.md) |
 | 2 | Controlled MCP tools | completed | [phase-02-controlled-mcp-tools.md](./phase-02-controlled-mcp-tools.md) |
-| 3 | Repository RAG | pending | [phase-03-repository-rag.md](./phase-03-repository-rag.md) |
+| 3 | Repository RAG | completed | [phase-03-repository-rag.md](./phase-03-repository-rag.md) |
 | 4 | End-to-end coding workflow | pending | [phase-04-end-to-end-coding-workflow.md](./phase-04-end-to-end-coding-workflow.md) |
 | 5 | Reliability and recovery | pending | [phase-05-reliability-and-recovery.md](./phase-05-reliability-and-recovery.md) |
 | 6 | Evaluation and documentation | pending | [phase-06-evaluation-and-documentation.md](./phase-06-evaluation-and-documentation.md) |
