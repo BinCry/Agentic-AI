@@ -116,8 +116,13 @@ class WorkflowEngine:
         *,
         active_skill: ActiveSkill | None = None,
     ) -> TransitionResult:
-        if next_status not in {WorkflowStatus.EDITING, WorkflowStatus.FINALIZING}:
-            raise InvalidTransitionError("approval can resume only EDITING or FINALIZING")
+        if next_status not in {
+            WorkflowStatus.EDITING,
+            WorkflowStatus.TESTING,
+            WorkflowStatus.DEBUGGING,
+            WorkflowStatus.FINALIZING,
+        }:
+            raise InvalidTransitionError("approval can resume only an executable workflow state")
         self._validate_preconditions(next_status)
         previous_return_status = self.state.approval_return_status
         self.state.approval_return_status = next_status

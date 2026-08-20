@@ -4,7 +4,7 @@
 |---|---|---|
 | 0 | Audit, dọn generated/vendor artifacts, tạo layout tái lập | completed |
 | 1 | Task state, workflow, skill routing, LLM boundary, persistence, trace, CLI | completed |
-| 2 | Controlled MCP tools và approval policy | pending |
+| 2 | Controlled MCP tools và approval policy | completed |
 | 3 | Repository RAG, indexing, hybrid retrieval và citations | pending |
 | 4 | Agent loop end-to-end | pending |
 | 5 | Recovery, checkpoint, resilience và security hardening | pending |

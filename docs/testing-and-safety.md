@@ -8,8 +8,8 @@ Runtime root mặc định là `.coding-agent` bên trong workspace. `WorkspaceP
 
 Xem lệnh PowerShell đầy đủ trong README. Điều kiện bắt buộc trước khi chạy:
 
-- `PYTHONPATH=D:\Agentic-AI\src`
-- `CODING_AGENT_TEST_TMP` nằm dưới `D:\Agentic-AI\.tmp`
+- `PYTHONPATH` trỏ tới `<workspace>\src`
+- `CODING_AGENT_TEST_TMP` nằm dưới `<workspace>\.tmp`
 - `PYTHONDONTWRITEBYTECODE=1`
 - các biến temp/home/cache đều trỏ vào D
 
@@ -18,6 +18,10 @@ Sau đó chạy:
 ```powershell
 python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
+
+Phase 2 adds policy, repository, patch, bounded subprocess, Git, executor and
+MCP contract coverage. The complete Phase 2 tool contract is documented in
+[Controlled MCP Tools](controlled-mcp-tools.md).
 
 ## Coverage hành vi
 

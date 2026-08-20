@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Sequence
 
@@ -18,6 +19,10 @@ from .storage.task_store import JsonTaskStore
 from .storage.workspace import WorkspacePaths
 from .workflow.engine import TransitionResult, WorkflowEngine
 from .workflow.status import WorkflowStatus
+from .mcp.server import McpToolServer
+from .tools.contracts import ToolRequest
+from .tools.executor import ToolExecutor
+from .tools.policy import ToolPermissionPolicy
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -57,6 +62,16 @@ def _parser() -> argparse.ArgumentParser:
     approve_parser.add_argument("--task-id", required=True)
     approve_parser.add_argument("--reason", default="approval granted")
     approve_parser.add_argument("--skill-root", default=".claude/skills")
+
+    approve_tool_parser = subparsers.add_parser(
+        "approve-tool", help="Approve and execute the exact pending tool request"
+    )
+    approve_tool_parser.add_argument("--task-id", required=True)
+    approve_tool_parser.add_argument("--request-id", required=True)
+    approve_tool_parser.add_argument("--arguments-json", required=True)
+
+    mcp_parser = subparsers.add_parser("mcp-server", help="Serve controlled tools over JSON-RPC stdio")
+    mcp_parser.add_argument("--task-id", required=True)
 
     skills_parser = subparsers.add_parser("skills", help="List reusable skills by workflow state")
     skills_parser.add_argument("--skill-root", default=".claude/skills")
@@ -168,6 +183,39 @@ def _approve(args: argparse.Namespace) -> int:
     )
 
 
+def _approve_tool(args: argparse.Namespace) -> int:
+    paths, store, _ = _runtime(args)
+    state = store.load(args.task_id)
+    if state.pending_tool_call is None:
+        raise ValueError("task has no pending tool approval")
+    try:
+        arguments = json.loads(args.arguments_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"arguments-json must be valid JSON: {exc}") from exc
+    if not isinstance(arguments, dict):
+        raise ValueError("arguments-json must contain an object")
+    pending = state.pending_tool_call
+    request = ToolRequest(
+        request_id=args.request_id,
+        task_id=state.task_id,
+        tool_name=pending.tool_name,
+        arguments=arguments,
+        workflow_state=pending.workflow_state,
+    )
+    result = ToolExecutor(ToolPermissionPolicy(paths)).approve_and_execute(state, request)
+    store.save(state)
+    _write_json(asdict(result))
+    return 0 if result.success else 2
+
+
+def _mcp_server(args: argparse.Namespace) -> int:
+    paths, store, _ = _runtime(args)
+    state = store.load(args.task_id)
+    server = McpToolServer(state, ToolExecutor(ToolPermissionPolicy(paths)))
+    server.serve_forever(state_saver=store.save)
+    return 0
+
+
 def _finish_transition(
     store: JsonTaskStore,
     trace: JsonlTraceWriter,
@@ -231,6 +279,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "transition": _transition,
         "request-approval": _request_approval,
         "approve": _approve,
+        "approve-tool": _approve_tool,
+        "mcp-server": _mcp_server,
         "skills": _skills,
     }
     try:

@@ -20,6 +20,7 @@ from .records import (
     records_to_dict,
 )
 from .validation import ModelValidationError
+from ..tools.contracts import PendingToolCall
 from ..workflow.status import WorkflowStatus
 
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -57,6 +58,7 @@ class CodingTaskState:
     tool_execution_trace: list[ToolTraceRecord] = field(default_factory=list)
     final_summary: str = ""
     approval_return_status: WorkflowStatus | None = None
+    pending_tool_call: PendingToolCall | None = None
     schema_version: int = 1
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
@@ -97,6 +99,8 @@ class CodingTaskState:
             self.approval_return_status, WorkflowStatus
         ):
             errors.append("approval_return_status must be a WorkflowStatus or null")
+        if self.pending_tool_call is not None and not isinstance(self.pending_tool_call, PendingToolCall):
+            errors.append("pending_tool_call must be a PendingToolCall or null")
         for current, maximum, label in (
             (self.current_iteration, self.maximum_iterations, "iteration"),
             (self.current_repair_iteration, self.maximum_repair_iterations, "repair iteration"),
@@ -165,6 +169,8 @@ class CodingTaskState:
                 errors.append("WAITING_APPROVAL requires approval_return_status")
             elif self.approval_return_status not in {
                 WorkflowStatus.EDITING,
+                WorkflowStatus.TESTING,
+                WorkflowStatus.DEBUGGING,
                 WorkflowStatus.FINALIZING,
             }:
                 errors.append("WAITING_APPROVAL has an invalid approval_return_status")
@@ -237,6 +243,9 @@ class CodingTaskState:
         data["errors"] = records_to_dict(self.errors)
         data["checkpoints"] = records_to_dict(self.checkpoints)
         data["tool_execution_trace"] = records_to_dict(self.tool_execution_trace)
+        data["pending_tool_call"] = (
+            asdict(self.pending_tool_call) if self.pending_tool_call else None
+        )
         return data
 
     @classmethod
@@ -266,6 +275,8 @@ class CodingTaskState:
         payload["tool_execution_trace"] = [
             ToolTraceRecord.from_dict(item) for item in payload.get("tool_execution_trace", [])
         ]
+        pending = payload.get("pending_tool_call")
+        payload["pending_tool_call"] = PendingToolCall.from_dict(pending) if pending else None
         state = cls(**payload)
         state.validate()
         return state

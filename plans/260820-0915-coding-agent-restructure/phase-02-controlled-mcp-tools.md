@@ -7,7 +7,7 @@
 ## Overview
 
 - **Priority:** high
-- **Status:** pending
+- **Status:** completed
 - **Description:** Expose validated repository, patch, test, and Git tools through MCP.
 
 ## Requirements
@@ -19,14 +19,16 @@
 
 ## Todo
 
-- [ ] Define MCP contracts and permission policy.
-- [ ] Implement repository and mutation services.
-- [ ] Implement test and Git allowlists.
-- [ ] Add MCP transport and contract tests.
+- [x] Define MCP contracts and permission policy.
+- [x] Implement repository and mutation services.
+- [x] Implement test and Git allowlists.
+- [x] Add MCP transport and contract tests.
 
 ## Success Criteria
 
-- Traversal, forbidden commands, timeouts, and patch conflicts are tested.
+- Traversal, forbidden tools/arguments, timeouts, output limits, and patch conflicts are tested.
+- Mutating tools are bound to an exact approval request and arguments hash.
+- MCP `initialize`, `tools/list`, `tools/call`, and stdio notification handling are covered by contract tests.
 
 ## Risk Assessment
 
@@ -36,4 +38,20 @@
 
 ## Next Steps
 
-- Build retrieval over the same repository boundary.
+- Build retrieval over the same repository boundary in Phase 3.
+
+## Delivered Modules
+
+- `src/coding_agent/tools/contracts.py`: typed tool requests, results, specs, and pending approvals.
+- `src/coding_agent/tools/policy.py`: deny-by-default tool/state/path/argument policy.
+- `src/coding_agent/tools/repository_service.py`: bounded UTF-8 read, exact search, and Python symbols.
+- `src/coding_agent/tools/patch_service.py`: create and conflict-aware unified patch operations.
+- `src/coding_agent/tools/test_runner.py` and `git_service.py`: named test profiles and read-only Git.
+- `src/coding_agent/tools/executor.py`: controller-owned approval, dispatch, state updates, and trace metadata.
+- `src/coding_agent/mcp/server.py`: dependency-free JSON-RPC stdio transport.
+- CLI commands: `mcp-server` and `approve-tool`.
+
+## Verification
+
+- Full regression and Phase 2 contract suite: 65 tests passed; 2 Windows symlink tests skipped because the current account lacks symlink privilege.
+- No arbitrary shell command is exposed; subprocess calls use fixed allowlists, `shell=False`, bounded output, and timeout process-tree termination.

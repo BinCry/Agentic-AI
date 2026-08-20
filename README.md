@@ -6,7 +6,7 @@
 
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Hiện trạng: Phase 0 (dọn cấu trúc an toàn) và Phase 1 (task state + workflow foundation) đã hoàn thành. Repository RAG, controlled MCP tools và vòng chạy coding end-to-end thuộc các phase tiếp theo, chưa được quảng cáo là đã triển khai.
+Hiện trạng: Phase 0, Phase 1 và Phase 2 (controlled MCP tools + approval policy) đã hoàn thành. Repository RAG và vòng chạy coding end-to-end thuộc các phase tiếp theo, chưa được quảng cáo là đã triển khai.
 
 ## An toàn ổ đĩa
 
@@ -17,21 +17,23 @@ Hiện trạng: Phase 0 (dọn cấu trúc an toàn) và Phase 1 (task state + w
 
 ## Chạy nhanh trên Windows
 
-Từ PowerShell trong `D:\Agentic-AI`:
+Từ PowerShell trong `D:\HK5\AGENTIC`:
 
 ```powershell
-$env:PYTHONPATH = 'D:\Agentic-AI\src'
-python -B -m coding_agent --workspace D:\Agentic-AI skills
-python -B -m coding_agent --workspace D:\Agentic-AI init `
+$env:PYTHONPATH = 'D:\HK5\AGENTIC\src'
+python -B -m coding_agent --workspace D:\HK5\AGENTIC skills
+python -B -m coding_agent --workspace D:\HK5\AGENTIC init `
   --task-id demo-01 `
   --issue 'Kiểm tra workflow coding agent' `
   --repository Agentic-AI
-python -B -m coding_agent --workspace D:\Agentic-AI show --task-id demo-01
+python -B -m coding_agent --workspace D:\HK5\AGENTIC show --task-id demo-01
 ```
 
 Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyên tử và ghi trace JSONL đã che các trường nhạy cảm.
 
-Approval không đi qua lệnh `transition` trực tiếp. Dùng `request-approval --resume-to EDITING|FINALIZING`, sau đó dùng `approve`; resume target được lưu trong task state và validate lại khi đọc từ disk.
+Approval workflow dùng `request-approval --resume-to EDITING|FINALIZING`, sau đó dùng `approve`. Approval cho tool mutation/test dùng `approve-tool` và luôn kiểm tra lại request hash.
+
+Phase 2 tool surface, policy, approval flow và cách chạy MCP được mô tả trong [Controlled MCP Tools](docs/controlled-mcp-tools.md).
 
 ## Chạy test chỉ trên ổ D
 
@@ -73,9 +75,10 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 - [Tóm tắt codebase](docs/codebase-summary.md)
 - [Chuẩn code](docs/code-standards.md)
 - [Kiểm thử và an toàn](docs/testing-and-safety.md)
+- [Controlled MCP Tools](docs/controlled-mcp-tools.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 
 ## Giới hạn hiện tại
 
-Phase 1 mới cung cấp nền móng điều phối và persistence. CLI chưa gọi LLM thật, chưa chỉnh code tự động, chưa expose tool qua MCP và chưa có repository index/vector search. Các khả năng đó chỉ được thêm khi phase tương ứng có test, policy và approval gate hoàn chỉnh.
+Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test. CLI chưa gọi LLM thật và chưa có repository index/vector search. Các khả năng đó chỉ được thêm khi phase tương ứng có test, policy và approval gate hoàn chỉnh.
