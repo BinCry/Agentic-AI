@@ -1,303 +1,77 @@
-# Claude Kit - Bản quyền bảo lưu
+# Agentic Coding Agent
 
-![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Claude Kit là bộ workspace kit để dùng với AI coding tools, tập trung vào:
+Hiện trạng: Phase 0 (dọn cấu trúc an toàn) và Phase 1 (task state + workflow foundation) đã hoàn thành. Repository RAG, controlled MCP tools và vòng chạy coding end-to-end thuộc các phase tiếp theo, chưa được quảng cáo là đã triển khai.
 
-- `/.claude`: rules, hooks, agents, scripts, statusline, skills cho Claude Code
-- `/.codex`: skills cho Codex
-- `/plans/templates`: template plan để tổ chức công việc
-- `CLAUDE.md`: instruction gốc cho agent trong repo này
+## An toàn ổ đĩa
 
-Repo này phù hợp nếu bạn muốn tải về để:
+- Runtime mặc định ghi vào `<workspace>/.coding-agent`.
+- Mọi đường dẫn ghi phải nằm trong workspace.
+- Ổ `C:` bị từ chối theo mặc định trên Windows.
+- Test dùng temp/cache dưới `D:\Agentic-AI\.tmp`; không cần cài dependency Python ngoài.
 
-- dùng nguyên repo như một bộ mẫu tham khảo
-- copy `/.claude` và `/.codex` sang project khác
-- chia sẻ chung cho team để mọi người có cùng workflow
+## Chạy nhanh trên Windows
 
-## Tải Repo
-
-### Cách 1: Dùng git
-
-```bash
-git clone https://github.com/BinCry/Claude_Kit.git
-cd Claude_Kit
-```
-
-### Cách 2: Download ZIP
-
-1. Mở `https://github.com/BinCry/Claude_Kit`
-2. Bấm `Code`
-3. Chọn `Download ZIP`
-4. Giải nén và mở thư mục repo
-
-Lưu ý: repo này khá lớn vì đang giữ nguyên nhiều assets và dependency đã được đóng gói sẵn trong một số skill.
-
-## Yêu Cầu
-
-Nên có sẵn:
-
-- `Node.js 18+`
-- `Python 3`
-- `Git`
-- `bash` trên Windows
-
-Trên Windows, nên có một trong các package manager sau:
-
-- `winget`
-- `scoop`
-- `choco`
-
-## Cài Nhanh
-
-Nếu bạn chỉ muốn đọc tài liệu hoặc tham khảo skill thì không cần cài gì thêm.
-
-Nếu muốn dùng đầy đủ script và skill:
-
-### Windows
-
-Mở PowerShell:
+Từ PowerShell trong `D:\Agentic-AI`:
 
 ```powershell
-cd .claude\skills
-Set-ExecutionPolicy Bypass -Scope Process -Force
-.\install.ps1 -PreferPackageManager winget
+$env:PYTHONPATH = 'D:\Agentic-AI\src'
+python -B -m coding_agent --workspace D:\Agentic-AI skills
+python -B -m coding_agent --workspace D:\Agentic-AI init `
+  --task-id demo-01 `
+  --issue 'Kiểm tra workflow coding agent' `
+  --repository Agentic-AI
+python -B -m coding_agent --workspace D:\Agentic-AI show --task-id demo-01
 ```
 
-Nếu cần quyền admin cho một số package hệ thống:
+Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyên tử và ghi trace JSONL đã che các trường nhạy cảm.
+
+Approval không đi qua lệnh `transition` trực tiếp. Dùng `request-approval --resume-to EDITING|FINALIZING`, sau đó dùng `approve`; resume target được lưu trong task state và validate lại khi đọc từ disk.
+
+## Chạy test chỉ trên ổ D
 
 ```powershell
-.\install.ps1 -WithAdmin -PreferPackageManager choco
+$taskTemp = 'D:\Agentic-AI\.tmp\phase-01'
+New-Item -ItemType Directory -Force -Path $taskTemp | Out-Null
+$env:TEMP = $taskTemp
+$env:TMP = $taskTemp
+$env:HOME = $taskTemp
+$env:USERPROFILE = $taskTemp
+$env:PYTHONPYCACHEPREFIX = Join-Path $taskTemp 'pycache'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+$env:PYTHONPATH = 'D:\Agentic-AI\src'
+$env:CODING_AGENT_TEST_TMP = Join-Path $taskTemp 'tests'
+python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-### Linux / macOS
+## Cấu trúc chính
 
-```bash
-cd .claude/skills
-chmod +x install.sh
-./install.sh
+```text
+src/coding_agent/
+  models/          task state và structured decision models
+  workflow/        trạng thái, transition và giới hạn vòng lặp
+  skills/          đọc/routing các SKILL.md hiện hữu
+  llm/             provider-neutral interface và JSON validation
+  storage/         workspace policy và atomic task store
+  observability/   append-only JSONL trace có redaction
+tests/             unit và CLI integration tests
+docs/              kiến trúc, chuẩn code, kiểm thử và roadmap
+plans/             kế hoạch triển khai theo phase
 ```
 
-Script cài đặt sẽ setup các phần chính như:
+Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.opencode` vẫn được giữ để tương thích với các client hiện hữu. Các cây `node_modules`, coverage, bytecode và backup sinh tự động đã được xóa khỏi worktree và đang chờ commit; dependency có lockfile thì cài lại từ manifest/lock tương ứng trên ổ D khi cần.
 
-- `FFmpeg`
-- `ImageMagick`
-- `pnpm`
-- `wrangler`
-- `repomix`
-- Python virtual environment cho skills
+## Tài liệu
 
-## Cấu Hình
+- [Tổng quan và yêu cầu sản phẩm](docs/project-overview-pdr.md)
+- [Kiến trúc hệ thống](docs/system-architecture.md)
+- [Tóm tắt codebase](docs/codebase-summary.md)
+- [Chuẩn code](docs/code-standards.md)
+- [Kiểm thử và an toàn](docs/testing-and-safety.md)
+- [Roadmap](docs/project-roadmap.md)
+- [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 
-### 1. Biến môi trường
+## Giới hạn hiện tại
 
-Copy file mẫu:
-
-```bash
-cp .claude/.env.example .claude/.env
-```
-
-Trên Windows có thể tạo thủ công file `.claude\.env` từ `.claude\.env.example`.
-
-Điền các key bạn cần, ví dụ:
-
-- `GEMINI_API_KEY`
-- `STITCH_API_KEY`
-- `CLAUDEKIT_API_KEY`
-- webhook Telegram / Discord / Slack
-
-### 2. MCP server
-
-Nếu bạn dùng MCP:
-
-```bash
-cp .claude/.mcp.json.example .mcp.json
-```
-
-Sau đó sửa key và command theo môi trường của bạn.
-
-## Cách Dùng
-
-### Dùng trực tiếp repo này
-
-Bạn có thể mở thẳng thư mục repo bằng công cụ AI coding tương thích và làm việc ngay trên nó để:
-
-- tham khảo skill
-- chỉnh rule / hook / script
-- tái sử dụng cấu hình cho project khác
-
-### Gắn vào project khác
-
-Thông thường bạn sẽ copy các phần sau sang root project của mình:
-
-- `/.claude`
-- `/.codex`
-- `/plans/templates`
-- `CLAUDE.md`
-
-Khuyến nghị:
-
-- merge thủ công với `.gitignore` hiện có của project, không nên ghi đè mù
-- nếu project đã có `CLAUDE.md`, hãy hợp nhất nội dung thay vì thay toàn bộ
-- sau khi copy, chạy cài đặt trong `/.claude/skills`
-
-## Thành Phần Chính
-
-### `/.claude`
-
-Chứa phần lõi cho Claude Code:
-
-- `hooks/`: chặn đọc thư mục nặng, chặn file nhạy cảm, notification, status helpers
-- `agents/`: các persona như planner, debugger, tester, reviewer
-- `skills/`: thư viện skill lớn để mở rộng workflow
-- `scripts/`: tiện ích dùng chung như resolve env
-- `rules/`: bộ quy tắc làm việc
-
-### `/.codex`
-
-Chứa skill dành cho Codex, dùng cho các workflow tương tự nhưng theo cấu trúc của Codex.
-
-### `/plans/templates`
-
-Chứa mẫu plan để làm:
-
-- bug fix
-- feature implementation
-- refactor
-
-## Cập Nhật Repo
-
-Nếu bạn clone bằng git:
-
-```bash
-git pull origin main
-```
-
-Nếu bạn dùng bản copy trong project khác, nên cập nhật có chọn lọc:
-
-- `/.claude/rules`
-- `/.claude/hooks`
-- `/.claude/scripts`
-- skill nào bạn thực sự đang dùng
-
-## Gợi Ý Dùng Thực Tế
-
-- Nếu chỉ cần workflow Claude Code: ưu tiên `/.claude`
-- Nếu chỉ cần skill cho Codex: ưu tiên `/.codex`
-- Nếu muốn share cho team: giữ repo này như upstream, rồi copy/merge sang từng project
-
-## Repo
-
-- GitHub: `https://github.com/BinCry/Claude_Kit`
-
-## Windows Codex Setup On D Drive
-
-You have 2 supported Windows setups depending on whether Claude-Kit should load in every Codex session or only in selected projects.
-
-### Option A: Global Claude-Kit for Every Project
-
-Use this when you want:
-
-- `CODEX_HOME` on `D:`
-- Claude-Kit skills, hooks, agents, and `AGENTS.md` loaded in every project
-- one shared Claude-Kit repo on disk instead of copying config into each project
-
-1. Install Claude-Kit globally into `D:\CodexHome`
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome
-```
-
-The migration step preserves config/auth, session indexes, and top-level Codex SQLite state files when they already exist in the legacy home.
-The installer also broadcasts the updated Windows environment after changing `CODEX_HOME`, so newly launched apps can pick up `D:\CodexHome` more reliably before you fully sign out.
-
-If you also want the installer to start the cleanup watcher in the background immediately:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome -StartCleanupWatcher
-```
-
-If `CODEX_HOME` was already moved earlier and you only want to refresh the global Claude-Kit wiring:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-claude-kit-globally-to-codex-home.ps1 -TargetCodexHome D:\CodexHome -SkipStateMigration
-```
-
-2. Restart VS Code / Codex and verify:
-
-```powershell
-codex doctor
-```
-
-You can also run the Claude-Kit verifier for the static wiring checks:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-global-claude-kit-codex-home.ps1 -TargetCodexHome D:\CodexHome
-```
-
-If you want a one-screen status summary before cleanup or debugging:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\get-global-claude-kit-codex-home-status.ps1 -TargetCodexHome D:\CodexHome
-```
-
-Add `-RunCodexDoctor` when you also want the status script to confirm which `CODEX_HOME` a fresh `codex` launch would use when started from the configured user home.
-
-If you want to remove the global Claude-Kit wiring later but keep `CODEX_HOME` itself on `D:`, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall-claude-kit-globally-from-codex-home.ps1 -TargetCodexHome D:\CodexHome
-```
-
-3. After `codex doctor` confirms `CODEX_HOME` is `D:\CodexHome`, remove the old home on `C:` to free disk space:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-after-migration.ps1 -ExpectedCodexHome D:\CodexHome
-```
-
-If you want to start that cleanup watcher in the background right away, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-home-cleanup-watcher.ps1 -ExpectedCodexHome D:\CodexHome
-```
-
-The watcher now persists cleanup state in `D:\CodexHome\claudekit-legacy-codex-home-cleanup-status.json`, and `scripts/get-global-claude-kit-codex-home-status.ps1` will surface whether legacy-home cleanup is `waiting`, `completed`, or `failed`.
-
-When that cleanup runs after an older Codex session exits, it now performs one last state sync from the legacy home into `D:\CodexHome` before deleting `C:\Users\HP\.codex`, so the last pre-restart session data is preserved.
-
-This mode preserves built-in Codex `.system` skills, keeps the writable Codex home on `D:\CodexHome`, and points global Claude-Kit skills/hooks/agents back to this repo so updates in `D:\Claude-Kit` are reused everywhere.
-
-### Option B: Project-Local Claude-Kit Only
-
-Use this when you want `CODEX_HOME` on `D:` but only specific trusted projects should load Claude-Kit.
-
-1. Move `CODEX_HOME` to `D:\CodexHome`
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-codex-home-on-d-drive.ps1 -TargetCodexHome D:\CodexHome
-```
-
-This migration preserves config/auth, session indexes, and top-level Codex SQLite state files when they already exist in the legacy home.
-
-2. Attach Claude-Kit only to the project you choose
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\attach-claude-kit-to-project.ps1 -ProjectPath D:\my-project
-```
-
-3. Detach it from that project when you no longer want it there
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\detach-claude-kit-from-project.ps1 -ProjectPath D:\my-project
-```
-
-4. After you restart Codex / VS Code and confirm `codex doctor` uses `D:\CodexHome`, remove the old home on `C:` to free disk space
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\remove-legacy-codex-home-after-migration.ps1 -ExpectedCodexHome D:\CodexHome
-```
-
-This keeps the global Codex home on `D:\CodexHome`, while Claude-Kit is loaded only in projects that you explicitly attach and trust.
-
+Phase 1 mới cung cấp nền móng điều phối và persistence. CLI chưa gọi LLM thật, chưa chỉnh code tự động, chưa expose tool qua MCP và chưa có repository index/vector search. Các khả năng đó chỉ được thêm khi phase tương ứng có test, policy và approval gate hoàn chỉnh.
