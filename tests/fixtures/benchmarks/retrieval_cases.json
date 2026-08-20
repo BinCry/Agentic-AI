@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "phase6-repository-retrieval-smoke",
+  "cases": [
+    {
+      "case_id": "orchestrator-symbol",
+      "query": "CodingWorkflowOrchestrator",
+      "relevant_paths": ["src/coding_agent/workflow/orchestrator.py"]
+    },
+    {
+      "case_id": "grounded-patch",
+      "query": "ToolExecutor",
+      "relevant_paths": ["src/coding_agent/tools/executor.py"]
+    },
+    {
+      "case_id": "checkpoint-recovery",
+      "query": "CheckpointStore",
+      "relevant_paths": ["src/coding_agent/storage/checkpoint_store.py"]
+    }
+  ]
+}

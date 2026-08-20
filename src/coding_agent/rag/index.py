@@ -241,7 +241,8 @@ class RepositoryIndex:
         return "".join(lines[evidence.start_line - 1 : evidence.end_line]) == evidence.content
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path)
+        connection = sqlite3.connect(self.database_path, timeout=5.0)
+        connection.execute("PRAGMA busy_timeout = 5000")
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 

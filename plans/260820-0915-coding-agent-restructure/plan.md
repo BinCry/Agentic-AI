@@ -25,7 +25,7 @@ Restructure the current Claude-Kit distribution into a lean academic Coding Agen
 | 3 | Repository RAG | completed | [phase-03-repository-rag.md](./phase-03-repository-rag.md) |
 | 4 | End-to-end coding workflow | completed | [phase-04-end-to-end-coding-workflow.md](./phase-04-end-to-end-coding-workflow.md) |
 | 5 | Reliability and recovery | completed | [phase-05-reliability-and-recovery.md](./phase-05-reliability-and-recovery.md) |
-| 6 | Evaluation and documentation | pending | [phase-06-evaluation-and-documentation.md](./phase-06-evaluation-and-documentation.md) |
+| 6 | Evaluation and documentation | completed | [phase-06-evaluation-and-documentation.md](./phase-06-evaluation-and-documentation.md) |
 
 ## Dependencies
 

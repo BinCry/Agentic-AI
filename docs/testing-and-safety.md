@@ -35,6 +35,10 @@ Phase 5 adds valid-JSON context compaction, atomic checkpoint/file rollback,
 durable approval ledger and failure-injection coverage. See
 [Reliability and Recovery](reliability-and-recovery.md).
 
+Phase 6 adds versioned benchmark fixtures, retrieval/coding-agent metrics,
+machine-readable failure analysis and explicit null handling for missing samples.
+See [Evaluation and Benchmarking](evaluation.md).
+
 ## Coverage hành vi
 
 Bộ test Phase 1 bao phủ:

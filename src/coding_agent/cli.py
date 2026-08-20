@@ -24,6 +24,7 @@ from .mcp.server import McpToolServer
 from .tools.contracts import ToolRequest
 from .tools.executor import ToolExecutor
 from .tools.policy import ToolPermissionPolicy
+from .evaluation.runner import EvaluationRunner
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -87,6 +88,15 @@ def _parser() -> argparse.ArgumentParser:
 
     skills_parser = subparsers.add_parser("skills", help="List reusable skills by workflow state")
     skills_parser.add_argument("--skill-root", default=".claude/skills")
+
+    evaluate_parser = subparsers.add_parser(
+        "evaluate", help="Run a machine-readable retrieval/task evaluation"
+    )
+    evaluate_parser.add_argument(
+        "--benchmark", default="tests/fixtures/benchmarks/retrieval_cases.json"
+    )
+    evaluate_parser.add_argument("--top-k", type=int, default=5)
+    evaluate_parser.add_argument("--task-id", action="append", default=[])
     return parser
 
 
@@ -308,6 +318,14 @@ def _skills(args: argparse.Namespace) -> int:
     return 0
 
 
+def _evaluate(args: argparse.Namespace) -> int:
+    paths, store, _ = _runtime(args)
+    states = [store.load(task_id) for task_id in args.task_id]
+    report = EvaluationRunner(paths).run(args.benchmark, top_k=args.top_k, states=states)
+    _write_json(report)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
@@ -322,6 +340,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "approve-tool": _approve_tool,
         "mcp-server": _mcp_server,
         "skills": _skills,
+        "evaluate": _evaluate,
     }
     try:
         return handlers[args.command](args)

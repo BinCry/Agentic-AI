@@ -51,6 +51,10 @@ Phase 5 bổ sung `ContextProjector`/`ContextCompactor`, `CheckpointStore` và
 bytes để rollback, còn approval ledger độc lập với task JSON để chịu được gián
 đoạn tiến trình.
 
+Phase 6 bổ sung evaluation runner độc lập với provider, benchmark schema có
+version, metric retrieval/coding-agent và failure analysis JSON; metric tùy chọn
+không có sample sẽ trả `null` thay vì suy diễn.
+
 ## Phase 4 orchestration boundary
 
 ```mermaid

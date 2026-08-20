@@ -7,7 +7,7 @@
 ## Overview
 
 - **Priority:** medium
-- **Status:** pending
+- **Status:** completed
 - **Description:** Add benchmark data, metrics, failure analysis, operating docs, and risk controls.
 
 ## Requirements
@@ -19,14 +19,31 @@
 
 ## Todo
 
-- [ ] Add benchmark schema and sample fixtures.
-- [ ] Add retrieval and coding-agent metrics.
-- [ ] Add failure-analysis reports.
-- [ ] Complete operating and architecture documentation.
+- [x] Add versioned benchmark schema and sample fixtures.
+- [x] Add retrieval and coding-agent metrics.
+- [x] Add machine-readable failure-analysis reports.
+- [x] Complete operating, evaluation and architecture documentation.
 
 ## Success Criteria
 
-- Evaluation commands produce honest machine-readable results without fabricated passes.
+- Evaluation commands produce honest machine-readable results without fabricated
+  passes; missing task samples remain explicit as `null` metrics.
+
+## Delivered
+
+- `evaluation/runner.py` validates benchmark schema and computes Recall@K, MRR,
+  citation correctness, latency, completion, repair, regression and tool-failure
+  metrics.
+- `coding-agent evaluate` emits JSON and accepts repeated `--task-id` samples.
+- `tests/fixtures/benchmarks/retrieval_cases.json` provides three deterministic
+  repository cases.
+- Evaluation method and measured failure analysis are documented in
+  `docs/evaluation.md` and this phase's report.
+
+## Verification
+
+- Full regression after Phase 6 implementation: 78 tests passed, 2 Windows
+  symlink tests skipped because symlink privilege is unavailable.
 
 ## Risk Assessment
 

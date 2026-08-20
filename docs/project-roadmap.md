@@ -8,6 +8,6 @@
 | 3 | Repository RAG, indexing, hybrid retrieval và citations | completed |
 | 4 | Agent loop end-to-end | completed |
 | 5 | Recovery, checkpoint, resilience và security hardening | completed |
-| 6 | Evaluation, benchmark và tài liệu học thuật | pending |
+| 6 | Evaluation, benchmark và tài liệu học thuật | completed |
 
 Không bắt đầu phase kế tiếp chỉ vì phase trước đã code xong. Mỗi phase phải qua test, review và cập nhật tài liệu trước khi được duyệt triển khai tiếp.
