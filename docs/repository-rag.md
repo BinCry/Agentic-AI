@@ -73,9 +73,10 @@ Phase 2's read-only MCP surface now includes `repo.retrieve`:
 ```
 
 The controller stores returned evidence in `CodingTaskState.retrieved_evidence`
-and records the query in `retrieval_queries`. Phase 4 will decide when to call
-retrieval as part of an autonomous coding loop; Phase 3 does not implement that
-loop.
+and records the query in `retrieval_queries`. Phase 4's
+`CodingWorkflowOrchestrator` calls retrieval during `RETRIEVING` before it can
+request a mutation, so the patch boundary can require current evidence for the
+target file.
 
 ## Verification
 

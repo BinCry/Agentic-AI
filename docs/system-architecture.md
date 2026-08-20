@@ -44,4 +44,21 @@ Mọi trạng thái đang chạy có thể chuyển sang `FAILED` theo transitio
 
 ## Hướng mở rộng
 
-Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 đã bổ sung repository index/retrieval có citation, grounding và bounded stale recovery. Phase 4 mới kết nối LLM, retriever và MCP thành agent loop hoàn chỉnh.
+Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 đã bổ sung repository index/retrieval có citation, grounding và bounded stale recovery. Phase 4 đã kết nối structured LLM decisions, retriever và MCP thành agent loop bounded qua `CodingWorkflowOrchestrator`; mutation/test vẫn do controller và approval gate sở hữu.
+
+## Phase 4 orchestration boundary
+
+```mermaid
+flowchart LR
+    State[CodingTaskState] --> Orchestrator[CodingWorkflowOrchestrator]
+    Orchestrator --> Prompt[Bounded PromptAssembler]
+    Prompt --> LLM[Provider + StructuredOutputService]
+    Orchestrator --> RAG[repo.retrieve]
+    Orchestrator --> Tools[ToolExecutor]
+    Tools --> Approval[Approval Gate]
+    Tools --> Patch[Grounded Patch]
+    Tools --> Tests[Allowlisted Tests]
+    Tests --> Review[ReviewResult]
+    Review --> Final[TaskCompletionResult]
+    Orchestrator --> State
+```

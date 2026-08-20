@@ -141,7 +141,7 @@ class McpToolServer:
             "repo.retrieve": {"type": "object", "required": ["query"], "properties": {"query": {"type": "string"}, "top_k": {"type": "integer", "minimum": 1, "maximum": 100}}},
             "repo.apply_patch": {"type": "object", "required": ["path", "patch", "expected_sha256"], "properties": {"path": {"type": "string"}, "patch": {"type": "string"}, "expected_sha256": {"type": "string"}}},
             "repo.create_file": {"type": "object", "required": ["path", "content"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
-            "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit"]}}},
+            "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit", "fixture"]}}},
             "git.status": {"type": "object", "properties": {}},
             "git.diff": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}},
         }

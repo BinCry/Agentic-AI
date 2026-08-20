@@ -40,7 +40,7 @@ class ToolExecutorTests(WorkspaceTestCase):
             {
                 "path": "module.py",
                 "patch": "@@ -1 +1 @@\n-value = 1\n+value = 2\n",
-                "expected_sha256": hashlib.sha256(original.encode()).hexdigest(),
+                "expected_sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
             },
             WorkflowStatus.EDITING.value,
         )

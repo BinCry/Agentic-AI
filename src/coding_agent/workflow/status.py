@@ -25,7 +25,12 @@ ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
     WorkflowStatus.ANALYZING: frozenset({WorkflowStatus.RETRIEVING, WorkflowStatus.FAILED}),
     WorkflowStatus.RETRIEVING: frozenset({WorkflowStatus.PLANNING, WorkflowStatus.FAILED}),
     WorkflowStatus.PLANNING: frozenset(
-        {WorkflowStatus.EDITING, WorkflowStatus.WAITING_APPROVAL, WorkflowStatus.FAILED}
+        {
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.EDITING,
+            WorkflowStatus.WAITING_APPROVAL,
+            WorkflowStatus.FAILED,
+        }
     ),
     WorkflowStatus.EDITING: frozenset(
         {WorkflowStatus.TESTING, WorkflowStatus.WAITING_APPROVAL, WorkflowStatus.FAILED}
@@ -55,7 +60,13 @@ ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
         }
     ),
     WorkflowStatus.WAITING_APPROVAL: frozenset(
-        {WorkflowStatus.EDITING, WorkflowStatus.FINALIZING, WorkflowStatus.FAILED}
+        {
+            WorkflowStatus.EDITING,
+            WorkflowStatus.TESTING,
+            WorkflowStatus.DEBUGGING,
+            WorkflowStatus.FINALIZING,
+            WorkflowStatus.FAILED,
+        }
     ),
     WorkflowStatus.FINALIZING: frozenset({WorkflowStatus.COMPLETED, WorkflowStatus.FAILED}),
     WorkflowStatus.COMPLETED: frozenset(),

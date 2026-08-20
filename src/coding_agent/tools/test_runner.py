@@ -21,7 +21,20 @@ class TestProfileNotFoundError(TestRunnerError):
 
 
 class AllowlistedTestRunner:
-    PROFILES = {"unit": ("-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v")}
+    PROFILES = {
+        "unit": ("-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"),
+        "fixture": (
+            "-B",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests/fixtures/sample_repo",
+            "-p",
+            "test_*.py",
+            "-v",
+        ),
+    }
 
     def __init__(self, paths: WorkspacePaths, *, maximum_output_bytes: int = 64_000) -> None:
         self.paths = paths

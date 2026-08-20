@@ -52,8 +52,12 @@ class PatchService:
         target = self._existing_file_path(path)
         if len(patch.encode("utf-8")) > self.maximum_patch_bytes:
             raise PatchToolError("patch exceeds patch-size policy")
-        original = target.read_text(encoding="utf-8")
-        actual_sha256 = hashlib.sha256(original.encode("utf-8")).hexdigest()
+        try:
+            original_bytes = target.read_bytes()
+            original = original_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise PatchToolError(f"cannot read UTF-8 source for {path}: {exc}") from exc
+        actual_sha256 = hashlib.sha256(original_bytes).hexdigest()
         if actual_sha256.lower() != expected_sha256.lower():
             raise PatchConflictError(f"source digest mismatch for {path}")
         updated = self._apply_hunks(original, patch, path)

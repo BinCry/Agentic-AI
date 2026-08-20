@@ -39,7 +39,7 @@
 
 ## Next Steps
 
-- Connect retrieval and tools to the workflow controller in Phase 3 implementation; Phase 4 will add autonomous orchestration.
+- Connect retrieval and tools to the workflow controller; Phase 4 now provides the bounded autonomous orchestration loop.
 
 ## Delivered Modules
 

@@ -6,7 +6,7 @@
 
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Hiện trạng: Phase 0, Phase 1, Phase 2 (controlled MCP tools + approval policy) và Phase 3 (repository RAG + grounded citations) đã hoàn thành. Vòng chạy coding end-to-end thuộc phase tiếp theo.
+Hiện trạng: Phase 0 đến Phase 4 đã hoàn thành, gồm controlled MCP tools, repository RAG với grounded citations và vòng coding end-to-end có approval, test, repair và review.
 
 ## An toàn ổ đĩa
 
@@ -34,6 +34,9 @@ Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyê
 Approval workflow dùng `request-approval --resume-to EDITING|FINALIZING`, sau đó dùng `approve`. Approval cho tool mutation/test dùng `approve-tool` và luôn kiểm tra lại request hash.
 
 Phase 2 tool surface, policy, approval flow và cách chạy MCP được mô tả trong [Controlled MCP Tools](docs/controlled-mcp-tools.md).
+
+Vòng coding end-to-end, grounding, approval và fixture verification được mô tả
+trong [End-to-End Coding Workflow](docs/end-to-end-workflow.md).
 
 ## Chạy test chỉ trên ổ D
 
@@ -82,4 +85,4 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 
 ## Giới hạn hiện tại
 
-Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery. CLI chưa gọi LLM thật và chưa có autonomous coding loop; các khả năng đó thuộc Phase 4.
+Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery; Phase 4 kết nối các thành phần thành bounded coding loop có structured decisions, repair, review và completion invariants. Reliability/recovery nâng cao và benchmark vẫn thuộc Phase 5–6.

@@ -39,7 +39,7 @@ class RepositoryToolTests(WorkspaceTestCase):
         record = service.apply_unified_patch(
             "module.py",
             patch,
-            expected_sha256=hashlib.sha256(original.encode("utf-8")).hexdigest(),
+            expected_sha256=hashlib.sha256(target.read_bytes()).hexdigest(),
         )
         self.assertTrue(record.applied)
         self.assertEqual(target.read_text(encoding="utf-8"), "a = 3\nb = 2\n")

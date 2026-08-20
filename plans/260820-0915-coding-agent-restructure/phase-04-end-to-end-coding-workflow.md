@@ -7,7 +7,7 @@
 ## Overview
 
 - **Priority:** high
-- **Status:** pending
+- **Status:** completed
 - **Description:** Connect analysis, retrieval, planning, editing, testing, debugging, review, and summary.
 
 ## Requirements
@@ -19,14 +19,29 @@
 
 ## Todo
 
-- [ ] Implement observe/decide/execute/validate loop.
-- [ ] Connect skills, RAG, MCP tools, and state persistence.
-- [ ] Implement repair loop and final review gate.
-- [ ] Add an end-to-end fixture repository.
+- [x] Implement observe/decide/execute/validate loop.
+- [x] Connect RAG, controlled tools, approvals, and persisted task state.
+- [x] Implement bounded repair loop and final review gate.
+- [x] Add a deterministic end-to-end fixture repository.
 
 ## Success Criteria
 
-- A benchmark issue completes with passing tests, diff, trace, and citations.
+- A fixture issue completes with passing tests, a grounded diff, trace metadata,
+  and repository citations.
+
+## Delivered
+
+- `src/coding_agent/workflow/orchestrator.py` implements the bounded state-selected loop.
+- `PromptAssembler` keeps model context bounded and source-grounded.
+- `repo.retrieve` evidence is persisted and required for patch mutations.
+- `fixture` is an allowlisted test profile for deterministic E2E validation.
+- Windows path resolution and raw-byte SHA-256 checks keep evidence and patches
+  consistent across newline formats.
+
+## Verification
+
+- Full suite: 71 tests passed, 2 Windows symlink tests skipped because symlink
+  privilege is unavailable to the current account.
 
 ## Risk Assessment
 

@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from ..models.records import ToolTraceRecord
 from ..models.task_state import CodingTaskState, utc_now
+from ..storage.workspace import WorkspacePolicyError
 from ..workflow.engine import InvalidTransitionError, WorkflowEngine
 from ..workflow.status import WorkflowStatus
 from .contracts import PendingToolCall, ToolRequest, ToolResult
@@ -177,7 +178,8 @@ class ToolExecutor:
             return ToolResult(request.tool_name, True, asdict(record))
         if request.tool_name == "repo.apply_patch":
             if not any(
-                evidence.path == arguments["path"] and self.rag.verify_evidence(evidence)
+                self._same_workspace_path(evidence.path, arguments["path"])
+                and self.rag.verify_evidence(evidence)
                 for evidence in state.retrieved_evidence
             ):
                 raise ToolExecutionError(
@@ -205,6 +207,15 @@ class ToolExecutor:
     def _record_modified_file(state: CodingTaskState, path: str) -> None:
         if path not in state.modified_files:
             state.modified_files.append(path)
+
+    def _same_workspace_path(self, left: str, right: str) -> bool:
+        """Compare repository-relative paths independent of Windows separators."""
+        try:
+            left_path = self.policy.paths.resolve_workspace_path(left)
+            right_path = self.policy.paths.resolve_workspace_path(right)
+        except (OSError, WorkspacePolicyError):
+            return False
+        return left_path == right_path
 
     @staticmethod
     def _check_task_and_state(state: CodingTaskState, request: ToolRequest) -> None:

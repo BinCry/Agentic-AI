@@ -1,0 +1,60 @@
+# End-to-End Coding Workflow
+
+Phase 4 adds the bounded coding loop that connects structured model decisions,
+repository retrieval, controlled tools, workflow state and final validation.
+The orchestrator is provider-neutral; all repository side effects remain behind
+the Phase 2 `ToolExecutor` boundary.
+
+## Loop
+
+```text
+ANALYZING -> RETRIEVING -> PLANNING -> EDITING -> TESTING
+                                      ^           |
+                                      |           v
+                                  DEBUGGING <- failed test
+
+TESTING -> REVIEWING -> FINALIZING -> COMPLETED
+              |
+              v
+           EDITING (review findings)
+```
+
+`CodingWorkflowOrchestrator` selects one handler from the persisted
+`CodingTaskState` at a time. Each model response is validated against a typed
+structured-output model. Prompts include only bounded issue, plan, evidence,
+recent errors and tool-trace metadata; retrieved source chunks are cited by
+path, line range and file digest.
+
+## Safety and approvals
+
+- Retrieval is performed through the allowlisted `repo.retrieve` tool and its
+  grounded evidence is stored in task state.
+- `repo.apply_patch` and `test.run` remain approval-gated. The controller owns
+  approval and rechecks request identity and argument hash before execution.
+- A patch requires current evidence for the target file and a matching raw-byte
+  SHA-256 digest. Windows path separators are resolved through the workspace
+  boundary before evidence is matched.
+- Test failures enter the existing bounded repair state machine; global step,
+  repair-iteration and retrieval-retry limits still apply.
+- Review must approve before finalization. Completion requires acceptance
+  criteria, repository evidence, modified-file evidence and passing tests.
+
+## Deterministic verification
+
+`tests/test_orchestrator.py` builds a temporary fixture repository and uses a
+fake provider with fixed structured responses. It exercises retrieval,
+grounded patching, approval, the allowlisted `fixture` test profile, review and
+completion without an external API or network dependency.
+
+Run the full suite from PowerShell in `D:\Agentic-AI`:
+
+```powershell
+$env:PYTHONPATH = 'D:\Agentic-AI\src'
+$env:CODING_AGENT_TEST_TMP = 'D:\Agentic-AI\.tmp'
+$env:PYTHONDONTWRITEBYTECODE = '1'
+python -B -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+The Phase 4 verification run completed with 71 tests passing; two Windows
+symlink tests were skipped because the current account does not have symlink
+privilege.

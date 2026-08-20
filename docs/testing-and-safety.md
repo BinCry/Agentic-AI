@@ -27,6 +27,10 @@ Phase 3 adds AST/Markdown chunking, ingestion filters, persistent SQLite
 indexing, hybrid retrieval, grounded citations, stale recovery and retrieval
 metrics. See [Repository RAG](repository-rag.md).
 
+Phase 4 adds orchestrator E2E coverage for analysis, retrieval, structured plan,
+approval, grounded patch, fixture tests, review, finalization and bounded repair
+routing. See [End-to-End Coding Workflow](end-to-end-workflow.md).
+
 ## Coverage hành vi
 
 Bộ test Phase 1 bao phủ:
@@ -39,6 +43,11 @@ Bộ test Phase 1 bao phủ:
 - trace redaction và giới hạn kích thước;
 - model-output repair hữu hạn;
 - CLI init/show/transition và JSON errors.
+- bounded end-to-end orchestration with deterministic fixture provider;
+- Windows path-separator normalization and raw-byte patch digest checks.
+
+The Phase 4 full verification run passed 71 tests; 2 symlink tests were skipped
+because the current Windows account lacks symlink privilege.
 
 ## Artifact policy
 
