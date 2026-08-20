@@ -1,5 +1,11 @@
 # Agentic Coding Agent
 
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-Ready-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Phase](https://img.shields.io/badge/Phase_1-Complete-2EA44F?style=for-the-badge&logo=githubactions&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-47%2F47_Passing-2EA44F?style=for-the-badge&logo=checkmarx&logoColor=white)
+
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
 Hiện trạng: Phase 0 (dọn cấu trúc an toàn) và Phase 1 (task state + workflow foundation) đã hoàn thành. Repository RAG, controlled MCP tools và vòng chạy coding end-to-end thuộc các phase tiếp theo, chưa được quảng cáo là đã triển khai.
