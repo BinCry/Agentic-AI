@@ -70,6 +70,33 @@ class CodingTaskStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelValidationError, "passed_count"):
             CodingTaskState.from_dict(payload)
 
+    def test_plan_step_verification_and_progress_round_trip(self) -> None:
+        state = CodingTaskState.create("Issue", "repo")
+        state.implementation_plan = ImplementationPlan(
+            objective="Implement safely",
+            steps=[
+                ImplementationStep(
+                    "s1",
+                    "modify",
+                    "src/app.py",
+                    "Implement change",
+                    [],
+                    "run the focused unit test",
+                )
+            ],
+        )
+        state.current_plan_step_index = 1
+        state.completed_plan_step_ids = ["s1"]
+        state.current_status = WorkflowStatus.EDITING
+        state.validate()
+        restored = CodingTaskState.from_dict(state.to_dict())
+        self.assertEqual(restored.current_plan_step_index, 1)
+        self.assertEqual(restored.completed_plan_step_ids, ["s1"])
+        self.assertEqual(
+            restored.implementation_plan.steps[0].verification_method,
+            "run the focused unit test",
+        )
+
     def test_persisted_state_rejects_forged_terminal_and_waiting_states(self) -> None:
         payload = CodingTaskState.create("Issue", "repo").to_dict()
         payload["current_status"] = "COMPLETED"

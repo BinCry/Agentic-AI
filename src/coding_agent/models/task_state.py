@@ -49,6 +49,8 @@ class CodingTaskState:
     retrieval_queries: list[str] = field(default_factory=list)
     retrieved_evidence: list[RepositoryEvidence] = field(default_factory=list)
     implementation_plan: ImplementationPlan | None = None
+    current_plan_step_index: int = 0
+    completed_plan_step_ids: list[str] = field(default_factory=list)
     modified_files: list[str] = field(default_factory=list)
     patches: list[PatchRecord] = field(default_factory=list)
     test_results: list[TestExecution] = field(default_factory=list)
@@ -128,6 +130,12 @@ class CodingTaskState:
             or self.test_run_start_index > len(self.test_results)
         ):
             errors.append("invalid test_run_start_index")
+        if (
+            not isinstance(self.current_plan_step_index, int)
+            or isinstance(self.current_plan_step_index, bool)
+            or self.current_plan_step_index < 0
+        ):
+            errors.append("invalid current_plan_step_index")
         if not isinstance(self.schema_version, int) or isinstance(self.schema_version, bool):
             errors.append("schema_version must be an integer")
         elif self.schema_version != 1:
@@ -137,6 +145,7 @@ class CodingTaskState:
             (self.retrieval_queries, "retrieval_queries"),
             (self.modified_files, "modified_files"),
             (self.final_citations, "final_citations"),
+            (self.completed_plan_step_ids, "completed_plan_step_ids"),
         ):
             if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
                 errors.append(f"{label} must be a list of strings")
@@ -161,6 +170,19 @@ class CodingTaskState:
             self.implementation_plan, ImplementationPlan
         ):
             errors.append("implementation_plan has an invalid record type")
+        if self.implementation_plan is not None:
+            plan_step_ids = [step.id for step in self.implementation_plan.steps]
+            if self.current_plan_step_index > len(plan_step_ids):
+                errors.append("current_plan_step_index exceeds implementation plan")
+            if len(self.completed_plan_step_ids) != len(set(self.completed_plan_step_ids)):
+                errors.append("completed_plan_step_ids must be unique")
+            unknown_completed = set(self.completed_plan_step_ids) - set(plan_step_ids)
+            if unknown_completed:
+                errors.append(
+                    f"completed_plan_step_ids contains unknown steps: {sorted(unknown_completed)}"
+                )
+        elif self.current_plan_step_index or self.completed_plan_step_ids:
+            errors.append("plan-step progress requires implementation_plan")
         plan_required_states = {
             WorkflowStatus.EDITING,
             WorkflowStatus.TESTING,

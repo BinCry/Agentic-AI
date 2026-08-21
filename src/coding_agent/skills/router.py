@@ -11,6 +11,7 @@ from .catalog import SkillCatalog, SkillCatalogError, SkillDefinition
 DEFAULT_STATE_SKILLS: dict[WorkflowStatus, tuple[str, ...]] = {
     WorkflowStatus.ANALYZING: ("fix", "ask", "ck-debug"),
     WorkflowStatus.RETRIEVING: ("scout", "gkg", "ck-graphify"),
+    WorkflowStatus.VERIFYING_EVIDENCE: ("scout", "gkg", "ck-graphify"),
     WorkflowStatus.PLANNING: ("ck-plan", "cook"),
     WorkflowStatus.EDITING: ("cook", "fix"),
     WorkflowStatus.TESTING: ("test",),

@@ -105,6 +105,8 @@ class CodingWorkflowOrchestrator:
                 self._analyze()
             elif status is WorkflowStatus.RETRIEVING:
                 self._retrieve()
+            elif status is WorkflowStatus.VERIFYING_EVIDENCE:
+                self._verify_evidence()
             elif status is WorkflowStatus.PLANNING:
                 self._plan()
             elif status is WorkflowStatus.EDITING:
@@ -143,10 +145,26 @@ class CodingWorkflowOrchestrator:
         result = self.executor.request_execution(self.state, request)
         if not result.success:
             raise OrchestrationError(result.error_message or "repository retrieval failed")
-        self._transition(WorkflowStatus.PLANNING, "grounded repository evidence retrieved")
+        self._transition(WorkflowStatus.VERIFYING_EVIDENCE, "repository evidence retrieved")
+
+    def _verify_evidence(self) -> None:
+        if not self.state.retrieved_evidence:
+            raise OrchestrationError("repository evidence is required before planning")
+        stale = [
+            evidence.path
+            for evidence in self.state.retrieved_evidence
+            if not self.executor.rag.verify_evidence(evidence)
+        ]
+        if stale:
+            raise OrchestrationError(
+                f"repository evidence is stale or invalid: {sorted(set(stale))}"
+            )
+        self._transition(WorkflowStatus.PLANNING, "repository evidence verified")
 
     def _plan(self) -> None:
         self.state.implementation_plan = self._decide(ImplementationPlan)
+        self.state.current_plan_step_index = 0
+        self.state.completed_plan_step_ids = []
         self._transition(WorkflowStatus.EDITING, "implementation plan validated")
 
     def _edit(self) -> bool:

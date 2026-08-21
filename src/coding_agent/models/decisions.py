@@ -47,6 +47,7 @@ class ImplementationStep:
     file: str
     description: str
     dependencies: list[str] = field(default_factory=list)
+    verification_method: str = "run configured tests and review the final diff"
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "ImplementationStep":
@@ -57,6 +58,13 @@ class ImplementationStep:
             file=require_string(data, "file"),
             description=require_string(data, "description"),
             dependencies=require_string_list(data, "dependencies"),
+            verification_method=require_string(
+                data,
+                "verification_method",
+                allow_empty=False,
+            )
+            if "verification_method" in data
+            else "run configured tests and review the final diff",
         )
 
 

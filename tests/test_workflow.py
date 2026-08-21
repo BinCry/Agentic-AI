@@ -43,6 +43,7 @@ class WorkflowEngineTests(unittest.TestCase):
         for target in (
             WorkflowStatus.ANALYZING,
             WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
             WorkflowStatus.PLANNING,
         ):
             engine.transition(target, "test")
@@ -59,7 +60,7 @@ class WorkflowEngineTests(unittest.TestCase):
         self.add_completion_evidence(engine)
         engine.transition(WorkflowStatus.COMPLETED, "test")
         self.assertEqual(engine.state.current_status, WorkflowStatus.COMPLETED)
-        self.assertEqual(engine.state.current_iteration, 8)
+        self.assertEqual(engine.state.current_iteration, 9)
 
     def test_invalid_transition_is_rejected(self) -> None:
         engine = self.make_engine()
@@ -75,14 +76,24 @@ class WorkflowEngineTests(unittest.TestCase):
 
     def test_editing_requires_an_implementation_plan(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         with self.assertRaisesRegex(TransitionPreconditionError, "plan"):
             engine.transition(WorkflowStatus.EDITING, "missing plan")
 
     def test_review_and_completion_require_evidence(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         self.add_plan(engine)
         engine.transition(WorkflowStatus.EDITING, "test")
@@ -99,7 +110,12 @@ class WorkflowEngineTests(unittest.TestCase):
 
     def test_completion_requires_acceptance_repository_and_file_evidence(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         self.add_plan(engine)
         engine.transition(WorkflowStatus.EDITING, "test")
@@ -111,9 +127,23 @@ class WorkflowEngineTests(unittest.TestCase):
         with self.assertRaisesRegex(TransitionPreconditionError, "acceptance criteria"):
             engine.transition(WorkflowStatus.COMPLETED, "incomplete evidence")
 
+    def test_retrieval_requires_explicit_evidence_verification_stage(self) -> None:
+        engine = self.make_engine()
+        engine.transition(WorkflowStatus.ANALYZING, "analysis")
+        engine.transition(WorkflowStatus.RETRIEVING, "retrieve")
+        engine.transition(WorkflowStatus.VERIFYING_EVIDENCE, "evidence retrieved")
+        self.assertEqual(engine.state.current_status, WorkflowStatus.VERIFYING_EVIDENCE)
+        engine.transition(WorkflowStatus.PLANNING, "evidence verified")
+        self.assertEqual(engine.state.current_status, WorkflowStatus.PLANNING)
+
     def test_latest_repair_test_batch_can_supersede_historical_failure(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         self.add_plan(engine)
         engine.transition(WorkflowStatus.EDITING, "test")
@@ -142,6 +172,7 @@ class WorkflowEngineTests(unittest.TestCase):
         for target in (
             WorkflowStatus.ANALYZING,
             WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
             WorkflowStatus.PLANNING,
         ):
             engine.transition(target, "test")
@@ -176,7 +207,12 @@ class WorkflowEngineTests(unittest.TestCase):
 
     def test_approval_round_trip(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         self.add_plan(engine)
         engine.request_approval(WorkflowStatus.EDITING, "needs consent")
@@ -193,7 +229,12 @@ class WorkflowEngineTests(unittest.TestCase):
 
     def test_waiting_approval_cannot_be_bypassed_by_direct_transition(self) -> None:
         engine = self.make_engine()
-        for target in (WorkflowStatus.ANALYZING, WorkflowStatus.RETRIEVING, WorkflowStatus.PLANNING):
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
             engine.transition(target, "test")
         self.add_plan(engine)
         engine.request_approval(WorkflowStatus.EDITING, "needs consent")

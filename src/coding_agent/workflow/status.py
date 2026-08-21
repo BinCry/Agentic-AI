@@ -9,6 +9,7 @@ class WorkflowStatus(StrEnum):
     CREATED = "CREATED"
     ANALYZING = "ANALYZING"
     RETRIEVING = "RETRIEVING"
+    VERIFYING_EVIDENCE = "VERIFYING_EVIDENCE"
     PLANNING = "PLANNING"
     EDITING = "EDITING"
     TESTING = "TESTING"
@@ -23,7 +24,12 @@ class WorkflowStatus(StrEnum):
 ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
     WorkflowStatus.CREATED: frozenset({WorkflowStatus.ANALYZING, WorkflowStatus.FAILED}),
     WorkflowStatus.ANALYZING: frozenset({WorkflowStatus.RETRIEVING, WorkflowStatus.FAILED}),
-    WorkflowStatus.RETRIEVING: frozenset({WorkflowStatus.PLANNING, WorkflowStatus.FAILED}),
+    WorkflowStatus.RETRIEVING: frozenset(
+        {WorkflowStatus.VERIFYING_EVIDENCE, WorkflowStatus.FAILED}
+    ),
+    WorkflowStatus.VERIFYING_EVIDENCE: frozenset(
+        {WorkflowStatus.PLANNING, WorkflowStatus.FAILED}
+    ),
     WorkflowStatus.PLANNING: frozenset(
         {
             WorkflowStatus.RETRIEVING,
