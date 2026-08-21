@@ -49,9 +49,11 @@ evidence against the current workspace before planning.
 - Review must approve before finalization. Completion requires acceptance
   criteria, repository evidence, modified-file evidence and passing tests.
 - Finalization records the read-only Git diff (or the applied patch fallback
-  for a non-Git fixture), a PR summary and final citations before `COMPLETED`.
-  These fields are persisted in the task state and enforced by the model and
-  transition engine.
+  for a non-Git fixture), a PR summary, final citations and a seven-section
+  structured report before `COMPLETED`. Reported modified files must match the
+  controlled tool state, and report test/review sections are generated from
+  persisted executions and findings rather than model claims. See
+  [Structured Final Reporting](structured-final-report.md).
 
 ## Deterministic verification
 
@@ -70,5 +72,5 @@ $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The current full verification passed 100 tests; two Windows symlink tests were
+The current full verification passed 110 tests; two Windows symlink tests were
 skipped because the current account does not have symlink privilege.

@@ -9,9 +9,11 @@ from .decisions import (
     ToolDecision,
 )
 from .task_state import CodingTaskState
+from .records import FinalReport
 
 __all__ = [
     "CodingTaskState",
+    "FinalReport",
     "ImplementationPlan",
     "ImplementationStep",
     "IssueAnalysis",

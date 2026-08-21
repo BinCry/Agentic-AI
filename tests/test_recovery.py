@@ -82,6 +82,13 @@ class RecoveryTests(WorkspaceTestCase):
         self.assertEqual(payload["recent_tests"][0]["target"], "unit")
         self.assertEqual(len(payload["recent_tests"][0]["stdout_summary"]), 2_000)
 
+    def test_finalization_context_declares_required_completion_fields(self) -> None:
+        state = CodingTaskState.create("Finalize", "fixture", task_id="final-context")
+        payload = json.loads(ContextProjector().project(state, "TaskCompletionResult"))
+        requirements = payload["output_requirements"]
+        self.assertIn("reasoning", requirements)
+        self.assertIn("unresolved_findings", requirements)
+
     def test_checkpoint_failure_does_not_enter_pending_approval(self) -> None:
         target = self.test_root / "module.py"
         target.write_text("value = 1\n", encoding="utf-8")

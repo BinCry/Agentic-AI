@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep, ReviewFinding
-from coding_agent.models.records import ActiveSkill, RepositoryEvidence, TestExecution
+from coding_agent.models.records import ActiveSkill, FinalReport, RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.models.validation import ModelValidationError
 from coding_agent.workflow.status import WorkflowStatus
@@ -103,6 +103,22 @@ class CodingTaskStateTests(unittest.TestCase):
             "run the focused unit test",
         )
 
+    def test_final_report_round_trip_preserves_all_sections(self) -> None:
+        state = CodingTaskState.create("Issue", "repo")
+        state.review_summary = "Review approved."
+        state.final_report = FinalReport(
+            "completed",
+            "Implemented safely.",
+            "Repository evidence supports the minimal patch.",
+            ["src/app.py: apply the guarded change"],
+            ["unit: PASS (1 passed, 0 failed, 4 ms)"],
+            ["Approved: Review approved."],
+            ["src/app.py:1-5"],
+            ["No known limitations."],
+        )
+        restored = CodingTaskState.from_dict(state.to_dict())
+        self.assertEqual(restored.final_report.to_dict(), state.final_report.to_dict())
+
     def test_persisted_state_rejects_forged_terminal_and_waiting_states(self) -> None:
         payload = CodingTaskState.create("Issue", "repo").to_dict()
         payload["current_status"] = "COMPLETED"
@@ -112,6 +128,31 @@ class CodingTaskStateTests(unittest.TestCase):
         payload["current_status"] = "WAITING_APPROVAL"
         with self.assertRaisesRegex(ModelValidationError, "approval_return_status"):
             CodingTaskState.from_dict(payload)
+
+    def test_legacy_completed_state_without_report_remains_loadable(self) -> None:
+        state = CodingTaskState.create("Issue", "repo", task_id="legacy-completed")
+        state.current_status = WorkflowStatus.COMPLETED
+        state.acceptance_criteria = ["Tests pass"]
+        state.retrieved_evidence = [
+            RepositoryEvidence("c1", "src/app.py", 1, 1, "code", 1.0, "exact")
+        ]
+        state.implementation_plan = ImplementationPlan(
+            "Implement",
+            [ImplementationStep("s1", "modify", "src/app.py", "Implement", [])],
+        )
+        state.current_plan_step_index = 1
+        state.completed_plan_step_ids = ["s1"]
+        state.modified_files = ["src/app.py"]
+        state.test_results = [
+            TestExecution(["python"], "unit", 0, 1, 0, 1, "ok", "")
+        ]
+        state.final_summary = "Done"
+        state.final_diff = "diff"
+        state.pr_summary = "Done"
+        state.final_citations = ["src/app.py:1-1"]
+        restored = CodingTaskState.from_dict(state.to_dict())
+        self.assertEqual(restored.current_status, WorkflowStatus.COMPLETED)
+        self.assertIsNone(restored.final_report)
 
     def test_waiting_for_finalization_rejects_blocking_review_finding(self) -> None:
         state = CodingTaskState.create("Issue", "repo")

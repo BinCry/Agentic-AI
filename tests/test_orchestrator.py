@@ -9,7 +9,7 @@ from typing import Sequence
 from coding_agent.llm.provider import LLMMessage, LLMResponse
 from coding_agent.errors import ErrorCode
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
-from coding_agent.models.records import TestExecution
+from coding_agent.models.records import PatchRecord, RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.workspace import WorkspacePaths
 from coding_agent.tools.executor import ToolExecutor
@@ -130,6 +130,7 @@ class OrchestratorTests(WorkspaceTestCase):
                 {
                     "status": "completed",
                     "summary": "Phase 4 fixture completed with grounded evidence and passing tests.",
+                    "reasoning": "The helper lacked documentation; the minimal grounded patch added only a docstring.",
                     "modified_files": ["tests/fixtures/sample_repo/app.py"],
                     "tests_passed": True,
                     "citations": ["tests/fixtures/sample_repo/app.py:1-3"],
@@ -154,6 +155,13 @@ class OrchestratorTests(WorkspaceTestCase):
         self.assertEqual(state.completed_plan_step_ids, ["step-read", "step-modify"])
         self.assertEqual([item.target for item in state.test_results], ["fixture", "unit"])
         self.assertEqual(state.active_skill.name, "git")
+        self.assertIsNotNone(state.final_report)
+        self.assertEqual(state.final_report.status, "completed")
+        self.assertEqual(
+            [line.split(":", 1)[0] for line in state.final_report.tests],
+            ["fixture", "unit"],
+        )
+        self.assertIn("## Remaining Limitations", state.final_report.to_markdown())
         self.assertIn("Return the fixture greeting", app.read_text(encoding="utf-8"))
 
     def test_debug_decision_records_root_cause_before_repair(self) -> None:
@@ -294,6 +302,48 @@ class OrchestratorTests(WorkspaceTestCase):
         self.assertEqual(state.current_status, WorkflowStatus.FAILED)
         self.assertEqual(state.errors[-1].code, ErrorCode.INVALID_MODEL_OUTPUT.value)
         self.assertFalse(state.errors[-1].recoverable)
+
+    def test_final_report_conflict_fails_instead_of_claiming_success(self) -> None:
+        state = CodingTaskState.create("Finalize safely", "fixture", task_id="final-conflict")
+        state.current_status = WorkflowStatus.FINALIZING
+        state.acceptance_criteria = ["Tests pass"]
+        state.retrieved_evidence = [
+            RepositoryEvidence("c1", "module.py", 1, 1, "value = 1", 1.0, "exact")
+        ]
+        state.implementation_plan = ImplementationPlan(
+            "Patch module",
+            [ImplementationStep("s1", "modify", "module.py", "Update module")],
+        )
+        state.current_plan_step_index = 1
+        state.completed_plan_step_ids = ["s1"]
+        state.modified_files = ["module.py"]
+        state.patches = [PatchRecord("module.py", "patch", True, "now")]
+        state.test_results = [
+            TestExecution(["python"], "unit", 0, 1, 0, 2, "ok", "")
+        ]
+        state.review_summary = "Approved."
+        state.validate()
+        provider = FixtureProvider(
+            [
+                {
+                    "status": "completed",
+                    "summary": "Done.",
+                    "reasoning": "The patch addresses the issue.",
+                    "modified_files": ["other.py"],
+                    "tests_passed": True,
+                    "citations": ["module.py:1-1"],
+                    "unresolved_findings": [],
+                }
+            ]
+        )
+        executor = ToolExecutor(
+            ToolPermissionPolicy(WorkspacePaths.create(self.test_root).ensure())
+        )
+        orchestrator = CodingWorkflowOrchestrator(state, provider, executor)
+        with self.assertRaisesRegex(OrchestrationError, "conflicts with verified"):
+            orchestrator._finalize()
+        self.assertEqual(state.current_status, WorkflowStatus.FAILED)
+        self.assertEqual(state.errors[-1].code, ErrorCode.INVALID_MODEL_OUTPUT.value)
 
     def test_empty_retrieval_retries_are_bounded_before_failure(self) -> None:
         state = CodingTaskState.create(

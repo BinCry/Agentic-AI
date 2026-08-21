@@ -44,6 +44,9 @@ Checkpoint, rollback, context compaction và approval audit được mô tả tr
 Mã lỗi ổn định và tuyến phục hồi được mô tả trong
 [Error Taxonomy and Recovery](docs/error-taxonomy.md).
 
+Báo cáo cuối có cấu trúc, Definition of Done và lệnh xuất JSON/Markdown được mô
+tả trong [Structured Final Reporting](docs/structured-final-report.md).
+
 Benchmark, metric và failure analysis được mô tả trong
 [Evaluation and Benchmarking](docs/evaluation.md).
 
@@ -90,6 +93,7 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 - [Controlled MCP Tools](docs/controlled-mcp-tools.md)
 - [Repository RAG](docs/repository-rag.md)
 - [Error Taxonomy and Recovery](docs/error-taxonomy.md)
+- [Structured Final Reporting](docs/structured-final-report.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 

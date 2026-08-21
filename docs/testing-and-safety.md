@@ -35,6 +35,11 @@ Batch 2 adds typed failure coverage for empty retrieval, invalid model output,
 patch conflicts, failed/timed-out tests and access denial. See
 [Error Taxonomy and Recovery](error-taxonomy.md).
 
+Batch 2 finalization also persists a seven-section report, rejects success when
+model file claims conflict with controlled state, and exposes verified JSON or
+Markdown through the CLI. See
+[Structured Final Reporting](structured-final-report.md).
+
 Phase 5 adds valid-JSON context compaction, atomic checkpoint/file rollback,
 durable approval ledger and failure-injection coverage. See
 [Reliability and Recovery](reliability-and-recovery.md).
@@ -61,7 +66,7 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The latest full verification passed 100 tests; 2 symlink tests were skipped
+The latest full verification passed 110 tests; 2 symlink tests were skipped
 because the current Windows account lacks symlink privilege.
 
 ## Artifact policy

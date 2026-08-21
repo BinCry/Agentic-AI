@@ -9,6 +9,7 @@ from .validation import (
     ModelValidationError,
     optional_string,
     require_boolean,
+    require_choice,
     require_dict,
     require_integer,
     require_mapping,
@@ -211,6 +212,70 @@ class ToolTraceRecord:
             result_metadata=require_dict(payload, "result_metadata"),
             error=optional_string(payload, "error"),
         )
+
+
+@dataclass(slots=True)
+class FinalReport:
+    status: str
+    summary: str
+    root_cause_or_reasoning: str
+    changes: list[str]
+    tests: list[str]
+    review: list[str]
+    evidence: list[str]
+    remaining_limitations: list[str]
+
+    def __post_init__(self) -> None:
+        payload = asdict(self)
+        require_choice(payload, "status", {"completed", "failed"})
+        require_string(payload, "summary")
+        require_string(payload, "root_cause_or_reasoning")
+        for key in (
+            "changes",
+            "tests",
+            "review",
+            "evidence",
+            "remaining_limitations",
+        ):
+            require_string_list(payload, key, allow_empty=False)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FinalReport":
+        payload = require_mapping(data, "final_report")
+        return cls(
+            status=require_choice(payload, "status", {"completed", "failed"}),
+            summary=require_string(payload, "summary"),
+            root_cause_or_reasoning=require_string(payload, "root_cause_or_reasoning"),
+            changes=require_string_list(payload, "changes", allow_empty=False),
+            tests=require_string_list(payload, "tests", allow_empty=False),
+            review=require_string_list(payload, "review", allow_empty=False),
+            evidence=require_string_list(payload, "evidence", allow_empty=False),
+            remaining_limitations=require_string_list(
+                payload, "remaining_limitations", allow_empty=False
+            ),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def to_markdown(self) -> str:
+        sections: list[tuple[str, str | list[str]]] = [
+            ("Summary", self.summary),
+            ("Root Cause / Reasoning", self.root_cause_or_reasoning),
+            ("Changes", self.changes),
+            ("Tests", self.tests),
+            ("Review", self.review),
+            ("Evidence", self.evidence),
+            ("Remaining Limitations", self.remaining_limitations),
+        ]
+        lines = [f"# Final Report ({self.status})", ""]
+        for heading, content in sections:
+            lines.extend([f"## {heading}", ""])
+            if isinstance(content, str):
+                lines.extend([content, ""])
+            else:
+                lines.extend([*(f"- {item}" for item in content), ""])
+        return "\n".join(lines).rstrip() + "\n"
 
 
 def records_to_dict(records: list[Any]) -> list[dict[str, Any]]:

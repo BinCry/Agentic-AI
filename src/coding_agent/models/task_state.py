@@ -14,6 +14,7 @@ from .records import (
     ApprovalDecisionRecord,
     CheckpointRecord,
     ErrorRecord,
+    FinalReport,
     PatchRecord,
     RepositoryEvidence,
     TestExecution,
@@ -60,6 +61,7 @@ class CodingTaskState:
     test_results: list[TestExecution] = field(default_factory=list)
     test_run_start_index: int = 0
     review_findings: list[ReviewFinding] = field(default_factory=list)
+    review_summary: str = ""
     errors: list[ErrorRecord] = field(default_factory=list)
     checkpoints: list[CheckpointRecord] = field(default_factory=list)
     approval_decisions: list[ApprovalDecisionRecord] = field(default_factory=list)
@@ -68,6 +70,7 @@ class CodingTaskState:
     final_diff: str = ""
     pr_summary: str = ""
     final_citations: list[str] = field(default_factory=list)
+    final_report: FinalReport | None = None
     approval_return_status: WorkflowStatus | None = None
     pending_tool_call: PendingToolCall | None = None
     schema_version: int = 1
@@ -196,6 +199,10 @@ class CodingTaskState:
             errors.append("debug_action must be a string")
         elif self.debug_action not in {"", "edit", "retrieve", "fail"}:
             errors.append("debug_action must be empty, edit, retrieve, or fail")
+        if not isinstance(self.review_summary, str):
+            errors.append("review_summary must be a string")
+        if self.final_report is not None and not isinstance(self.final_report, FinalReport):
+            errors.append("final_report has an invalid record type")
         plan_required_states = {
             WorkflowStatus.EDITING,
             WorkflowStatus.TESTING,
@@ -268,6 +275,13 @@ class CodingTaskState:
                 errors.append("COMPLETED requires retrieved_evidence")
             if not any(item.strip() for item in self.modified_files):
                 errors.append("COMPLETED requires modified_files")
+            if self.final_report is not None:
+                if self.final_report.status != "completed":
+                    errors.append("COMPLETED requires a completed final_report")
+                elif self.final_report.summary != self.final_summary:
+                    errors.append("final_report summary must match final_summary")
+                elif self.final_report.evidence != self.final_citations:
+                    errors.append("final_report evidence must match final_citations")
         if errors:
             raise ModelValidationError(errors)
 
@@ -292,6 +306,7 @@ class CodingTaskState:
         data["checkpoints"] = records_to_dict(self.checkpoints)
         data["approval_decisions"] = records_to_dict(self.approval_decisions)
         data["tool_execution_trace"] = records_to_dict(self.tool_execution_trace)
+        data["final_report"] = self.final_report.to_dict() if self.final_report else None
         data["pending_tool_call"] = (
             asdict(self.pending_tool_call) if self.pending_tool_call else None
         )
@@ -328,6 +343,8 @@ class CodingTaskState:
         payload["tool_execution_trace"] = [
             ToolTraceRecord.from_dict(item) for item in payload.get("tool_execution_trace", [])
         ]
+        final_report = payload.get("final_report")
+        payload["final_report"] = FinalReport.from_dict(final_report) if final_report else None
         pending = payload.get("pending_tool_call")
         payload["pending_tool_call"] = PendingToolCall.from_dict(pending) if pending else None
         state = cls(**payload)

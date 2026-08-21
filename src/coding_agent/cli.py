@@ -42,6 +42,12 @@ def _parser() -> argparse.ArgumentParser:
     show_parser = subparsers.add_parser("show", help="Show persisted task state")
     show_parser.add_argument("--task-id", required=True)
 
+    report_parser = subparsers.add_parser(
+        "report", help="Print the verified final report for a completed task"
+    )
+    report_parser.add_argument("--task-id", required=True)
+    report_parser.add_argument("--format", choices=("json", "markdown"), default="json")
+
     checkpoints_parser = subparsers.add_parser(
         "checkpoints", help="List durable checkpoints for a task"
     )
@@ -148,6 +154,18 @@ def _init(args: argparse.Namespace) -> int:
 def _show(args: argparse.Namespace) -> int:
     _, store, _ = _runtime(args)
     _write_json(store.load(args.task_id).to_dict())
+    return 0
+
+
+def _report(args: argparse.Namespace) -> int:
+    _, store, _ = _runtime(args)
+    state = store.load(args.task_id)
+    if state.current_status is not WorkflowStatus.COMPLETED or state.final_report is None:
+        raise ValueError("final report is available only for a completed task")
+    if args.format == "markdown":
+        sys.stdout.write(state.final_report.to_markdown())
+    else:
+        _write_json(state.final_report.to_dict())
     return 0
 
 
@@ -332,6 +350,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     handlers = {
         "init": _init,
         "show": _show,
+        "report": _report,
         "checkpoints": _checkpoints,
         "recover": _recover,
         "transition": _transition,

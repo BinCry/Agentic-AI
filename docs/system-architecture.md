@@ -74,6 +74,12 @@ flowchart LR
     Tools --> Patch[Grounded Patch]
     Tools --> Tests[Allowlisted Tests]
     Tests --> Review[ReviewResult]
-    Review --> Final[TaskCompletionResult]
+    Review --> Completion[TaskCompletionResult]
+    Completion --> Final[Verified FinalReport Builder]
+    Final --> State
     Orchestrator --> State
 ```
+
+Batch 2 B2.5 keeps report assembly on the controller side. Model completion
+fields are reconciled with modified-file, test, review and citation records
+before `FinalReport` is persisted or the task can reach `COMPLETED`.

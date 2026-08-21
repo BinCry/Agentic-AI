@@ -22,6 +22,7 @@ from ..tools.executor import ToolExecutor
 from ..skills.router import SkillRouter
 from .engine import TransitionPreconditionError, WorkflowEngine
 from .context import ContextCompactor, ContextProjector
+from .reporting import FinalReportError, build_final_report
 from .status import WorkflowStatus
 
 
@@ -387,6 +388,7 @@ class CodingWorkflowOrchestrator:
     def _review(self) -> None:
         review = self._decide(ReviewResult)
         self.state.review_findings = list(review.findings)
+        self.state.review_summary = review.summary
         if not review.approved:
             self.state.pending_repair = True
         self._transition(
@@ -416,6 +418,12 @@ class CodingWorkflowOrchestrator:
             self.state.final_diff = "\n".join(item.patch for item in self.state.patches if item.applied)
         if not self.state.final_diff.strip():
             raise OrchestrationError("final diff is unavailable")
+        try:
+            self.state.final_report = build_final_report(self.state, completion)
+        except FinalReportError as exc:
+            message = f"final report conflicts with verified workflow state: {exc}"
+            WorkflowEngine(self.state).fail(ErrorCode.INVALID_MODEL_OUTPUT, message)
+            raise OrchestrationError(message) from exc
         self._transition(WorkflowStatus.COMPLETED, "completion invariants satisfied")
 
     def _build_pr_summary(self, summary: str) -> str:

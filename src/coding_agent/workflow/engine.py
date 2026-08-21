@@ -251,6 +251,8 @@ class WorkflowEngine:
             errors.append("PR summary is required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.final_citations:
             errors.append("final citations are required before COMPLETED")
+        if target is WorkflowStatus.COMPLETED and self.state.final_report is None:
+            errors.append("structured final report is required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.acceptance_criteria:
             errors.append("acceptance criteria are required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.retrieved_evidence:

@@ -114,12 +114,30 @@ class DecisionModelTests(unittest.TestCase):
                 {
                     "status": "completed",
                     "summary": "Done",
+                    "reasoning": "The guarded implementation satisfies the issue.",
                     "modified_files": ["src/app.py"],
                     "tests_passed": False,
                     "citations": [],
                     "unresolved_findings": [],
                 }
             )
+
+    def test_completed_result_preserves_non_blocking_limitations(self) -> None:
+        result = TaskCompletionResult.from_dict(
+            {
+                "status": "completed",
+                "summary": "Implemented safely.",
+                "reasoning": "The repository evidence supported the minimal patch.",
+                "modified_files": ["src/app.py"],
+                "tests_passed": True,
+                "citations": ["src/app.py:1-4"],
+                "unresolved_findings": ["A platform-specific test remains unavailable."],
+            }
+        )
+        self.assertEqual(
+            result.unresolved_findings,
+            ["A platform-specific test remains unavailable."],
+        )
 
 
 if __name__ == "__main__":

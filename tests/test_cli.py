@@ -7,6 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 
 from coding_agent.cli import main
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
+from coding_agent.models.records import FinalReport, RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.task_store import JsonTaskStore
 from coding_agent.storage.workspace import WorkspacePaths
@@ -118,6 +119,46 @@ class CliTests(WorkspaceTestCase):
         self.assertEqual((code, error), (0, ""))
         self.assertEqual(approved["current_status"], "EDITING")
         self.assertIsNone(approved["approval_return_status"])
+
+    def test_report_command_emits_only_verified_final_report(self) -> None:
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        state = CodingTaskState.create("Issue", "repo", task_id="report-cli")
+        state.current_status = WorkflowStatus.COMPLETED
+        state.acceptance_criteria = ["Tests pass"]
+        state.retrieved_evidence = [
+            RepositoryEvidence("c1", "src/app.py", 1, 2, "code", 1.0, "exact")
+        ]
+        state.implementation_plan = ImplementationPlan(
+            "Implement",
+            [ImplementationStep("s1", "modify", "src/app.py", "Implement", [])],
+        )
+        state.current_plan_step_index = 1
+        state.completed_plan_step_ids = ["s1"]
+        state.modified_files = ["src/app.py"]
+        state.test_results = [
+            TestExecution(["python"], "unit", 0, 1, 0, 4, "ok", "")
+        ]
+        state.final_summary = "Implemented safely."
+        state.final_diff = "diff --git a/src/app.py b/src/app.py"
+        state.pr_summary = "Implemented safely."
+        state.final_citations = ["src/app.py:1-2"]
+        state.final_report = FinalReport(
+            "completed",
+            state.final_summary,
+            "Repository evidence supports the patch.",
+            ["src/app.py: Implement"],
+            ["unit: PASS (1 passed, 0 failed, 4 ms)"],
+            ["Approved: no blocking findings."],
+            state.final_citations,
+            ["No known limitations."],
+        )
+        JsonTaskStore(paths).save(state)
+
+        code, payload, error = self.run_cli("report", "--task-id", "report-cli")
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(payload["status"], "completed")
+        self.assertEqual(payload["evidence"], ["src/app.py:1-2"])
+        self.assertNotIn("final_diff", payload)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep, ReviewFinding
-from coding_agent.models.records import RepositoryEvidence, TestExecution
+from coding_agent.models.records import FinalReport, RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.workflow.engine import (
     InvalidTransitionError,
@@ -57,6 +57,16 @@ class WorkflowEngineTests(unittest.TestCase):
         engine.state.final_diff = "diff --git a/src/app.py b/src/app.py"
         engine.state.pr_summary = "Completed safely"
         engine.state.final_citations = ["src/app.py:L1-L1"]
+        engine.state.final_report = FinalReport(
+            "completed",
+            "Completed safely",
+            "The verified implementation satisfies the acceptance criteria.",
+            ["src/app.py: Implement"],
+            ["tests: PASS (1 passed, 0 failed, 5 ms)"],
+            ["Approved: no blocking findings."],
+            ["src/app.py:L1-L1"],
+            ["No known limitations."],
+        )
         self.add_completion_evidence(engine)
         engine.transition(WorkflowStatus.COMPLETED, "test")
         self.assertEqual(engine.state.current_status, WorkflowStatus.COMPLETED)
@@ -126,6 +136,29 @@ class WorkflowEngineTests(unittest.TestCase):
         engine.state.final_summary = "Done"
         with self.assertRaisesRegex(TransitionPreconditionError, "acceptance criteria"):
             engine.transition(WorkflowStatus.COMPLETED, "incomplete evidence")
+
+    def test_completion_requires_structured_final_report(self) -> None:
+        engine = self.make_engine()
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
+            engine.transition(target, "test")
+        self.add_plan(engine)
+        engine.transition(WorkflowStatus.EDITING, "test")
+        engine.transition(WorkflowStatus.TESTING, "test")
+        self.add_passing_test(engine)
+        engine.transition(WorkflowStatus.REVIEWING, "test")
+        engine.transition(WorkflowStatus.FINALIZING, "test")
+        self.add_completion_evidence(engine)
+        engine.state.final_summary = "Done"
+        engine.state.final_diff = "diff --git a/src/app.py b/src/app.py"
+        engine.state.pr_summary = "Done"
+        engine.state.final_citations = ["src/app.py:L1-L1"]
+        with self.assertRaisesRegex(TransitionPreconditionError, "structured final report"):
+            engine.transition(WorkflowStatus.COMPLETED, "missing report")
 
     def test_retrieval_requires_explicit_evidence_verification_stage(self) -> None:
         engine = self.make_engine()

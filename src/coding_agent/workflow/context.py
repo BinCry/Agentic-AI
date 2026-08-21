@@ -109,4 +109,15 @@ class ContextProjector:
                 "retrieval_retry": [state.retrieval_retry_count, state.maximum_retrieval_retries],
             },
         }
+        if decision_name == "TaskCompletionResult":
+            payload["output_requirements"] = {
+                "status": "completed or failed",
+                "summary": "concise implemented outcome",
+                "reasoning": "root cause for a bug or repository-grounded implementation reasoning",
+                "modified_files": "exact paths modified by controlled tools",
+                "tests_passed": "must agree with current test executions",
+                "citations": "repository path and line citations",
+                "unresolved_findings": "known non-blocking limitations; use an empty list when none",
+                "pr_summary": "optional pull-request summary",
+            }
         return self.compactor.compact(payload)

@@ -204,6 +204,7 @@ class ReviewResult:
 class TaskCompletionResult:
     status: str
     summary: str
+    reasoning: str
     modified_files: list[str]
     tests_passed: bool
     citations: list[str]
@@ -216,16 +217,21 @@ class TaskCompletionResult:
         status = require_choice(data, "status", {"completed", "failed"})
         tests_passed = require_boolean(data, "tests_passed")
         unresolved = require_string_list(data, "unresolved_findings")
-        if status == "completed" and (not tests_passed or unresolved):
-            raise ModelValidationError(
-                ["completed result requires passing tests and no unresolved findings"]
-            )
+        modified_files = require_string_list(data, "modified_files")
+        citations = require_string_list(data, "citations")
+        if status == "completed" and not tests_passed:
+            raise ModelValidationError(["completed result requires passing tests"])
+        if status == "completed" and not modified_files:
+            raise ModelValidationError(["completed result requires modified files"])
+        if status == "completed" and not citations:
+            raise ModelValidationError(["completed result requires citations"])
         return cls(
             status=status,
             summary=require_string(data, "summary"),
-            modified_files=require_string_list(data, "modified_files"),
+            reasoning=require_string(data, "reasoning"),
+            modified_files=modified_files,
             tests_passed=tests_passed,
-            citations=require_string_list(data, "citations"),
+            citations=citations,
             unresolved_findings=unresolved,
             pr_summary=(data.get("pr_summary", "") if isinstance(data.get("pr_summary", ""), str) else ""),
         )
