@@ -9,5 +9,9 @@
 | 4 | Agent loop end-to-end | completed |
 | 5 | Recovery, checkpoint, resilience và security hardening | completed |
 | 6 | Evaluation, benchmark và tài liệu học thuật | completed |
+| B2 | Evidence verification, grounded execution, staged debug, typed recovery và verified final report | completed (2026-08-22) |
 
 Không bắt đầu phase kế tiếp chỉ vì phase trước đã code xong. Mỗi phase phải qua test, review và cập nhật tài liệu trước khi được duyệt triển khai tiếp.
+
+Batch 2 đã qua gate cuối B2.6. Chi tiết mapping yêu cầu, commit và regression
+nằm trong [Batch 2 Acceptance Report](batch-2-acceptance.md).

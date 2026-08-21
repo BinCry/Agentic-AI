@@ -69,6 +69,9 @@ Bộ test Phase 1 bao phủ:
 The latest full verification passed 110 tests; 2 symlink tests were skipped
 because the current Windows account lacks symlink privilege.
 
+Batch 2 final acceptance, requirement mapping and known limitations are recorded
+in [Batch 2 Acceptance Report](batch-2-acceptance.md).
+
 ## Artifact policy
 
 Không commit `node_modules`, coverage output, bytecode, backup hay runtime task/trace. Lockfiles và manifest phải được commit để dependency có thể tái tạo. Dữ liệu runtime trong `.coding-agent` là local-only và có thể chứa nội dung issue/repository, nên không đưa vào Git.

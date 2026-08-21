@@ -6,7 +6,10 @@
 
 Đây là nền tảng coding agent dựa trên skill, được cấu trúc lại từ bộ Claude-Kit hiện có. Runtime mới dùng Python 3.11+, lưu task state ngoài hội thoại, điều phối bằng state machine rõ ràng và tái sử dụng trực tiếp các `SKILL.md` trong repository.
 
-Hiện trạng: Phase 0 đến Phase 6 đã hoàn thành, gồm controlled MCP tools, repository RAG, vòng coding end-to-end, recovery crash-safe và evaluation benchmark machine-readable.
+Hiện trạng: Phase 0 đến Phase 6 và Batch 2 hardening đã hoàn thành, gồm
+controlled MCP tools, repository RAG, evidence verification, staged
+test/debug/recovery, verified final reporting, recovery crash-safe và evaluation
+benchmark machine-readable.
 
 ## An toàn ổ đĩa
 
@@ -30,6 +33,14 @@ python -B -m coding_agent --workspace D:\Agentic-AI show --task-id demo-01
 ```
 
 Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyên tử và ghi trace JSONL đã che các trường nhạy cảm.
+
+Sau khi task đạt `COMPLETED`, xuất báo cáo đã xác minh bằng:
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI report `
+  --task-id demo-01 `
+  --format markdown
+```
 
 Approval workflow dùng `request-approval --resume-to EDITING|FINALIZING`, sau đó dùng `approve`. Approval cho tool mutation/test dùng `approve-tool` và luôn kiểm tra lại request hash.
 
@@ -81,7 +92,11 @@ docs/              kiến trúc, chuẩn code, kiểm thử và roadmap
 plans/             kế hoạch triển khai theo phase
 ```
 
-Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.opencode` vẫn được giữ để tương thích với các client hiện hữu. Các cây `node_modules`, coverage, bytecode và backup sinh tự động đã được xóa khỏi worktree và đang chờ commit; dependency có lockfile thì cài lại từ manifest/lock tương ứng trên ổ D khi cần.
+Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và
+`.opencode` vẫn được giữ để tương thích với các client hiện hữu. `node_modules`,
+coverage, bytecode, runtime state, temp data và backup sinh tự động không thuộc
+source control; dependency có lockfile thì cài lại từ manifest/lock tương ứng
+trên ổ D khi cần.
 
 ## Tài liệu
 
@@ -94,9 +109,27 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 - [Repository RAG](docs/repository-rag.md)
 - [Error Taxonomy and Recovery](docs/error-taxonomy.md)
 - [Structured Final Reporting](docs/structured-final-report.md)
+- [Batch 2 Acceptance Report](docs/batch-2-acceptance.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 
-## Giới hạn hiện tại
+## Năng lực đã triển khai
 
-Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding và stale recovery; Phase 4 kết nối các thành phần thành bounded coding loop có structured decisions, repair, review và completion invariants; Phase 5 bổ sung checkpoint/rollback, durable approvals và bounded context; Phase 6 bổ sung benchmark, metrics và failure analysis có output machine-readable.
+Phase 1 cung cấp nền móng điều phối và persistence; Phase 2 bổ sung các tool
+repository/test/Git được allowlist và expose qua JSON-RPC stdio MCP với approval
+cho mutation/test; Phase 3 bổ sung SQLite hybrid retrieval, citations, grounding
+và stale recovery; Phase 4 kết nối các thành phần thành bounded coding loop có
+structured decisions, repair, review và completion invariants; Phase 5 bổ sung
+checkpoint/rollback, durable approvals và bounded context; Phase 6 bổ sung
+benchmark, metrics và failure analysis có output machine-readable. Batch 2
+hardening bổ sung evidence verification tường minh, staged execution/debug,
+typed recovery và verified final report.
+
+## Giới hạn còn lại
+
+- Embedding mặc định là deterministic/offline; provider semantic production cần
+  triển khai interface sẵn có.
+- Runtime chỉ cho phép tool repository/test/Git đã allowlist, không cung cấp
+  shell tùy ý.
+- Hai test symlink-hardening trên Windows sẽ skip nếu tài khoản chạy test không
+  có quyền tạo symlink.
