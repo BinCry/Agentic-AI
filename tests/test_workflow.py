@@ -202,7 +202,7 @@ class WorkflowEngineTests(unittest.TestCase):
     def test_retrieval_failure_cannot_mutate_terminal_task(self) -> None:
         engine = self.make_engine()
         engine.transition(WorkflowStatus.FAILED, "terminal")
-        with self.assertRaisesRegex(InvalidTransitionError, "only while RETRIEVING"):
+        with self.assertRaisesRegex(InvalidTransitionError, "only while retrieving"):
             engine.record_retrieval_failure("late failure")
 
     def test_approval_round_trip(self) -> None:

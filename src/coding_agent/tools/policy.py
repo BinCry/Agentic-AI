@@ -26,6 +26,10 @@ class ToolArgumentError(ToolPolicyError):
     """Raised when a tool argument is malformed or unsafe."""
 
 
+class ToolAccessError(ToolArgumentError):
+    """Raised when a tool path violates the workspace access boundary."""
+
+
 @dataclass(slots=True, frozen=True)
 class PolicyDecision:
     spec: ToolSpec
@@ -170,4 +174,4 @@ class ToolPermissionPolicy:
             try:
                 self.paths.resolve_workspace_path(value, must_exist=must_exist)
             except WorkspacePolicyError as exc:
-                raise ToolArgumentError(str(exc)) from exc
+                raise ToolAccessError(str(exc)) from exc

@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import unittest
+from unittest.mock import patch
 
+from coding_agent.errors import ErrorCode
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
+from coding_agent.models.records import TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.workspace import WorkspacePaths
 from coding_agent.tools.contracts import ToolRequest
@@ -135,6 +138,94 @@ class ToolExecutorTests(WorkspaceTestCase):
         self.assertTrue(state.retrieved_evidence)
         self.assertEqual(state.retrieved_evidence[0].path, "module.py")
         self.assertEqual(len(state.retrieved_evidence[0].file_digest), 64)
+
+    def test_empty_retrieval_uses_structured_error_code(self) -> None:
+        state = self.make_state()
+        state.current_status = WorkflowStatus.RETRIEVING
+        state.validate()
+        result = self.make_executor().request_execution(
+            state,
+            ToolRequest(
+                "retrieve-empty",
+                state.task_id,
+                "repo.retrieve",
+                {"query": "definitely-missing-symbol", "top_k": 3},
+                WorkflowStatus.RETRIEVING.value,
+            ),
+        )
+        self.assertEqual(result.error_code, ErrorCode.RETRIEVAL_EMPTY.value)
+        self.assertEqual(state.errors[-1].code, ErrorCode.RETRIEVAL_EMPTY.value)
+        self.assertTrue(state.errors[-1].recoverable)
+
+    def test_access_boundary_uses_access_denied_code(self) -> None:
+        state = self.make_state()
+        result = self.make_executor().request_execution(
+            state,
+            ToolRequest(
+                "read-escape",
+                state.task_id,
+                "repo.read_file",
+                {"path": "../outside.py"},
+                WorkflowStatus.EDITING.value,
+            ),
+        )
+        self.assertEqual(result.error_code, ErrorCode.ACCESS_DENIED.value)
+        self.assertEqual(state.errors[-1].code, ErrorCode.ACCESS_DENIED.value)
+        self.assertFalse(state.errors[-1].recoverable)
+
+    def test_patch_conflict_is_recoverable_and_typed(self) -> None:
+        target = self.test_root / "module.py"
+        target.write_text("value = 1\n", encoding="utf-8")
+        state = self.make_state()
+        executor = self.make_executor()
+        state.retrieved_evidence.append(executor.rag.retrieve_grounded("value = 1")[0].evidence)
+        request = ToolRequest(
+            "patch-conflict",
+            state.task_id,
+            "repo.apply_patch",
+            {
+                "path": "module.py",
+                "patch": "@@ -1 +1 @@\n-value = 1\n+value = 2\n",
+                "expected_sha256": "0" * 64,
+            },
+            WorkflowStatus.EDITING.value,
+        )
+        executor.request_execution(state, request)
+        result = executor.approve_and_execute(state, request)
+        self.assertEqual(result.error_code, ErrorCode.PATCH_CONFLICT.value)
+        self.assertEqual(state.errors[-1].code, ErrorCode.PATCH_CONFLICT.value)
+        self.assertTrue(state.errors[-1].recoverable)
+
+    def test_failed_and_timed_out_tests_have_distinct_codes(self) -> None:
+        cases = (
+            (
+                TestExecution(["python"], "unit", 1, 0, 1, 2, "", "failed"),
+                ErrorCode.TEST_FAILED,
+            ),
+            (
+                TestExecution(["python"], "unit", 1, 0, 0, 2, "", "timeout", True),
+                ErrorCode.TEST_TIMEOUT,
+            ),
+        )
+        for execution, expected_code in cases:
+            with self.subTest(expected_code=expected_code.value):
+                state = self.make_state()
+                state.current_status = WorkflowStatus.TESTING
+                state.validate()
+                executor = self.make_executor()
+                request = ToolRequest(
+                    f"test-{expected_code.value.lower()}",
+                    state.task_id,
+                    "test.run",
+                    {"profile": "unit"},
+                    WorkflowStatus.TESTING.value,
+                )
+                with patch.object(executor.tests, "run", return_value=execution):
+                    executor.request_execution(state, request)
+                    result = executor.approve_and_execute(state, request)
+                self.assertEqual(result.error_code, expected_code.value)
+                self.assertEqual(state.errors[-1].code, expected_code.value)
+                self.assertTrue(state.errors[-1].recoverable)
 
 
 if __name__ == "__main__":

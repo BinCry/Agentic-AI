@@ -12,6 +12,7 @@ from dataclasses import asdict
 from typing import Any, Callable, TextIO
 from uuid import uuid4
 
+from ..errors import ErrorCode
 from ..models.task_state import CodingTaskState
 from ..tools.contracts import ToolRequest, ToolResult
 from ..tools.executor import ToolExecutionError, ToolExecutor
@@ -105,7 +106,11 @@ class McpToolServer:
         try:
             result = self.executor.request_execution(self.state, request)
         except (ToolExecutionError, ValueError) as exc:
-            result = ToolResult.failure(name, "TOOL_REQUEST_INVALID", str(exc))
+            result = ToolResult.failure(
+                name,
+                ErrorCode.TOOL_REQUEST_INVALID.value,
+                str(exc),
+            )
         return self._tool_result(result)
 
     @staticmethod

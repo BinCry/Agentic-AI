@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..errors import ErrorCode, is_recoverable, normalize_error_code
 from ..models.records import ActiveSkill, ErrorRecord
 from ..models.task_state import CodingTaskState, utc_now
 from .status import WorkflowStatus, can_transition
@@ -67,16 +68,22 @@ class WorkflowEngine:
         if target is WorkflowStatus.FAILED:
             if self.state.current_iteration < self.state.maximum_iterations:
                 self.state.current_iteration += 1
-            self._set_failed("TASK_FAILED", reason)
+            self._set_failed(ErrorCode.TASK_FAILED, reason)
             self.state.validate()
             return TransitionResult(previous=previous, current=target, reason=reason)
         if self.state.current_iteration >= self.state.maximum_iterations:
-            return self._fail_for_limit("MAX_ITERATIONS", "maximum workflow iterations exceeded", reason)
+            return self._fail_for_limit(
+                ErrorCode.MAX_ITERATIONS,
+                "maximum workflow iterations exceeded",
+                reason,
+            )
         self._validate_preconditions(target)
         if previous is WorkflowStatus.DEBUGGING and target is WorkflowStatus.EDITING:
             if self.state.current_repair_iteration >= self.state.maximum_repair_iterations:
                 return self._fail_for_limit(
-                    "MAX_REPAIR_ITERATIONS", "maximum repair iterations exceeded", reason
+                    ErrorCode.MAX_REPAIR_ITERATIONS,
+                    "maximum repair iterations exceeded",
+                    reason,
                 )
             self.state.current_repair_iteration += 1
         self.state.current_iteration += 1
@@ -90,24 +97,53 @@ class WorkflowEngine:
         self.state.validate()
         return TransitionResult(previous=previous, current=target, reason=reason)
 
-    def record_retrieval_failure(self, message: str) -> bool:
-        if self.state.current_status is not WorkflowStatus.RETRIEVING:
-            raise InvalidTransitionError("retrieval failures can be recorded only while RETRIEVING")
+    def record_retrieval_failure(
+        self,
+        message: str,
+        *,
+        code: ErrorCode = ErrorCode.RETRIEVAL_EMPTY,
+    ) -> bool:
+        if self.state.current_status not in {
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+        }:
+            raise InvalidTransitionError(
+                "retrieval failures can be recorded only while retrieving or verifying evidence"
+            )
         if self.state.retrieval_retry_count >= self.state.maximum_retrieval_retries:
-            self._set_failed("MAX_RETRIEVAL_RETRIES", "maximum retrieval retries exceeded")
+            self._set_failed(
+                ErrorCode.MAX_RETRIEVAL_RETRIES,
+                "maximum retrieval retries exceeded",
+            )
             return False
         self.state.retrieval_retry_count += 1
+        self.record_error(code, message)
+        return True
+
+    def record_error(
+        self,
+        code: ErrorCode | str,
+        message: str,
+        *,
+        recoverable: bool | None = None,
+    ) -> None:
+        normalized = normalize_error_code(code)
         self.state.errors.append(
             ErrorRecord(
-                code="RETRIEVAL_FAILED",
+                code=normalized,
                 message=message,
                 workflow_state=self.state.current_status.value,
                 created_at=utc_now(),
-                recoverable=True,
+                recoverable=is_recoverable(normalized) if recoverable is None else recoverable,
             )
         )
         self.state.touch()
-        return True
+
+    def fail(self, code: ErrorCode | str, message: str) -> None:
+        if self.state.current_status in {WorkflowStatus.COMPLETED, WorkflowStatus.FAILED}:
+            raise InvalidTransitionError("terminal task cannot be failed again")
+        self._set_failed(code, message)
+        self.state.validate()
 
     def request_approval(
         self,
@@ -161,7 +197,12 @@ class WorkflowEngine:
             approval_requested=False,
         )
 
-    def _fail_for_limit(self, code: str, message: str, reason: str) -> TransitionResult:
+    def _fail_for_limit(
+        self,
+        code: ErrorCode | str,
+        message: str,
+        reason: str,
+    ) -> TransitionResult:
         previous = self.state.current_status
         self._set_failed(code, message)
         return TransitionResult(
@@ -171,16 +212,22 @@ class WorkflowEngine:
             forced_failure=True,
         )
 
-    def _set_failed(self, code: str, message: str) -> None:
-        self.state.errors.append(
-            ErrorRecord(
-                code=code,
-                message=message,
-                workflow_state=self.state.current_status.value,
-                created_at=utc_now(),
-                recoverable=False,
+    def _set_failed(self, code: ErrorCode | str, message: str) -> None:
+        normalized = normalize_error_code(code)
+        if not (
+            self.state.errors
+            and self.state.errors[-1].code == normalized
+            and self.state.errors[-1].message == message
+        ):
+            self.state.errors.append(
+                ErrorRecord(
+                    code=normalized,
+                    message=message,
+                    workflow_state=self.state.current_status.value,
+                    created_at=utc_now(),
+                    recoverable=False,
+                )
             )
-        )
         self.state.current_status = WorkflowStatus.FAILED
         self.state.approval_return_status = None
         self.state.touch()

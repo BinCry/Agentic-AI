@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Sequence
 
 from coding_agent.llm.provider import LLMMessage, LLMResponse
+from coding_agent.errors import ErrorCode
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
 from coding_agent.models.records import TestExecution
 from coding_agent.models.task_state import CodingTaskState
@@ -272,6 +273,87 @@ class OrchestratorTests(WorkspaceTestCase):
         orchestrator._review()
         self.assertEqual(state.current_status, WorkflowStatus.EDITING)
         self.assertTrue(state.pending_repair)
+
+    def test_invalid_model_output_fails_with_typed_error(self) -> None:
+        state = CodingTaskState.create("Reject invalid JSON", "fixture", task_id="invalid-model")
+        state.current_status = WorkflowStatus.ANALYZING
+        state.validate()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(WorkspacePaths.create(self.test_root).ensure())
+        )
+        provider = FixtureProvider([])
+        provider.responses = ["not-json"]
+        orchestrator = CodingWorkflowOrchestrator(
+            state,
+            provider,
+            executor,
+            structured_retries=0,
+        )
+        with self.assertRaisesRegex(OrchestrationError, "remained invalid"):
+            orchestrator._analyze()
+        self.assertEqual(state.current_status, WorkflowStatus.FAILED)
+        self.assertEqual(state.errors[-1].code, ErrorCode.INVALID_MODEL_OUTPUT.value)
+        self.assertFalse(state.errors[-1].recoverable)
+
+    def test_empty_retrieval_retries_are_bounded_before_failure(self) -> None:
+        state = CodingTaskState.create(
+            "Find missing evidence",
+            "fixture",
+            task_id="retrieval-empty",
+            maximum_retrieval_retries=1,
+        )
+        state.current_status = WorkflowStatus.RETRIEVING
+        state.validate()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(WorkspacePaths.create(self.test_root).ensure())
+        )
+        orchestrator = CodingWorkflowOrchestrator(state, FixtureProvider([]), executor)
+        orchestrator._retrieve()
+        self.assertEqual(state.current_status, WorkflowStatus.RETRIEVING)
+        self.assertEqual(state.retrieval_retry_count, 1)
+        orchestrator._retrieve()
+        self.assertEqual(state.current_status, WorkflowStatus.FAILED)
+        self.assertEqual(state.errors[-1].code, ErrorCode.MAX_RETRIEVAL_RETRIES.value)
+
+    def test_patch_conflict_routes_back_to_retrieval(self) -> None:
+        target = self.test_root / "module.py"
+        target.write_text("value = 1\n", encoding="utf-8")
+        state = CodingTaskState.create("Patch safely", "fixture", task_id="patch-route")
+        state.current_status = WorkflowStatus.EDITING
+        state.implementation_plan = ImplementationPlan(
+            "Patch module",
+            [ImplementationStep("step-1", "modify", "module.py", "Update value")],
+        )
+        state.validate()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(WorkspacePaths.create(self.test_root).ensure())
+        )
+        state.retrieved_evidence.append(executor.rag.retrieve_grounded("value = 1")[0].evidence)
+        provider = FixtureProvider(
+            [
+                {
+                    "tool_name": "repo.apply_patch",
+                    "arguments": {
+                        "path": "module.py",
+                        "patch": "@@ -1 +1 @@\n-value = 1\n+value = 2\n",
+                        "expected_sha256": "0" * 64,
+                    },
+                    "rationale": "Exercise conflict recovery.",
+                    "requires_approval": True,
+                }
+            ]
+        )
+        orchestrator = CodingWorkflowOrchestrator(
+            state,
+            provider,
+            executor,
+            approval_handler=lambda current_state, request: True,
+        )
+        orchestrator._edit()
+        self.assertEqual(state.current_status, WorkflowStatus.RETRIEVING)
+        self.assertEqual(state.errors[-1].code, ErrorCode.PATCH_CONFLICT.value)
+        self.assertFalse(state.retrieved_evidence)
+        self.assertEqual(state.retrieval_queries[0], "module.py")
 
 
 if __name__ == "__main__":

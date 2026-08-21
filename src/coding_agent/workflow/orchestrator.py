@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from ..errors import ErrorCode
 from ..llm.provider import LLMMessage, LLMProvider
-from ..llm.structured_output import StructuredOutputService
+from ..llm.structured_output import StructuredOutputError, StructuredOutputService
 from ..models.decisions import (
     DebugDecision,
     ImplementationPlan,
@@ -156,32 +157,53 @@ class CodingWorkflowOrchestrator:
             result = self.executor.request_execution(self.state, request)
             if not result.success:
                 failures.append(result.error_message or f"query failed: {query}")
+                if result.error_code == ErrorCode.ACCESS_DENIED.value:
+                    WorkflowEngine(self.state).fail(
+                        ErrorCode.ACCESS_DENIED,
+                        result.error_message or "repository retrieval access denied",
+                    )
+                    return
 
         if not self.state.retrieved_evidence:
             details = f"; errors: {' | '.join(failures)}" if failures else ""
-            raise OrchestrationError(
-                f"repository retrieval returned no grounded evidence for {len(queries)} query(s){details}"
+            WorkflowEngine(self.state).record_retrieval_failure(
+                f"repository retrieval returned no grounded evidence for {len(queries)} query(s){details}",
+                code=ErrorCode.RETRIEVAL_EMPTY,
             )
+            return
         self._transition(WorkflowStatus.VERIFYING_EVIDENCE, "repository evidence retrieved")
 
     def _verify_evidence(self) -> None:
         if not self.state.retrieved_evidence:
-            raise OrchestrationError("repository evidence is required before planning")
+            engine = WorkflowEngine(self.state)
+            if engine.record_retrieval_failure(
+                "repository evidence is required before planning",
+                code=ErrorCode.RETRIEVAL_EMPTY,
+            ):
+                self._transition(WorkflowStatus.RETRIEVING, "retry missing repository evidence")
+            return
         stale = [
             evidence.path
             for evidence in self.state.retrieved_evidence
             if not self.executor.rag.verify_evidence(evidence)
         ]
         if stale:
-            raise OrchestrationError(
-                f"repository evidence is stale or invalid: {sorted(set(stale))}"
-            )
+            message = f"repository evidence is stale or invalid: {sorted(set(stale))}"
+            self.state.retrieved_evidence = []
+            engine = WorkflowEngine(self.state)
+            if engine.record_retrieval_failure(
+                message,
+                code=ErrorCode.RETRIEVAL_FAILED,
+            ):
+                self._transition(WorkflowStatus.RETRIEVING, "retry stale repository evidence")
+            return
         self._transition(WorkflowStatus.PLANNING, "repository evidence verified")
 
     def _plan(self) -> None:
         self.state.implementation_plan = self._decide(ImplementationPlan)
         self.state.current_plan_step_index = 0
         self.state.completed_plan_step_ids = []
+        self.state.pending_repair = False
         self._transition(WorkflowStatus.EDITING, "implementation plan validated")
 
     def _edit(self) -> bool:
@@ -212,11 +234,28 @@ class CodingWorkflowOrchestrator:
             workflow_state=self.state.current_status.value,
         )
         result = self.executor.request_execution(self.state, request, reason=decision.rationale)
-        if result.error_code == "APPROVAL_REQUIRED":
+        if result.error_code == ErrorCode.APPROVAL_REQUIRED.value:
             if not self._approve(request):
                 return False
             result = self.executor.approve_and_execute(self.state, request)
         if not result.success:
+            if result.error_code == ErrorCode.PATCH_CONFLICT.value:
+                conflict_query = step.file if step is not None else self.state.original_issue
+                self.state.retrieval_queries = list(
+                    dict.fromkeys([conflict_query, *self.state.retrieval_queries])
+                )
+                self.state.retrieved_evidence = []
+                self._transition(
+                    WorkflowStatus.RETRIEVING,
+                    "patch conflict requires fresh evidence and replanning",
+                )
+                return True
+            if result.error_code == ErrorCode.ACCESS_DENIED.value:
+                WorkflowEngine(self.state).fail(
+                    ErrorCode.ACCESS_DENIED,
+                    result.error_message or "editing access denied",
+                )
+                return True
             raise OrchestrationError(result.error_message or "editing tool failed")
         if self.state.pending_repair:
             self.state.pending_repair = False
@@ -249,11 +288,17 @@ class CodingWorkflowOrchestrator:
             request,
             reason=f"run {stage_name} {profile} tests",
         )
-        if result.error_code == "APPROVAL_REQUIRED":
+        if result.error_code == ErrorCode.APPROVAL_REQUIRED.value:
             if not self._approve(request):
                 return False
             result = self.executor.approve_and_execute(self.state, request)
         if not result.success:
+            if result.error_code == ErrorCode.ACCESS_DENIED.value:
+                WorkflowEngine(self.state).fail(
+                    ErrorCode.ACCESS_DENIED,
+                    result.error_message or "test execution access denied",
+                )
+                return True
             self._transition(WorkflowStatus.DEBUGGING, f"{stage_name} {profile} tests failed")
             return True
         if stage_index + 1 >= len(profiles):
@@ -379,10 +424,15 @@ class CodingWorkflowOrchestrator:
         return f"{summary}\nModified files: {files}\nCitations: {citations}"
 
     def _decide(self, model_type: type[Any]) -> Any:
-        result = self.structured.generate(
-            model_type,
-            self.prompts.assemble(self.state, model_type.__name__),
-        )
+        try:
+            result = self.structured.generate(
+                model_type,
+                self.prompts.assemble(self.state, model_type.__name__),
+            )
+        except StructuredOutputError as exc:
+            message = f"{model_type.__name__} remained invalid after {exc.attempts} attempts"
+            WorkflowEngine(self.state).fail(ErrorCode.INVALID_MODEL_OUTPUT, message)
+            raise OrchestrationError(message) from exc
         return result.value
 
     def _approve(self, request: ToolRequest) -> bool:

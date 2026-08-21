@@ -70,5 +70,5 @@ $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The current full verification passed 93 tests; two Windows symlink tests were
+The current full verification passed 100 tests; two Windows symlink tests were
 skipped because the current account does not have symlink privilege.

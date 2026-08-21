@@ -41,6 +41,9 @@ trong [End-to-End Coding Workflow](docs/end-to-end-workflow.md).
 Checkpoint, rollback, context compaction và approval audit được mô tả trong
 [Reliability and Recovery](docs/reliability-and-recovery.md).
 
+Mã lỗi ổn định và tuyến phục hồi được mô tả trong
+[Error Taxonomy and Recovery](docs/error-taxonomy.md).
+
 Benchmark, metric và failure analysis được mô tả trong
 [Evaluation and Benchmarking](docs/evaluation.md).
 
@@ -86,6 +89,7 @@ Các root `.claude`, `.codex`, `.agents`, `.agent`, `.cursor`, `.gemini` và `.o
 - [Kiểm thử và an toàn](docs/testing-and-safety.md)
 - [Controlled MCP Tools](docs/controlled-mcp-tools.md)
 - [Repository RAG](docs/repository-rag.md)
+- [Error Taxonomy and Recovery](docs/error-taxonomy.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 

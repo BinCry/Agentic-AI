@@ -6,6 +6,7 @@ import time
 from dataclasses import asdict
 from uuid import uuid4
 
+from ..errors import ErrorCode
 from ..models.records import ApprovalDecisionRecord, ToolTraceRecord
 from ..models.task_state import CodingTaskState, utc_now
 from ..storage.workspace import WorkspacePolicyError
@@ -14,8 +15,14 @@ from ..workflow.status import WorkflowStatus
 from .contracts import PendingToolCall, ToolRequest, ToolResult
 from .contracts import ToolCategory
 from .git_service import GitToolError, ReadOnlyGitService
-from .patch_service import PatchToolError, PatchService
-from .policy import PolicyDecision, ToolPermissionPolicy, ToolPolicyError
+from .patch_service import PatchConflictError, PatchToolError, PatchService
+from .policy import (
+    PolicyDecision,
+    ToolAccessError,
+    ToolPermissionPolicy,
+    ToolPolicyError,
+    ToolStateError,
+)
 from .repository_service import RepositoryReadService, RepositoryToolError
 from .test_runner import AllowlistedTestRunner, TestRunnerError
 from ..rag.index import RepositoryIndex, StaleEvidenceError
@@ -51,8 +58,14 @@ class ToolExecutor:
         try:
             decision = self.policy.evaluate(request)
         except ToolPolicyError as exc:
-            result = ToolResult.failure(request.tool_name, "TOOL_REQUEST_INVALID", str(exc))
+            error_code = (
+                ErrorCode.ACCESS_DENIED
+                if isinstance(exc, (ToolAccessError, ToolStateError))
+                else ErrorCode.TOOL_REQUEST_INVALID
+            )
+            result = ToolResult.failure(request.tool_name, error_code.value, str(exc))
             self._trace(state, request, result, 0)
+            self._record_result_error(state, result)
             state.touch()
             state.validate()
             return result
@@ -86,7 +99,7 @@ class ToolExecutor:
             return ToolResult(
                 tool_name=request.tool_name,
                 success=False,
-                error_code="APPROVAL_REQUIRED",
+                error_code=ErrorCode.APPROVAL_REQUIRED.value,
                 error_message="tool execution is waiting for approval",
                 output=asdict(state.pending_tool_call),
             )
@@ -143,13 +156,30 @@ class ToolExecutor:
         started = time.perf_counter()
         try:
             result = self._dispatch(state, request, decision)
-        except (RepositoryToolError, PatchToolError, TestRunnerError, GitToolError, ToolPolicyError, StaleEvidenceError) as exc:
-            result = ToolResult.failure(request.tool_name, "TOOL_REJECTED", str(exc))
+        except PatchConflictError as exc:
+            result = ToolResult.failure(request.tool_name, ErrorCode.PATCH_CONFLICT.value, str(exc))
+        except (ToolAccessError, WorkspacePolicyError, PermissionError) as exc:
+            result = ToolResult.failure(request.tool_name, ErrorCode.ACCESS_DENIED.value, str(exc))
+        except StaleEvidenceError as exc:
+            result = ToolResult.failure(request.tool_name, ErrorCode.RETRIEVAL_FAILED.value, str(exc))
+        except TestRunnerError as exc:
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.TOOL_REQUEST_INVALID.value,
+                str(exc),
+            )
+        except (RepositoryToolError, PatchToolError, GitToolError, ToolPolicyError) as exc:
+            result = ToolResult.failure(request.tool_name, ErrorCode.TOOL_REJECTED.value, str(exc))
         except ToolExecutionError as exc:
-            result = ToolResult.failure(request.tool_name, "TOOL_GROUNDING_REQUIRED", str(exc))
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.TOOL_GROUNDING_REQUIRED.value,
+                str(exc),
+            )
         except OSError as exc:
-            result = ToolResult.failure(request.tool_name, "TOOL_IO_ERROR", str(exc))
+            result = ToolResult.failure(request.tool_name, ErrorCode.TOOL_IO_ERROR.value, str(exc))
         self._trace(state, request, result, int((time.perf_counter() - started) * 1000))
+        self._record_result_error(state, result)
         state.touch()
         state.validate()
         return result
@@ -201,6 +231,18 @@ class ToolExecutor:
             )
             if arguments["query"] not in state.retrieval_queries:
                 state.retrieval_queries.append(arguments["query"])
+            if not hits:
+                return ToolResult(
+                    request.tool_name,
+                    False,
+                    output=[],
+                    error_code=ErrorCode.RETRIEVAL_EMPTY.value,
+                    error_message=f"no grounded repository evidence found for query: {arguments['query']}",
+                    metadata={
+                        "matches": 0,
+                        "retrieval_metrics": asdict(retrieval.metrics),
+                    },
+                )
             return ToolResult(
                 request.tool_name,
                 True,
@@ -242,7 +284,24 @@ class ToolExecutor:
         if request.tool_name == "test.run":
             execution = self.tests.run(arguments["profile"], timeout_seconds=decision.spec.timeout_seconds)
             state.test_results.append(execution)
-            return ToolResult(request.tool_name, execution.exit_code == 0 and not execution.timed_out, asdict(execution))
+            if execution.timed_out:
+                return ToolResult(
+                    request.tool_name,
+                    False,
+                    output=asdict(execution),
+                    error_code=ErrorCode.TEST_TIMEOUT.value,
+                    error_message=f"test profile timed out: {arguments['profile']}",
+                    timed_out=True,
+                )
+            if execution.exit_code != 0 or execution.failed_count:
+                return ToolResult(
+                    request.tool_name,
+                    False,
+                    output=asdict(execution),
+                    error_code=ErrorCode.TEST_FAILED.value,
+                    error_message=f"test profile failed: {arguments['profile']}",
+                )
+            return ToolResult(request.tool_name, True, asdict(execution))
         if request.tool_name == "git.status":
             return ToolResult(request.tool_name, True, self.git.status())
         if request.tool_name == "git.diff":
@@ -255,6 +314,17 @@ class ToolExecutor:
     def _record_modified_file(state: CodingTaskState, path: str) -> None:
         if path not in state.modified_files:
             state.modified_files.append(path)
+
+    @staticmethod
+    def _record_result_error(state: CodingTaskState, result: ToolResult) -> None:
+        if result.success or not result.error_code:
+            return
+        if result.error_code == ErrorCode.APPROVAL_REQUIRED.value:
+            return
+        WorkflowEngine(state).record_error(
+            result.error_code,
+            result.error_message or f"{result.tool_name} failed",
+        )
 
     def _same_workspace_path(self, left: str, right: str) -> bool:
         """Compare repository-relative paths independent of Windows separators."""
