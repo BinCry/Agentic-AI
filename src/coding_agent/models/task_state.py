@@ -51,6 +51,10 @@ class CodingTaskState:
     implementation_plan: ImplementationPlan | None = None
     current_plan_step_index: int = 0
     completed_plan_step_ids: list[str] = field(default_factory=list)
+    debug_root_cause: str = ""
+    debug_evidence: list[str] = field(default_factory=list)
+    debug_action: str = ""
+    pending_repair: bool = False
     modified_files: list[str] = field(default_factory=list)
     patches: list[PatchRecord] = field(default_factory=list)
     test_results: list[TestExecution] = field(default_factory=list)
@@ -146,6 +150,7 @@ class CodingTaskState:
             (self.modified_files, "modified_files"),
             (self.final_citations, "final_citations"),
             (self.completed_plan_step_ids, "completed_plan_step_ids"),
+            (self.debug_evidence, "debug_evidence"),
         ):
             if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
                 errors.append(f"{label} must be a list of strings")
@@ -183,6 +188,14 @@ class CodingTaskState:
                 )
         elif self.current_plan_step_index or self.completed_plan_step_ids:
             errors.append("plan-step progress requires implementation_plan")
+        if not isinstance(self.pending_repair, bool):
+            errors.append("pending_repair must be a boolean")
+        if not isinstance(self.debug_root_cause, str):
+            errors.append("debug_root_cause must be a string")
+        if not isinstance(self.debug_action, str):
+            errors.append("debug_action must be a string")
+        elif self.debug_action not in {"", "edit", "retrieve", "fail"}:
+            errors.append("debug_action must be empty, edit, retrieve, or fail")
         plan_required_states = {
             WorkflowStatus.EDITING,
             WorkflowStatus.TESTING,

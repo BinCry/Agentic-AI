@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from coding_agent.models.decisions import (
+    DebugDecision,
     ImplementationPlan,
     IssueAnalysis,
     ReviewResult,
@@ -12,6 +13,28 @@ from coding_agent.models.validation import ModelValidationError
 
 
 class DecisionModelTests(unittest.TestCase):
+    def test_debug_decision_requires_root_cause_evidence_and_bounded_action(self) -> None:
+        decision = DebugDecision.from_dict(
+            {
+                "root_cause": "The patch omitted the null guard.",
+                "evidence": ["tests/test_app.py::test_none"],
+                "next_action": "edit",
+                "rationale": "Repair the guarded branch and rerun tests.",
+                "search_queries": [],
+            }
+        )
+        self.assertEqual(decision.next_action, "edit")
+        with self.assertRaises(ModelValidationError):
+            DebugDecision.from_dict(
+                {
+                    "root_cause": "Unknown",
+                    "evidence": [],
+                    "next_action": "retry_forever",
+                    "rationale": "Unbounded retry",
+                    "search_queries": [],
+                }
+            )
+
     def test_issue_analysis_accepts_complete_payload(self) -> None:
         model = IssueAnalysis.from_dict(
             {

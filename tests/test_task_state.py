@@ -87,11 +87,17 @@ class CodingTaskStateTests(unittest.TestCase):
         )
         state.current_plan_step_index = 1
         state.completed_plan_step_ids = ["s1"]
+        state.debug_root_cause = "A stale branch caused the failure."
+        state.debug_evidence = ["tests/test_app.py::test_branch"]
+        state.debug_action = "edit"
+        state.pending_repair = True
         state.current_status = WorkflowStatus.EDITING
         state.validate()
         restored = CodingTaskState.from_dict(state.to_dict())
         self.assertEqual(restored.current_plan_step_index, 1)
         self.assertEqual(restored.completed_plan_step_ids, ["s1"])
+        self.assertEqual(restored.debug_action, "edit")
+        self.assertTrue(restored.pending_repair)
         self.assertEqual(
             restored.implementation_plan.steps[0].verification_method,
             "run the focused unit test",

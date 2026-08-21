@@ -44,6 +44,7 @@ ALLOWED_TRANSITIONS: dict[WorkflowStatus, frozenset[WorkflowStatus]] = {
     WorkflowStatus.TESTING: frozenset(
         {
             WorkflowStatus.DEBUGGING,
+            WorkflowStatus.EDITING,
             WorkflowStatus.REVIEWING,
             WorkflowStatus.WAITING_APPROVAL,
             WorkflowStatus.FAILED,

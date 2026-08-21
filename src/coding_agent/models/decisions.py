@@ -131,6 +131,29 @@ class ToolDecision:
 
 
 @dataclass(slots=True)
+class DebugDecision:
+    root_cause: str
+    evidence: list[str]
+    next_action: str
+    rationale: str
+    search_queries: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "DebugDecision":
+        data = require_mapping(payload)
+        return cls(
+            root_cause=require_string(data, "root_cause"),
+            evidence=require_string_list(data, "evidence", allow_empty=False),
+            next_action=require_choice(data, "next_action", {"edit", "retrieve", "fail"}),
+            rationale=require_string(data, "rationale"),
+            search_queries=require_string_list(data, "search_queries"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class ReviewFinding:
     severity: str
     finding_type: str

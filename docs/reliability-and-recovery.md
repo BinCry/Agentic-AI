@@ -5,8 +5,9 @@ Runtime data remains inside the configured workspace runtime directory.
 
 ## Durable boundaries
 
-- `ContextProjector` separates decision-relevant issue, plan, evidence, limits
-  and recent trace data from unbounded task history.
+- `ContextProjector` separates decision-relevant issue, plan progress, debug
+  root cause, evidence, bounded recent tests, limits and trace data from
+  unbounded task history.
 - `ContextCompactor` applies a hard serialized context limit and keeps the
   compacted result valid JSON.
 - `CheckpointStore` writes immutable state snapshots atomically before

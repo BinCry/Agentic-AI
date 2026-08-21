@@ -8,6 +8,7 @@ from typing import Any, Callable
 from ..llm.provider import LLMMessage, LLMProvider
 from ..llm.structured_output import StructuredOutputService
 from ..models.decisions import (
+    DebugDecision,
     ImplementationPlan,
     IssueAnalysis,
     ReviewResult,
@@ -63,6 +64,7 @@ class CodingWorkflowOrchestrator:
         WorkflowStatus.ANALYZING: IssueAnalysis,
         WorkflowStatus.PLANNING: ImplementationPlan,
         WorkflowStatus.EDITING: ToolDecision,
+        WorkflowStatus.DEBUGGING: DebugDecision,
         WorkflowStatus.REVIEWING: ReviewResult,
         WorkflowStatus.FINALIZING: TaskCompletionResult,
     }
@@ -183,9 +185,27 @@ class CodingWorkflowOrchestrator:
         self._transition(WorkflowStatus.EDITING, "implementation plan validated")
 
     def _edit(self) -> bool:
+        plan = self.state.implementation_plan
+        if plan is None:
+            raise OrchestrationError("implementation plan is required before editing")
+        if not self.state.pending_repair and self.state.current_plan_step_index >= len(plan.steps):
+            self._transition(WorkflowStatus.TESTING, "implementation plan steps completed")
+            return True
+
+        step = None if self.state.pending_repair else plan.steps[self.state.current_plan_step_index]
+        if step is not None and step.action == "test":
+            self._transition(WorkflowStatus.TESTING, f"plan step {step.id} requires verification")
+            return True
+
         decision = self._decide(ToolDecision)
+        if step is not None:
+            self._validate_tool_for_step(step.action, step.file, decision)
         request = ToolRequest(
-            request_id=f"tool-{self.state.current_iteration + 1}",
+            request_id=(
+                f"repair-{self.state.current_iteration + 1}"
+                if self.state.pending_repair
+                else f"plan-{step.id}"
+            ),
             task_id=self.state.task_id,
             tool_name=decision.tool_name,
             arguments=decision.arguments,
@@ -198,34 +218,132 @@ class CodingWorkflowOrchestrator:
             result = self.executor.approve_and_execute(self.state, request)
         if not result.success:
             raise OrchestrationError(result.error_message or "editing tool failed")
-        self._transition(WorkflowStatus.TESTING, "editing tool completed")
+        if self.state.pending_repair:
+            self.state.pending_repair = False
+            self._transition(WorkflowStatus.TESTING, "bounded repair completed")
+            return True
+
+        self._complete_plan_step(step.id)
+        if self.state.current_plan_step_index >= len(plan.steps):
+            self._transition(WorkflowStatus.TESTING, "implementation plan steps completed")
         return True
 
     def _test(self) -> bool:
+        profiles = self._test_profiles()
+        current_results = self.state.test_results[self.state.test_run_start_index :]
+        stage_index = len(current_results)
+        if stage_index >= len(profiles):
+            self._advance_after_tests()
+            return True
+        profile = profiles[stage_index]
         request = ToolRequest(
-            request_id=f"test-{self.state.current_iteration + 1}",
+            request_id=f"test-{self.state.current_iteration + 1}-{stage_index + 1}-{profile}",
             task_id=self.state.task_id,
             tool_name="test.run",
-            arguments={"profile": "fixture"},
+            arguments={"profile": profile},
             workflow_state=self.state.current_status.value,
         )
-        result = self.executor.request_execution(self.state, request, reason="run targeted fixture tests")
+        stage_name = "targeted" if stage_index == 0 else "broad"
+        result = self.executor.request_execution(
+            self.state,
+            request,
+            reason=f"run {stage_name} {profile} tests",
+        )
         if result.error_code == "APPROVAL_REQUIRED":
             if not self._approve(request):
                 return False
             result = self.executor.approve_and_execute(self.state, request)
         if not result.success:
-            self._transition(WorkflowStatus.DEBUGGING, "targeted tests failed")
+            self._transition(WorkflowStatus.DEBUGGING, f"{stage_name} {profile} tests failed")
             return True
-        self._transition(WorkflowStatus.REVIEWING, "targeted tests passed")
+        if stage_index + 1 >= len(profiles):
+            self._advance_after_tests()
         return True
 
     def _debug(self) -> None:
-        self._transition(WorkflowStatus.EDITING, "bounded repair iteration")
+        decision = self._decide(DebugDecision)
+        self.state.debug_root_cause = decision.root_cause
+        self.state.debug_evidence = list(decision.evidence)
+        self.state.debug_action = decision.next_action
+        if decision.next_action == "retrieve":
+            queries = decision.search_queries or self.state.retrieval_queries
+            self.state.retrieval_queries = list(
+                dict.fromkeys(query.strip() for query in queries if query.strip())
+            )
+            self.state.retrieved_evidence = []
+            self._transition(WorkflowStatus.RETRIEVING, decision.rationale)
+            return
+        if decision.next_action == "fail":
+            self._transition(WorkflowStatus.FAILED, decision.rationale)
+            return
+        self.state.pending_repair = True
+        self._transition(WorkflowStatus.EDITING, decision.rationale)
+
+    def _advance_after_tests(self) -> None:
+        plan = self.state.implementation_plan
+        if plan is None:
+            raise OrchestrationError("implementation plan is required after testing")
+        if self.state.current_plan_step_index < len(plan.steps):
+            step = plan.steps[self.state.current_plan_step_index]
+            if step.action != "test":
+                raise OrchestrationError(f"plan step {step.id} was not executed before testing")
+            self._complete_plan_step(step.id)
+        target = (
+            WorkflowStatus.EDITING
+            if self.state.current_plan_step_index < len(plan.steps)
+            else WorkflowStatus.REVIEWING
+        )
+        self._transition(target, "targeted and broad tests passed")
+
+    def _test_profiles(self) -> list[str]:
+        plan = self.state.implementation_plan
+        configured = plan.expected_tests if plan else []
+        allowlisted = self.executor.tests.PROFILES
+        targeted = next(
+            (
+                profile
+                for value in configured
+                for profile in allowlisted
+                if value.strip().lower() == profile
+            ),
+            "unit",
+        )
+        return [targeted] if targeted == "unit" else [targeted, "unit"]
+
+    def _complete_plan_step(self, step_id: str) -> None:
+        if step_id not in self.state.completed_plan_step_ids:
+            self.state.completed_plan_step_ids.append(step_id)
+        self.state.current_plan_step_index += 1
+        self.state.touch()
+
+    @staticmethod
+    def _validate_tool_for_step(action: str, file: str, decision: ToolDecision) -> None:
+        allowed = {
+            "read": {"repo.list_files", "repo.read_file", "repo.search_text", "repo.find_symbols"},
+            "modify": {"repo.apply_patch"},
+            "create": {"repo.create_file"},
+        }
+        if decision.tool_name not in allowed.get(action, set()):
+            raise OrchestrationError(
+                f"tool {decision.tool_name} does not match plan action {action}"
+            )
+        requested_path = decision.arguments.get("path")
+        normalized_requested = (
+            requested_path.replace("\\", "/").casefold()
+            if isinstance(requested_path, str)
+            else requested_path
+        )
+        normalized_file = file.replace("\\", "/").casefold()
+        if action in {"modify", "create"} and normalized_requested != normalized_file:
+            raise OrchestrationError(
+                f"tool path {requested_path!r} does not match plan file {file!r}"
+            )
 
     def _review(self) -> None:
         review = self._decide(ReviewResult)
         self.state.review_findings = list(review.findings)
+        if not review.approved:
+            self.state.pending_repair = True
         self._transition(
             WorkflowStatus.FINALIZING if review.approved else WorkflowStatus.EDITING,
             "review approved" if review.approved else "review requires repair",

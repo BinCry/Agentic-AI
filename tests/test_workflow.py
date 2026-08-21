@@ -221,6 +221,25 @@ class WorkflowEngineTests(unittest.TestCase):
         self.assertEqual(engine.state.current_status, WorkflowStatus.EDITING)
         self.assertIsNone(engine.state.approval_return_status)
 
+    def test_test_approval_resume_preserves_current_test_batch(self) -> None:
+        engine = self.make_engine()
+        for target in (
+            WorkflowStatus.ANALYZING,
+            WorkflowStatus.RETRIEVING,
+            WorkflowStatus.VERIFYING_EVIDENCE,
+            WorkflowStatus.PLANNING,
+        ):
+            engine.transition(target, "test")
+        self.add_plan(engine)
+        engine.transition(WorkflowStatus.EDITING, "test")
+        engine.transition(WorkflowStatus.TESTING, "test")
+        engine.state.test_results.append(TestExecution(["python"], "fixture", 0, 1, 0, 1, "", ""))
+        engine.request_approval(WorkflowStatus.TESTING, "run broad tests")
+        engine.approve()
+        self.assertEqual(engine.state.current_status, WorkflowStatus.TESTING)
+        self.assertEqual(engine.state.test_run_start_index, 0)
+        self.assertIsNone(engine.state.approval_return_status)
+
     def test_invalid_approval_request_does_not_mutate_return_status(self) -> None:
         engine = self.make_engine()
         with self.assertRaises(InvalidTransitionError):

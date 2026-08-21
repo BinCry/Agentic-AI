@@ -81,7 +81,7 @@ class WorkflowEngine:
             self.state.current_repair_iteration += 1
         self.state.current_iteration += 1
         self.state.current_status = target
-        if target is WorkflowStatus.TESTING:
+        if target is WorkflowStatus.TESTING and previous is not WorkflowStatus.WAITING_APPROVAL:
             self.state.test_run_start_index = len(self.state.test_results)
         if previous is WorkflowStatus.WAITING_APPROVAL and approval_granted:
             self.state.approval_return_status = None

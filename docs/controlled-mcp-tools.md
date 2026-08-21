@@ -16,7 +16,7 @@ remain owned by the controller.
 | `repo.create_file` | Create a new file without overwrite | Yes | `EDITING`, `DEBUGGING` |
 | `repo.apply_patch` | Apply a single-file unified patch | Yes | `EDITING`, `DEBUGGING` |
 | `test.detect_framework` | Detect bounded Python test conventions | No | Same read states |
-| `test.run` | Run the named `unit` profile | Yes | `TESTING`, `DEBUGGING` |
+| `test.run` | Run an allowlisted `fixture` or `unit` profile | Yes | `TESTING`, `DEBUGGING` |
 | `git.status` | Read-only short status | No | Read states |
 | `git.diff` | Read-only diff, optionally scoped to paths | No | Read states |
 | `git.changed_files` | List files changed from `HEAD` | No | Read states |

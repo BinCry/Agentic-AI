@@ -28,6 +28,7 @@ class ContextCompactor:
         working["evidence"] = evidence[:4]
         working["recent_errors"] = list(working.get("recent_errors", []))[-2:]
         working["recent_tools"] = list(working.get("recent_tools", []))[-3:]
+        working["recent_tests"] = list(working.get("recent_tests", []))[-2:]
         content = self._encode(working)
         if len(content) <= self.maximum_chars:
             return content
@@ -75,7 +76,31 @@ class ContextProjector:
                 )[:8]
             ],
             "plan": asdict(state.implementation_plan) if state.implementation_plan else None,
+            "plan_progress": {
+                "current_step_index": state.current_plan_step_index,
+                "completed_step_ids": state.completed_plan_step_ids,
+            },
+            "debug": {
+                "root_cause": state.debug_root_cause,
+                "evidence": state.debug_evidence,
+                "next_action": state.debug_action,
+                "repair_pending": state.pending_repair,
+            },
             "modified_files": state.modified_files,
+            "recent_tests": [
+                {
+                    "command": item.command,
+                    "target": item.target,
+                    "exit_code": item.exit_code,
+                    "passed_count": item.passed_count,
+                    "failed_count": item.failed_count,
+                    "duration_ms": item.duration_ms,
+                    "stdout_summary": item.stdout_summary[-2_000:],
+                    "stderr_summary": item.stderr_summary[-2_000:],
+                    "timed_out": item.timed_out,
+                }
+                for item in state.test_results[-4:]
+            ],
             "recent_errors": [asdict(item) for item in state.errors[-4:]],
             "recent_tools": [asdict(item) for item in state.tool_execution_trace[-6:]],
             "limits": {

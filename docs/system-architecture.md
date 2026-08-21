@@ -30,6 +30,7 @@ stateDiagram-v2
     PLANNING --> WAITING_APPROVAL
     EDITING --> TESTING
     TESTING --> DEBUGGING
+    TESTING --> EDITING
     TESTING --> REVIEWING
     DEBUGGING --> RETRIEVING
     DEBUGGING --> EDITING
@@ -42,6 +43,10 @@ stateDiagram-v2
 ```
 
 Mọi trạng thái đang chạy có thể chuyển sang `FAILED` theo transition policy. Maximum workflow iterations, repair iterations và retrieval retries bảo đảm quá trình dừng hữu hạn.
+
+Plan execution persists its current step and completed step IDs. Testing is
+two-stage (targeted then broad), while `DEBUGGING` requires a structured root
+cause/evidence decision before repair, re-retrieval or failure.
 
 ## Hướng mở rộng
 

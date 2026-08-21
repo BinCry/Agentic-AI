@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
-from coding_agent.models.records import RepositoryEvidence
+from coding_agent.models.records import RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.checkpoint_store import CheckpointStore
 from coding_agent.storage.workspace import WorkspacePaths
@@ -63,6 +63,24 @@ class RecoveryTests(WorkspaceTestCase):
         payload = json.loads(ContextProjector().project(state, "ImplementationPlan"))
         self.assertEqual([item["chunk_id"] for item in payload["evidence"]], ["high", "low"])
         self.assertEqual(payload["evidence"][0]["score"], 0.9)
+
+    def test_context_projection_includes_bounded_recent_test_results(self) -> None:
+        state = CodingTaskState.create("Debug tests", "fixture", task_id="test-context")
+        state.test_results.append(
+            TestExecution(
+                ["python", "-m", "unittest"],
+                "unit",
+                1,
+                2,
+                1,
+                12,
+                "x" * 10_000,
+                "assertion failed",
+            )
+        )
+        payload = json.loads(ContextProjector().project(state, "DebugDecision"))
+        self.assertEqual(payload["recent_tests"][0]["target"], "unit")
+        self.assertEqual(len(payload["recent_tests"][0]["stdout_summary"]), 2_000)
 
     def test_checkpoint_failure_does_not_enter_pending_approval(self) -> None:
         target = self.test_root / "module.py"
