@@ -74,9 +74,11 @@ Phase 2's read-only MCP surface now includes `repo.retrieve`:
 
 The controller stores returned evidence in `CodingTaskState.retrieved_evidence`
 and records the query in `retrieval_queries`. Phase 4's
-`CodingWorkflowOrchestrator` calls retrieval during `RETRIEVING` before it can
-request a mutation, so the patch boundary can require current evidence for the
-target file.
+`CodingWorkflowOrchestrator` evaluates at most four unique analysis queries
+during `RETRIEVING`, retaining grounded hits from later queries when an earlier
+query is empty. It then enters `VERIFYING_EVIDENCE`; evidence is sorted by
+score before it is projected into prompts, and planning cannot start without
+current evidence.
 
 ## Verification
 

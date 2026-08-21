@@ -78,7 +78,7 @@ class OrchestratorTests(WorkspaceTestCase):
                     "problem": "The greeting helper needs a concise docstring.",
                     "expected_behavior": "The helper keeps its behavior and documents its purpose.",
                     "acceptance_criteria": ["fixture test passes"],
-                    "search_queries": ["greet"],
+                    "search_queries": ["missing-token", "greet"],
                     "risks": [],
                 },
                 {
@@ -129,6 +129,7 @@ class OrchestratorTests(WorkspaceTestCase):
         self.assertEqual(state.current_status, WorkflowStatus.COMPLETED)
         self.assertEqual(state.modified_files, ["tests/fixtures/sample_repo/app.py"])
         self.assertTrue(state.retrieved_evidence)
+        self.assertEqual(state.retrieval_queries, ["missing-token", "greet"])
         self.assertEqual(state.test_results[-1].target, "fixture")
         self.assertEqual(state.active_skill.name, "git")
         self.assertIn("Return the fixture greeting", app.read_text(encoding="utf-8"))

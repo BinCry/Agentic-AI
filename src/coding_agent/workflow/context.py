@@ -25,7 +25,7 @@ class ContextCompactor:
         evidence = list(working.get("evidence", []))
         for item in evidence:
             item["content"] = item.get("content", "")[:1_000]
-        working["evidence"] = evidence[-4:]
+        working["evidence"] = evidence[:4]
         working["recent_errors"] = list(working.get("recent_errors", []))[-2:]
         working["recent_tools"] = list(working.get("recent_tools", []))[-3:]
         content = self._encode(working)
@@ -65,9 +65,14 @@ class ContextProjector:
                     "path": item.path,
                     "lines": [item.start_line, item.end_line],
                     "digest": item.file_digest,
+                    "score": item.score,
+                    "retrieval_method": item.retrieval_method,
                     "content": item.content[:6_000],
                 }
-                for item in state.retrieved_evidence[-8:]
+                for item in sorted(
+                    state.retrieved_evidence,
+                    key=lambda item: (-item.score, item.path, item.start_line, item.chunk_id),
+                )[:8]
             ],
             "plan": asdict(state.implementation_plan) if state.implementation_plan else None,
             "modified_files": state.modified_files,

@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
+from coding_agent.models.records import RepositoryEvidence
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.checkpoint_store import CheckpointStore
 from coding_agent.storage.workspace import WorkspacePaths
@@ -52,6 +53,16 @@ class RecoveryTests(WorkspaceTestCase):
         projected = ContextProjector(ContextCompactor(1_000)).project(state, "IssueAnalysis")
         self.assertLessEqual(len(projected), 1_000)
         self.assertTrue(json.loads(projected)["truncated"])
+
+    def test_context_projection_prioritizes_grounded_evidence_score(self) -> None:
+        state = CodingTaskState.create("Prioritize evidence", "fixture", task_id="evidence-task")
+        state.retrieved_evidence = [
+            RepositoryEvidence("low", "low.py", 1, 1, "low\n", 0.1, "lexical", "a" * 64),
+            RepositoryEvidence("high", "high.py", 1, 1, "high\n", 0.9, "lexical+symbol", "b" * 64),
+        ]
+        payload = json.loads(ContextProjector().project(state, "ImplementationPlan"))
+        self.assertEqual([item["chunk_id"] for item in payload["evidence"]], ["high", "low"])
+        self.assertEqual(payload["evidence"][0]["score"], 0.9)
 
     def test_checkpoint_failure_does_not_enter_pending_approval(self) -> None:
         target = self.test_root / "module.py"

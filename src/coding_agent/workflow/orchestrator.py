@@ -57,6 +57,8 @@ class PromptAssembler:
 class CodingWorkflowOrchestrator:
     """Run one bounded task loop while keeping side effects behind ToolExecutor."""
 
+    MAX_RETRIEVAL_QUERIES = 4
+
     DECISION_TYPES: dict[WorkflowStatus, type[Any]] = {
         WorkflowStatus.ANALYZING: IssueAnalysis,
         WorkflowStatus.PLANNING: ImplementationPlan,
@@ -134,17 +136,30 @@ class CodingWorkflowOrchestrator:
         self._transition(WorkflowStatus.RETRIEVING, "issue analysis completed")
 
     def _retrieve(self) -> None:
-        query = self.state.retrieval_queries[0] if self.state.retrieval_queries else self.state.original_issue
-        request = ToolRequest(
-            request_id=f"retrieve-{self.state.current_iteration + 1}",
-            task_id=self.state.task_id,
-            tool_name="repo.retrieve",
-            arguments={"query": query, "top_k": 8},
-            workflow_state=self.state.current_status.value,
-        )
-        result = self.executor.request_execution(self.state, request)
-        if not result.success:
-            raise OrchestrationError(result.error_message or "repository retrieval failed")
+        raw_queries = self.state.retrieval_queries or [self.state.original_issue]
+        queries = list(dict.fromkeys(query.strip() for query in raw_queries if query.strip()))
+        queries = queries[: self.MAX_RETRIEVAL_QUERIES]
+        if not queries:
+            raise OrchestrationError("repository retrieval requires at least one non-empty query")
+
+        failures: list[str] = []
+        for offset, query in enumerate(queries, start=1):
+            request = ToolRequest(
+                request_id=f"retrieve-{self.state.current_iteration + 1}-{offset}",
+                task_id=self.state.task_id,
+                tool_name="repo.retrieve",
+                arguments={"query": query, "top_k": 8},
+                workflow_state=self.state.current_status.value,
+            )
+            result = self.executor.request_execution(self.state, request)
+            if not result.success:
+                failures.append(result.error_message or f"query failed: {query}")
+
+        if not self.state.retrieved_evidence:
+            details = f"; errors: {' | '.join(failures)}" if failures else ""
+            raise OrchestrationError(
+                f"repository retrieval returned no grounded evidence for {len(queries)} query(s){details}"
+            )
         self._transition(WorkflowStatus.VERIFYING_EVIDENCE, "repository evidence retrieved")
 
     def _verify_evidence(self) -> None:

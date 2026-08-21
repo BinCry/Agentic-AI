@@ -196,6 +196,9 @@ class ToolExecutor:
             for hit in hits:
                 if not any(item.chunk_id == hit.evidence.chunk_id for item in state.retrieved_evidence):
                     state.retrieved_evidence.append(hit.evidence)
+            state.retrieved_evidence.sort(
+                key=lambda item: (-item.score, item.path, item.start_line, item.chunk_id)
+            )
             if arguments["query"] not in state.retrieval_queries:
                 state.retrieval_queries.append(arguments["query"])
             return ToolResult(

@@ -8,7 +8,7 @@ the Phase 2 `ToolExecutor` boundary.
 ## Loop
 
 ```text
-ANALYZING -> RETRIEVING -> PLANNING -> EDITING -> TESTING
+ANALYZING -> RETRIEVING -> VERIFYING_EVIDENCE -> PLANNING -> EDITING -> TESTING
                                       ^           |
                                       |           v
                                   DEBUGGING <- failed test
@@ -23,12 +23,17 @@ TESTING -> REVIEWING -> FINALIZING -> COMPLETED
 `CodingTaskState` at a time. Each model response is validated against a typed
 structured-output model. Prompts include only bounded issue, plan, evidence,
 recent errors and tool-trace metadata; retrieved source chunks are cited by
-path, line range and file digest.
+path, line range, score and file digest. Retrieval evaluates up to four unique
+analysis queries in one bounded retrieval stage, then verifies the selected
+evidence against the current workspace before planning.
 
 ## Safety and approvals
 
 - Retrieval is performed through the allowlisted `repo.retrieve` tool and its
-  grounded evidence is stored in task state.
+  grounded evidence is stored in task state. If an early query has no hits,
+  later bounded queries remain eligible.
+- `VERIFYING_EVIDENCE` is an explicit state. Evidence is sorted by grounding
+  score for prompts and stale or missing evidence cannot reach planning.
 - `repo.apply_patch` and `test.run` remain approval-gated. The controller owns
   approval and rechecks request identity and argument hash before execution.
 - A patch requires current evidence for the target file and a matching raw-byte
@@ -50,14 +55,14 @@ fake provider with fixed structured responses. It exercises retrieval,
 grounded patching, approval, the allowlisted `fixture` test profile, review and
 completion without an external API or network dependency.
 
-Run the full suite from PowerShell in `D:\Agentic-AI`:
+Run the full suite from PowerShell in `D:\HK5\AGENTIC`:
 
 ```powershell
-$env:PYTHONPATH = 'D:\Agentic-AI\src'
-$env:CODING_AGENT_TEST_TMP = 'D:\Agentic-AI\.tmp'
+$env:PYTHONPATH = 'D:\HK5\AGENTIC\src'
+$env:CODING_AGENT_TEST_TMP = 'D:\HK5\AGENTIC\.tmp'
 $env:PYTHONDONTWRITEBYTECODE = '1'
 python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-The current full verification passed 83 tests; two Windows symlink tests were
+The current full verification passed 86 tests; two Windows symlink tests were
 skipped because the current account does not have symlink privilege.
