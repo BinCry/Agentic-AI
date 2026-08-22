@@ -35,8 +35,8 @@ RAG, persistence, recovery, evaluation, and reporting components.
 | Phase | Name | Status |
 |---|---|---|
 | 1 | [Restore Baseline and Bound Retrieval](./phase-01-restore-baseline-and-bound-retrieval.md) | completed |
-| 2 | [Add Production AI Providers](./phase-02-add-production-ai-providers.md) | in-progress |
-| 3 | [Expose Executable Coding Workflow](./phase-03-expose-executable-coding-workflow.md) | pending |
+| 2 | [Add Production AI Providers](./phase-02-add-production-ai-providers.md) | completed |
+| 3 | [Expose Executable Coding Workflow](./phase-03-expose-executable-coding-workflow.md) | in-progress |
 | 4 | [Enforce Reproducible Acceptance](./phase-04-enforce-reproducible-acceptance.md) | pending |
 
 ## Dependencies

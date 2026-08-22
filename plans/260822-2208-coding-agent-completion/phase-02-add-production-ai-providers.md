@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Add Production AI Providers"
-status: in-progress
+status: completed
 priority: P1
 effort: "3h"
 dependencies: [1]
@@ -36,10 +36,19 @@ dependencies: [1]
 
 ## Tests and Acceptance
 
-- [ ] Offline provider tests cover all typed failure paths.
-- [ ] Existing deterministic evaluation remains reproducible.
-- [ ] Optional live smoke clearly reports unavailable credentials instead of fabricating success.
-- [ ] No new general provider framework or vendor fan-out is introduced.
+- [x] Offline provider tests cover configuration, retry, response, ordering,
+  dimension, finite-value, and compatibility failure paths.
+- [x] Existing deterministic evaluation remains reproducible; full suite passes.
+- [x] Live smoke reports unavailable because no credential is present.
+- [x] No general provider framework or vendor fan-out introduced.
+
+## Completion Evidence
+
+- Implementation commit: `72bca15e79731a3cdf52b71d903e0559f8909121`.
+- Focused provider/RAG tests: 17 passed.
+- Full suite: 122 passed; combined branch coverage 81%.
+- Local and `origin/main` SHA matched after push.
+- Report: [Phase 2 Production AI Providers](./reports/phase-02-production-ai-providers-report.md).
 
 ## Risk and Rollback
 
