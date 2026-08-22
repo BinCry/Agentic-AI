@@ -107,6 +107,7 @@ trên ổ D khi cần.
 - [Kiểm thử và an toàn](docs/testing-and-safety.md)
 - [Controlled MCP Tools](docs/controlled-mcp-tools.md)
 - [Repository RAG](docs/repository-rag.md)
+- [Production AI Providers](docs/production-ai-providers.md)
 - [Error Taxonomy and Recovery](docs/error-taxonomy.md)
 - [Structured Final Reporting](docs/structured-final-report.md)
 - [Batch 2 Acceptance Report](docs/batch-2-acceptance.md)

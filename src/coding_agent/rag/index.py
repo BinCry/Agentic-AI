@@ -12,36 +12,13 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol, Sequence
+from typing import Sequence
 
 from ..models.records import RepositoryEvidence
 from ..storage.workspace import WorkspacePaths, WorkspacePolicyError
+from .embeddings import DeterministicEmbeddingProvider, EmbeddingProvider
 from .ingestion import IngestedFile, RepositoryIngestor
 from .models import RepositoryChunk, RetrievalHit
-
-
-class EmbeddingProvider(Protocol):
-    dimension: int
-
-    def embed(self, text: str) -> tuple[float, ...]: ...
-
-
-class DeterministicEmbeddingProvider:
-    """Stable offline vectorizer for tests and small local repositories."""
-
-    def __init__(self, dimension: int = 128) -> None:
-        if dimension < 8:
-            raise ValueError("embedding dimension must be at least 8")
-        self.dimension = dimension
-
-    def embed(self, text: str) -> tuple[float, ...]:
-        vector = [0.0] * self.dimension
-        for token in _tokens(text):
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            index = int.from_bytes(digest[:4], "big") % self.dimension
-            vector[index] += 1.0 if digest[4] % 2 else -1.0
-        norm = math.sqrt(sum(value * value for value in vector))
-        return tuple(value / norm for value in vector) if norm else tuple(vector)
 
 
 @dataclass(slots=True, frozen=True)
@@ -113,7 +90,13 @@ class RepositoryIndex:
                     "INSERT OR REPLACE INTO files(path, digest, modified_ns, size, indexed_at) VALUES (?, ?, ?, ?, ?)",
                     (ingested.path, ingested.digest, ingested.modified_ns, ingested.size, _now()),
                 )
-                for chunk in ingested.chunks:
+                vectors = _embed_batch(
+                    self.embedding_provider,
+                    [chunk.content for chunk in ingested.chunks],
+                )
+                if len(vectors) != len(ingested.chunks):
+                    raise ValueError("embedding provider returned an unexpected vector count")
+                for chunk, vector in zip(ingested.chunks, vectors, strict=True):
                     connection.execute(
                         "INSERT INTO chunks(chunk_id, path, start_line, end_line, content, kind, symbol, digest, vector) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
@@ -125,7 +108,7 @@ class RepositoryIndex:
                             chunk.kind,
                             chunk.symbol,
                             chunk.file_digest,
-                            json.dumps(self.embedding_provider.embed(chunk.content)),
+                            json.dumps(vector),
                         ),
                     )
                     indexed_chunks += 1
@@ -282,12 +265,46 @@ class RepositoryIndex:
                 );
                 CREATE INDEX IF NOT EXISTS chunks_path_index ON chunks(path);
                 CREATE INDEX IF NOT EXISTS chunks_symbol_index ON chunks(symbol);
+                CREATE TABLE IF NOT EXISTS metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 """
             )
+            row = connection.execute(
+                "SELECT value FROM metadata WHERE key = 'embedding_signature'"
+            ).fetchone()
+            signature = _embedding_signature(self.embedding_provider)
+            if row is None or row[0] != signature:
+                connection.execute("DELETE FROM chunks")
+                connection.execute("DELETE FROM files")
+                connection.execute(
+                    "INSERT OR REPLACE INTO metadata(key, value) VALUES ('embedding_signature', ?)",
+                    (signature,),
+                )
 
 
 def _tokens(value: str) -> list[str]:
     return re.findall(r"[A-Za-z0-9_]+", value.lower())
+
+
+def _embed_batch(
+    provider: EmbeddingProvider,
+    texts: Sequence[str],
+) -> tuple[tuple[float, ...], ...]:
+    batch_method = getattr(provider, "embed_batch", None)
+    if callable(batch_method):
+        return tuple(batch_method(texts))
+    return tuple(provider.embed(text) for text in texts)
+
+
+def _embedding_signature(provider: EmbeddingProvider) -> str:
+    explicit = getattr(provider, "signature", None)
+    if isinstance(explicit, str) and explicit:
+        return explicit
+    provider_name = getattr(provider, "provider_name", type(provider).__qualname__)
+    model = getattr(provider, "model", "legacy")
+    return f"{provider_name}:{model}:{provider.dimension}"
 
 
 def _lexical_score(query: str, query_tokens: set[str], content: str) -> float:

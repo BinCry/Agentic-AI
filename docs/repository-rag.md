@@ -1,8 +1,8 @@
 # Repository RAG
 
-Phase 3 adds a dependency-free repository retrieval layer on top of the Phase
-2 workspace boundary. It is deterministic and read-only: it does not call an
-LLM, modify source files or introduce a vector database.
+The repository retrieval layer is read-only and does not modify source files
+or introduce an external vector database. Deterministic embeddings remain the
+offline default; a configured production embedding adapter can call OpenAI.
 
 ## Pipeline
 
@@ -11,15 +11,16 @@ WorkspacePaths
     -> RepositoryIngestor (filters, UTF-8, size limit, SHA-256)
     -> PythonAstChunker / MarkdownHeadingChunker / LineChunker
     -> SQLite persistent index (.coding-agent/index/rag_index.db)
-    -> lexical + symbol + deterministic vector scoring
+    -> lexical + symbol + configured vector scoring
     -> grounded RepositoryEvidence with exact line citations
 ```
 
 ## Ingestion and chunking
 
-The ingestor indexes supported text extensions only and skips `.git`,
-`.coding-agent`, `.tmp`, virtual environments, build output, coverage and
-`node_modules`. Files larger than 1 MB or that are not valid UTF-8 are excluded.
+The ingestor indexes supported text extensions only and skips `.git`, agent
+client mirrors, `.coding-agent`, `.tmp`, virtual environments, build output,
+coverage and `node_modules`. Skills remain available through the separate
+`SkillCatalog`. Files larger than 1 MB or invalid UTF-8 are excluded.
 Every indexed file stores a SHA-256 digest, size and modification timestamp.
 
 Python files are parsed with the standard-library `ast` module. Classes,
@@ -44,8 +45,11 @@ Retrieval combines:
 - exact/partial symbol score for Python chunks;
 - a stable hashed vector score through the `EmbeddingProvider` interface.
 
-`DeterministicEmbeddingProvider` keeps tests offline and reproducible. A future
-provider may implement the same interface without changing the core index.
+`DeterministicEmbeddingProvider` keeps tests and CI offline and reproducible.
+`OpenAIEmbeddingProvider` supports bounded ordered batches through the same
+interface. The index persists a provider/model/dimension signature and safely
+rebuilds vectors when that signature changes. Legacy providers implementing
+only `dimension` and `embed()` remain compatible.
 
 ## Grounding and recovery
 
