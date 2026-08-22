@@ -60,13 +60,28 @@ class PendingToolCall:
     workflow_state: str
     reason: str
     created_at: str
+    arguments: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "PendingToolCall":
         required = ("request_id", "task_id", "tool_name", "arguments_hash", "workflow_state", "reason", "created_at")
         if any(not isinstance(payload.get(key), str) or not payload[key] for key in required):
             raise ValueError("pending tool call contains invalid fields")
-        return cls(**{key: payload[key] for key in required})
+        arguments = payload.get("arguments", {})
+        if not isinstance(arguments, dict):
+            raise ValueError("pending tool call arguments must be an object")
+        pending = cls(**{key: payload[key] for key in required}, arguments=dict(arguments))
+        if arguments:
+            request = ToolRequest(
+                pending.request_id,
+                pending.task_id,
+                pending.tool_name,
+                pending.arguments,
+                pending.workflow_state,
+            )
+            if request.arguments_hash() != pending.arguments_hash:
+                raise ValueError("pending tool call arguments do not match their hash")
+        return pending
 
 
 @dataclass(slots=True, frozen=True)

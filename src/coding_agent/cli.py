@@ -19,6 +19,7 @@ from .storage.task_store import JsonTaskStore
 from .storage.checkpoint_store import CheckpointStore
 from .storage.workspace import WorkspacePaths
 from .workflow.engine import TransitionResult, WorkflowEngine
+from .workflow.runtime import run_workflow
 from .workflow.status import WorkflowStatus
 from .mcp.server import McpToolServer
 from .tools.contracts import ToolRequest
@@ -38,6 +39,27 @@ def _parser() -> argparse.ArgumentParser:
     init_parser.add_argument("--repository")
     init_parser.add_argument("--task-id")
     init_parser.add_argument("--skill-root", default=".claude/skills")
+
+    run_parser = subparsers.add_parser(
+        "run", help="Start or resume the bounded coding workflow"
+    )
+    run_target = run_parser.add_mutually_exclusive_group(required=True)
+    run_target.add_argument("--issue", help="Start a new task for this issue")
+    run_target.add_argument("--task-id", help="Resume this persisted task")
+    run_parser.add_argument("--repository", help="Repository label for a new task")
+    run_parser.add_argument("--skill-root", default=".claude/skills")
+    run_parser.add_argument("--maximum-steps", type=int, default=40)
+    run_parser.add_argument("--structured-retries", type=int, default=2)
+    run_parser.add_argument(
+        "--embedding-provider",
+        choices=("deterministic", "openai"),
+        default="deterministic",
+    )
+    run_parser.add_argument(
+        "--auto-approve",
+        action="store_true",
+        help="Explicitly approve policy-gated mutations and tests during this run",
+    )
 
     show_parser = subparsers.add_parser("show", help="Show persisted task state")
     show_parser.add_argument("--task-id", required=True)
@@ -87,7 +109,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     approve_tool_parser.add_argument("--task-id", required=True)
     approve_tool_parser.add_argument("--request-id", required=True)
-    approve_tool_parser.add_argument("--arguments-json", required=True)
+    approve_tool_parser.add_argument(
+        "--arguments-json",
+        help="Exact request arguments; defaults to the persisted pending request",
+    )
 
     mcp_parser = subparsers.add_parser("mcp-server", help="Serve controlled tools over JSON-RPC stdio")
     mcp_parser.add_argument("--task-id", required=True)
@@ -155,6 +180,41 @@ def _show(args: argparse.Namespace) -> int:
     _, store, _ = _runtime(args)
     _write_json(store.load(args.task_id).to_dict())
     return 0
+
+
+def _run(args: argparse.Namespace) -> int:
+    paths, store, _ = _runtime(args)
+    outcome = run_workflow(
+        paths,
+        store,
+        issue=args.issue,
+        task_id=args.task_id,
+        repository=args.repository,
+        skill_root=args.skill_root,
+        maximum_steps=args.maximum_steps,
+        structured_retries=args.structured_retries,
+        auto_approve=args.auto_approve,
+        embedding_provider_name=args.embedding_provider,
+    )
+    state = outcome.state
+    result = outcome.result
+    _write_json(
+        {
+            "task_id": state.task_id,
+            "status": result.status.value,
+            "steps": result.steps,
+            "reason": result.reason,
+            "requires_approval": result.status is WorkflowStatus.WAITING_APPROVAL,
+            "pending_tool_call": (
+                asdict(state.pending_tool_call) if state.pending_tool_call else None
+            ),
+        }
+    )
+    if result.status is WorkflowStatus.COMPLETED:
+        return 0
+    if result.status is WorkflowStatus.WAITING_APPROVAL:
+        return 3
+    return 2
 
 
 def _report(args: argparse.Namespace) -> int:
@@ -254,10 +314,15 @@ def _approve_tool(args: argparse.Namespace) -> int:
     state = store.load(args.task_id)
     if state.pending_tool_call is None:
         raise ValueError("task has no pending tool approval")
-    try:
-        arguments = json.loads(args.arguments_json)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"arguments-json must be valid JSON: {exc}") from exc
+    if args.arguments_json is None:
+        arguments = dict(state.pending_tool_call.arguments)
+        if not arguments:
+            raise ValueError("legacy pending request requires arguments-json")
+    else:
+        try:
+            arguments = json.loads(args.arguments_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"arguments-json must be valid JSON: {exc}") from exc
     if not isinstance(arguments, dict):
         raise ValueError("arguments-json must contain an object")
     pending = state.pending_tool_call
@@ -349,6 +414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     handlers = {
         "init": _init,
+        "run": _run,
         "show": _show,
         "report": _report,
         "checkpoints": _checkpoints,

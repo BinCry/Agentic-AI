@@ -26,6 +26,7 @@ from .policy import (
 from .repository_service import RepositoryReadService, RepositoryToolError
 from .test_runner import AllowlistedTestRunner, TestRunnerError
 from ..rag.index import RepositoryIndex, StaleEvidenceError
+from ..rag.embeddings import EmbeddingProvider
 from ..storage.approval_store import ApprovalLedger
 from ..storage.checkpoint_store import CheckpointStore
 
@@ -37,10 +38,15 @@ class ToolExecutionError(ValueError):
 class ToolExecutor:
     """Execute only policy-approved tools and record bounded metadata in task state."""
 
-    def __init__(self, policy: ToolPermissionPolicy) -> None:
+    def __init__(
+        self,
+        policy: ToolPermissionPolicy,
+        *,
+        embedding_provider: EmbeddingProvider | None = None,
+    ) -> None:
         self.policy = policy
         self.repository = RepositoryReadService(policy.paths)
-        self.rag = RepositoryIndex(policy.paths)
+        self.rag = RepositoryIndex(policy.paths, embedding_provider=embedding_provider)
         self.patch = PatchService(policy.paths)
         self.tests = AllowlistedTestRunner(policy.paths)
         self.git = ReadOnlyGitService(policy.paths)
@@ -91,6 +97,7 @@ class ToolExecutor:
                 workflow_state=request.workflow_state,
                 reason=reason,
                 created_at=utc_now(),
+                arguments=dict(request.arguments),
             )
             WorkflowEngine(state).request_approval(
                 WorkflowStatus(request.workflow_state), reason

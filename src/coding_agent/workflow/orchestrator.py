@@ -96,40 +96,62 @@ class CodingWorkflowOrchestrator:
         self.skill_router = skill_router
         self.skill_workspace = executor.policy.paths.workspace_root
         self.structured = StructuredOutputService(provider, maximum_retries=structured_retries)
+        self.steps_run = 0
 
     def run(self) -> OrchestrationResult:
-        steps = 0
-        while steps < self.maximum_steps:
+        self.steps_run = 0
+        while self.steps_run < self.maximum_steps:
             if self.state.current_status in {WorkflowStatus.COMPLETED, WorkflowStatus.FAILED}:
-                return OrchestrationResult(self.state.current_status, steps, "workflow reached terminal state")
+                self._save()
+                return OrchestrationResult(
+                    self.state.current_status,
+                    self.steps_run,
+                    "workflow reached terminal state",
+                )
             status = self.state.current_status
             if status is WorkflowStatus.WAITING_APPROVAL:
-                return OrchestrationResult(status, steps, "approval is required before continuing")
-            self._select_skill(status)
-            steps += 1
-            if status is WorkflowStatus.ANALYZING:
-                self._analyze()
-            elif status is WorkflowStatus.RETRIEVING:
-                self._retrieve()
-            elif status is WorkflowStatus.VERIFYING_EVIDENCE:
-                self._verify_evidence()
-            elif status is WorkflowStatus.PLANNING:
-                self._plan()
-            elif status is WorkflowStatus.EDITING:
-                if not self._edit():
-                    return OrchestrationResult(self.state.current_status, steps, "tool approval is required")
-            elif status is WorkflowStatus.TESTING:
-                if not self._test():
-                    return OrchestrationResult(self.state.current_status, steps, "test approval is required")
-            elif status is WorkflowStatus.DEBUGGING:
-                self._debug()
-            elif status is WorkflowStatus.REVIEWING:
-                self._review()
-            elif status is WorkflowStatus.FINALIZING:
-                self._finalize()
-            else:
-                raise OrchestrationError(f"no orchestrator handler for {status.value}")
-            self._save()
+                self._save()
+                return OrchestrationResult(
+                    status,
+                    self.steps_run,
+                    "approval is required before continuing",
+                )
+            try:
+                self._select_skill(status)
+                self.steps_run += 1
+                if status is WorkflowStatus.ANALYZING:
+                    self._analyze()
+                elif status is WorkflowStatus.RETRIEVING:
+                    self._retrieve()
+                elif status is WorkflowStatus.VERIFYING_EVIDENCE:
+                    self._verify_evidence()
+                elif status is WorkflowStatus.PLANNING:
+                    self._plan()
+                elif status is WorkflowStatus.EDITING:
+                    if not self._edit():
+                        return OrchestrationResult(
+                            self.state.current_status,
+                            self.steps_run,
+                            "tool approval is required",
+                        )
+                elif status is WorkflowStatus.TESTING:
+                    if not self._test():
+                        return OrchestrationResult(
+                            self.state.current_status,
+                            self.steps_run,
+                            "test approval is required",
+                        )
+                elif status is WorkflowStatus.DEBUGGING:
+                    self._debug()
+                elif status is WorkflowStatus.REVIEWING:
+                    self._review()
+                elif status is WorkflowStatus.FINALIZING:
+                    self._finalize()
+                else:
+                    raise OrchestrationError(f"no orchestrator handler for {status.value}")
+            finally:
+                self._save()
+        self._save()
         raise OrchestrationError("maximum orchestrator steps exceeded")
 
     def _analyze(self) -> None:
@@ -208,6 +230,8 @@ class CodingWorkflowOrchestrator:
         self._transition(WorkflowStatus.EDITING, "implementation plan validated")
 
     def _edit(self) -> bool:
+        if self._resume_approved_edit():
+            return True
         plan = self.state.implementation_plan
         if plan is None:
             raise OrchestrationError("implementation plan is required before editing")
@@ -268,9 +292,68 @@ class CodingWorkflowOrchestrator:
             self._transition(WorkflowStatus.TESTING, "implementation plan steps completed")
         return True
 
+    def _resume_approved_edit(self) -> bool:
+        if self.state.pending_tool_call is not None or not self.state.approval_decisions:
+            return False
+        approval = self.state.approval_decisions[-1]
+        if approval.decision != "approved" or not self.state.tool_execution_trace:
+            return False
+        execution = self.state.tool_execution_trace[-1]
+        if (
+            execution.tool != approval.tool_name
+            or execution.input_metadata.get("arguments_hash") != approval.arguments_hash
+        ):
+            return False
+        if not execution.success:
+            error_code = execution.result_metadata.get("error_code")
+            if error_code == ErrorCode.PATCH_CONFLICT.value:
+                plan = self.state.implementation_plan
+                step = (
+                    plan.steps[self.state.current_plan_step_index]
+                    if plan and self.state.current_plan_step_index < len(plan.steps)
+                    else None
+                )
+                query = step.file if step is not None else self.state.original_issue
+                self.state.retrieval_queries = list(
+                    dict.fromkeys([query, *self.state.retrieval_queries])
+                )
+                self.state.retrieved_evidence = []
+                self._transition(
+                    WorkflowStatus.RETRIEVING,
+                    "approved patch conflict requires fresh evidence",
+                )
+                return True
+            if error_code == ErrorCode.ACCESS_DENIED.value:
+                WorkflowEngine(self.state).fail(
+                    ErrorCode.ACCESS_DENIED,
+                    execution.error or "approved editing execution was denied",
+                )
+                return True
+            raise OrchestrationError(execution.error or "approved editing execution failed")
+        if self.state.pending_repair and approval.request_id.startswith("repair-"):
+            self.state.pending_repair = False
+            self._transition(WorkflowStatus.TESTING, "approved repair execution completed")
+            return True
+        plan = self.state.implementation_plan
+        if plan is None or self.state.current_plan_step_index >= len(plan.steps):
+            return False
+        step = plan.steps[self.state.current_plan_step_index]
+        if approval.request_id != f"plan-{step.id}":
+            return False
+        self._complete_plan_step(step.id)
+        if self.state.current_plan_step_index >= len(plan.steps):
+            self._transition(WorkflowStatus.TESTING, "approved plan execution completed")
+        return True
+
     def _test(self) -> bool:
         profiles = self._test_profiles()
         current_results = self.state.test_results[self.state.test_run_start_index :]
+        if any(
+            item.exit_code != 0 or item.failed_count or item.timed_out
+            for item in current_results
+        ):
+            self._transition(WorkflowStatus.DEBUGGING, "approved test execution failed")
+            return True
         stage_index = len(current_results)
         if stage_index >= len(profiles):
             self._advance_after_tests()

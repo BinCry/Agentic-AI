@@ -10,6 +10,10 @@ bounded retry, typed errors, and dependency injection for offline tests.
 Deterministic embeddings remain the default until production embedding
 configuration is explicitly selected by the runtime caller.
 
+The CLI selects Responses automatically for `run`; use
+`--embedding-provider openai` to opt into semantic repository vectors. See
+[Executable Coding Workflow](executable-workflow.md).
+
 ## Configuration
 
 Set credentials only through the process environment. Do not pass keys as CLI

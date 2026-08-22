@@ -108,6 +108,7 @@ trên ổ D khi cần.
 - [Controlled MCP Tools](docs/controlled-mcp-tools.md)
 - [Repository RAG](docs/repository-rag.md)
 - [Production AI Providers](docs/production-ai-providers.md)
+- [Executable Coding Workflow](docs/executable-workflow.md)
 - [Error Taxonomy and Recovery](docs/error-taxonomy.md)
 - [Structured Final Reporting](docs/structured-final-report.md)
 - [Batch 2 Acceptance Report](docs/batch-2-acceptance.md)

@@ -64,12 +64,13 @@ python -B -m coding_agent `
   --workspace $repo `
   approve-tool `
   --task-id <task-id> `
-  --request-id <request-id> `
-  --arguments-json '<exact-original-arguments-json>'
+  --request-id <request-id>
 ```
 
-The arguments must be byte-for-byte equivalent after canonical JSON encoding;
-changing a path, patch, profile or other field invalidates the approval.
+Current pending requests persist their exact arguments and verify their
+canonical hash before execution. Legacy pending states without persisted
+arguments must also pass `--arguments-json '<exact-original-arguments-json>'`.
+Changing a path, patch, profile, or other field invalidates the approval.
 
 ## Verification
 

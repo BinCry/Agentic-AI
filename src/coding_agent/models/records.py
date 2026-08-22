@@ -33,6 +33,9 @@ class RepositoryEvidence:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "RepositoryEvidence":
         payload = require_mapping(data, "evidence")
+        content = payload.get("content")
+        if not isinstance(content, str):
+            raise ModelValidationError(["content must be a string"])
         start_line = require_integer(payload, "start_line", minimum=1)
         end_line = require_integer(payload, "end_line", minimum=1)
         if end_line < start_line:
@@ -42,7 +45,7 @@ class RepositoryEvidence:
             path=require_string(payload, "path"),
             start_line=start_line,
             end_line=end_line,
-            content=require_string(payload, "content", allow_empty=True),
+            content=content,
             score=require_number(payload, "score"),
             retrieval_method=require_string(payload, "retrieval_method"),
             file_digest=optional_string(payload, "file_digest"),

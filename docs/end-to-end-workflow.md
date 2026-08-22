@@ -5,6 +5,9 @@ repository retrieval, controlled tools, workflow state and final validation.
 The orchestrator is provider-neutral; all repository side effects remain behind
 the Phase 2 `ToolExecutor` boundary.
 
+The production start/resume command, approval sequence, JSON contract, and exit
+codes are documented in [Executable Coding Workflow](executable-workflow.md).
+
 ## Loop
 
 ```text
