@@ -39,8 +39,8 @@ retrieval benchmark is reproducible within the phase latency target.
 
 ## Commit and Push
 
-- Implementation commit: pending creation.
-- Remote status: pending push.
+- Implementation commit: `a996a2e4591700ceacd4e572b87354553f642f57`.
+- Remote status: pushed to `origin/main`; remote SHA verified equal.
 
 ## Known Limitations
 
