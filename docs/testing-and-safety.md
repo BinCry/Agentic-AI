@@ -2,7 +2,7 @@
 
 ## Disk policy
 
-Runtime root mặc định là `.coding-agent` bên trong workspace. `WorkspacePaths` từ chối runtime ngoài workspace, path traversal và ổ `C:` theo mặc định trên Windows. Policy chỉ kiểm soát các ghi do runtime mới thực hiện; script legacy phải tiếp tục được chạy với `TEMP`, `TMP`, `HOME`, `USERPROFILE` và cache trỏ vào D.
+Runtime root mặc định là `.coding-agent` bên trong workspace. `WorkspacePaths` từ chối runtime ngoài workspace, path traversal và ổ `C:` theo mặc định trên Windows. Policy chỉ kiểm soát các ghi do runtime mới thực hiện; script legacy phải tiếp tục được chạy với `TEMP`, `TMP`, `USERPROFILE` và cache trỏ vào D.
 
 ## Test command
 
@@ -11,7 +11,7 @@ Xem lệnh PowerShell đầy đủ trong README. Điều kiện bắt buộc tr�
 - `PYTHONPATH` trỏ tới `<workspace>\src`
 - `CODING_AGENT_TEST_TMP` nằm dưới `<workspace>\.tmp`
 - `PYTHONDONTWRITEBYTECODE=1`
-- các biến temp/home/cache đều trỏ vào D
+- các biến temp/profile/cache đều trỏ vào D
 
 Sau đó chạy:
 
@@ -66,8 +66,9 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The latest full verification passed 110 tests; 2 symlink tests were skipped
-because the current Windows account lacks symlink privilege.
+The latest full verification passed 131 tests with 82% combined branch
+coverage. `pyproject.toml` enforces an 80% minimum and CI repeats the gate on
+Python 3.11 and 3.12 before wheel/installed-CLI smoke.
 
 Batch 2 final acceptance, requirement mapping and known limitations are recorded
 in [Batch 2 Acceptance Report](batch-2-acceptance.md).

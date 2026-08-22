@@ -9,7 +9,8 @@
 Hiện trạng: Phase 0 đến Phase 6 và Batch 2 hardening đã hoàn thành, gồm
 controlled MCP tools, repository RAG, evidence verification, staged
 test/debug/recovery, verified final reporting, recovery crash-safe và evaluation
-benchmark machine-readable.
+benchmark machine-readable. Production completion bổ sung OpenAI Responses,
+semantic embeddings tùy chọn, CLI `run`, coverage gate và CI packaging smoke.
 
 ## An toàn ổ đĩa
 
@@ -33,6 +34,16 @@ python -B -m coding_agent --workspace D:\Agentic-AI show --task-id demo-01
 ```
 
 Lệnh `init` chọn skill cho trạng thái `ANALYZING`, lưu JSON state nguyên tử và ghi trace JSONL đã che các trường nhạy cảm.
+
+Khi `OPENAI_API_KEY` đã có trong process environment, chạy workflow thật bằng:
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI run `
+  --issue 'Áp dụng thay đổi repository đã yêu cầu'
+```
+
+Mutation/test dừng xin duyệt theo mặc định. Xem start/resume, exit code và
+`--auto-approve` tại [Executable Coding Workflow](docs/executable-workflow.md).
 
 Sau khi task đạt `COMPLETED`, xuất báo cáo đã xác minh bằng:
 
@@ -64,11 +75,10 @@ Benchmark, metric và failure analysis được mô tả trong
 ## Chạy test chỉ trên ổ D
 
 ```powershell
-$taskTemp = 'D:\Agentic-AI\.tmp\phase-01'
+$taskTemp = 'D:\Agentic-AI\.tmp\quality'
 New-Item -ItemType Directory -Force -Path $taskTemp | Out-Null
 $env:TEMP = $taskTemp
 $env:TMP = $taskTemp
-$env:HOME = $taskTemp
 $env:USERPROFILE = $taskTemp
 $env:PYTHONPYCACHEPREFIX = Join-Path $taskTemp 'pycache'
 $env:PYTHONDONTWRITEBYTECODE = '1'
@@ -129,8 +139,10 @@ typed recovery và verified final report.
 
 ## Giới hạn còn lại
 
-- Embedding mặc định là deterministic/offline; provider semantic production cần
-  triển khai interface sẵn có.
+- Embedding mặc định là deterministic/offline; semantic production chỉ bật khi
+  chọn `--embedding-provider openai` và có credential trong environment.
+- Live provider smoke không chạy nếu không có credential; offline tests không
+  dùng network hay giả lập một lần gọi live thành công.
 - Runtime chỉ cho phép tool repository/test/Git đã allowlist, không cung cấp
   shell tùy ý.
 - Hai test symlink-hardening trên Windows sẽ skip nếu tài khoản chạy test không

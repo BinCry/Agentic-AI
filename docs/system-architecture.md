@@ -61,6 +61,12 @@ Phase 6 bổ sung evaluation runner độc lập với provider, benchmark schem
 version, metric retrieval/coding-agent và failure analysis JSON; metric tùy chọn
 không có sample sẽ trả `null` thay vì suy diễn.
 
+Production completion bổ sung `OpenAIResponsesProvider`, batched
+`OpenAIEmbeddingProvider` và `workflow.runtime`. CLI `run` tạo hoặc resume task,
+lưu sau mỗi attempted step, dừng approval theo mặc định và chỉ tự duyệt khi có
+`--auto-approve`. CI giữ deterministic embeddings và provider fixtures để không
+phụ thuộc credential/network.
+
 ## Phase 4 orchestration boundary
 
 ```mermaid

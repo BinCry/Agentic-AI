@@ -1,0 +1,44 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-package-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      CODING_AGENT_TEST_TMP: ${{ github.workspace }}/.tmp/tests
+      PIP_CACHE_DIR: ${{ github.workspace }}/.tmp/pip-cache
+      PYTHONPYCACHEPREFIX: ${{ github.workspace }}/.tmp/pycache
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install test environment
+        run: python -m pip install --disable-pip-version-check -e ".[test]"
+      - name: Run branch coverage gate
+        run: |
+          python -m coverage run --branch -m unittest discover -s tests -p 'test_*.py'
+          python -m coverage report
+      - name: Build wheel
+        run: python -m pip wheel --disable-pip-version-check --no-deps --wheel-dir dist .
+      - name: Smoke installed wheel and CLI
+        run: |
+          python -m venv .tmp/install-smoke
+          cd .tmp/install-smoke
+          ./bin/python -m pip install --disable-pip-version-check --force-reinstall --no-deps ../../dist/*.whl
+          ./bin/coding-agent --help

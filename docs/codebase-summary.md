@@ -6,8 +6,11 @@
 - `src/coding_agent/workflow`: trạng thái hợp lệ và bounded transition engine.
 - `src/coding_agent/workflow/orchestrator.py`: autonomous bounded workflow,
   skill routing and finalization DoD.
+- `src/coding_agent/workflow/runtime.py`: production provider/executor assembly,
+  persisted start/resume and explicit auto-approval boundary.
 - `src/coding_agent/skills`: đọc metadata/content digest từ skill hiện hữu và route theo state.
-- `src/coding_agent/llm`: protocol cho model provider và strict structured-output boundary.
+- `src/coding_agent/llm`: provider protocol, strict structured-output boundary,
+  bounded OpenAI HTTPS client và Responses adapter.
 - `src/coding_agent/tools`: allowlisted repository, test and read-only Git/MCP
   tools with approval and trace boundaries.
 - `src/coding_agent/rag`: persistent repository index, grounded retrieval and
@@ -16,7 +19,8 @@
 - `src/coding_agent/evaluation`: versioned retrieval benchmark and honest
   coding-agent metrics.
 - `src/coding_agent/observability`: append-only trace, output-size cap và redaction.
-- `src/coding_agent/cli.py`: bề mặt vận hành Phase 1.
+- `src/coding_agent/cli.py`: task operations, executable `run`, approvals, MCP,
+  reporting and evaluation.
 
 ## Tài sản tương thích được giữ
 
@@ -30,4 +34,6 @@ install state, runtime task/trace và backup là artifact sinh tự động, kh�
 
 ## Test layout
 
-`tests/` kiểm tra model validation, task-state round trip, workflow bounds, skill routing, storage/path policy, trace redaction, structured output retry và CLI integration.
+`tests/` kiểm tra model validation, task-state round trip, workflow bounds,
+provider retry/redaction, skill routing, storage/path policy, trace redaction,
+approval/crash resume, executable CLI và installed workflow contracts.

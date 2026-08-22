@@ -62,6 +62,7 @@ logs.txt
 test-ck
 __pycache__/
 *.py[cod]
+*.egg-info/
 /.tmp/
 /.coding-agent/
 /tmp-codex-*/

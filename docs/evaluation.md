@@ -65,10 +65,18 @@ turning them into a fabricated pass.
 
 ## Verification result
 
-The checked-in three-case retrieval smoke fixture produced `recall@5=1.0`,
-`MRR=0.8333` and `citation_correctness=1.0` during the Phase 6 verification
-run. Coding-agent sample count was zero because no persisted task IDs were
-passed; its optional rates were therefore `null` by design.
+The checked-in three-case retrieval smoke fixture produced these production
+completion measurements on 2026-08-22:
+
+| Top-k | Recall | MRR | Citation correctness | Mean / p95 / max latency | Failures |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.6667 | 0.6667 | 1.0 | 718 / 647 / 868 ms | 1 |
+| 3 | 1.0 | 0.8333 | 1.0 | 636 / 638 / 643 ms | 0 |
+| 5 | 1.0 | 0.8333 | 1.0 | 635 / 634 / 642 ms | 0 |
+
+Coding-agent sample count was zero because no persisted task IDs were passed;
+its optional rates were therefore `null` by design. Recall@1 keeps the one
+observable miss rather than converting the smoke into a fabricated pass.
 
 ## Failure and risk coverage
 

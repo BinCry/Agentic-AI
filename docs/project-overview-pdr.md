@@ -11,7 +11,7 @@ Xây dựng một coding agent có thể phân tích issue, tìm bằng chứng 
 - Skill catalog và router dựa trên trạng thái.
 - Giao diện LLM trung lập nhà cung cấp, JSON validation và bounded repair.
 - Atomic JSON persistence, append-only JSONL trace và secret redaction.
-- CLI cho tạo task, xem state, transition và xem skill routes.
+- CLI cho tạo/resume workflow thật, xem state, transition, approval và skill routes.
 - Workspace policy từ chối ghi ngoài workspace và từ chối ổ `C:` mặc định.
 - MCP server cùng controlled repository/test/Git tools và approval ledger.
 - Repository RAG/indexing, deterministic hybrid ranking, citations và grounding.
@@ -19,6 +19,8 @@ Xây dựng một coding agent có thể phân tích issue, tìm bằng chứng 
 - Checkpoint/rollback, bounded context, benchmark và failure analysis.
 - Batch 2 hardening cho evidence verification, staged test/debug, typed recovery
   và final report JSON/Markdown.
+- OpenAI Responses và batched semantic embeddings sau provider-neutral contracts.
+- Offline CI trên Python 3.11/3.12 với branch coverage, wheel và installed-CLI smoke.
 
 ## Yêu cầu phi chức năng
 
