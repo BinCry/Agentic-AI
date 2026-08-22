@@ -1,7 +1,7 @@
 ---
 title: "Skill-Based Coding Agent with Repository RAG and MCP"
 description: "Restructure Claude-Kit into a workspace-safe coding agent and deliver the tested Phase 1 runtime foundation."
-status: in-progress
+status: completed
 priority: P1
 effort: large
 branch: main

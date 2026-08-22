@@ -32,8 +32,20 @@ class RepositoryRagTests(WorkspaceTestCase):
     def test_ingestion_filters_directories_and_large_files(self) -> None:
         (self.test_root / "src").mkdir()
         (self.test_root / "src" / "module.py").write_text("value = 1\n", encoding="utf-8")
-        (self.test_root / ".git").mkdir()
-        (self.test_root / ".git" / "ignored.py").write_text("ignored = True\n", encoding="utf-8")
+        ignored_roots = (
+            ".agent",
+            ".agents",
+            ".claude",
+            ".codex",
+            ".cursor",
+            ".gemini",
+            ".git",
+            ".opencode",
+        )
+        for ignored_root in ignored_roots:
+            directory = self.test_root / ignored_root
+            directory.mkdir()
+            (directory / "ignored.py").write_text("ignored = True\n", encoding="utf-8")
         (self.test_root / "large.py").write_text("x" * 100, encoding="utf-8")
         ingestor = RepositoryIngestor(self.make_paths(), maximum_file_bytes=50)
         paths = {str(item.relative_to(self.test_root)) for item in ingestor.iter_files()}

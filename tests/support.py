@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import shutil
+import stat
 import unittest
 from pathlib import Path
+from typing import Callable
 from uuid import uuid4
 
 
@@ -22,7 +24,7 @@ class WorkspaceTestCase(unittest.TestCase):
 
     def tearDown(self) -> None:
         if self.test_root.exists():
-            shutil.rmtree(self.test_root)
+            shutil.rmtree(self.test_root, onerror=_remove_readonly)
 
     def write_skill(
         self,
@@ -43,3 +45,10 @@ class WorkspaceTestCase(unittest.TestCase):
             encoding="utf-8",
         )
         return skill_path
+
+
+def _remove_readonly(function: Callable[[str], object], path: str, exception_info: object) -> None:
+    """Allow isolated Git fixture objects to be removed on Windows."""
+    del exception_info
+    os.chmod(path, stat.S_IWRITE)
+    function(path)

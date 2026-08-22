@@ -30,7 +30,24 @@ class RepositoryIngestor:
         {".py", ".md", ".txt", ".json", ".toml", ".yaml", ".yml", ".js", ".ts", ".tsx", ".jsx", ".css", ".html"}
     )
     DEFAULT_IGNORED_DIRECTORIES = frozenset(
-        {".git", ".coding-agent", ".tmp", "node_modules", "__pycache__", ".venv", "dist", "build", "coverage"}
+        {
+            ".agent",
+            ".agents",
+            ".claude",
+            ".coding-agent",
+            ".codex",
+            ".cursor",
+            ".gemini",
+            ".git",
+            ".opencode",
+            ".tmp",
+            ".venv",
+            "__pycache__",
+            "build",
+            "coverage",
+            "dist",
+            "node_modules",
+        }
     )
 
     def __init__(
