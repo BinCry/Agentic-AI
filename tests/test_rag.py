@@ -48,8 +48,8 @@ class RepositoryRagTests(WorkspaceTestCase):
             (directory / "ignored.py").write_text("ignored = True\n", encoding="utf-8")
         (self.test_root / "large.py").write_text("x" * 100, encoding="utf-8")
         ingestor = RepositoryIngestor(self.make_paths(), maximum_file_bytes=50)
-        paths = {str(item.relative_to(self.test_root)) for item in ingestor.iter_files()}
-        self.assertEqual(paths, {"src\\module.py"})
+        paths = {item.relative_to(self.test_root).as_posix() for item in ingestor.iter_files()}
+        self.assertEqual(paths, {"src/module.py"})
 
     def test_persistent_hybrid_index_returns_grounded_citation_and_reuses_digest(self) -> None:
         target = self.test_root / "module.py"
