@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Expose Executable Coding Workflow"
-status: pending
+status: completed
 priority: P1
 effort: "3h"
 dependencies: [2]
@@ -34,10 +34,19 @@ dependencies: [2]
 
 ## Tests and Acceptance
 
-- [ ] CLI runs and resumes the real orchestrator boundary.
-- [ ] Missing key, invalid provider response, approval pause, and terminal success are tested.
-- [ ] Default invocation cannot silently auto-approve mutation or test tools.
-- [ ] Existing CLI contracts remain compatible.
+- [x] CLI starts and resumes the real orchestrator boundary.
+- [x] Missing key, invalid provider output, approval pause, external approval,
+  persisted failure, and terminal success tested offline.
+- [x] Default invocation pauses mutation/test; automation requires `--auto-approve`.
+- [x] Existing CLI commands and legacy pending states remain compatible.
+
+## Completion Evidence
+
+- Implementation commit: `5640007035ed02760ab5591b0741d4791ab8d2dc`.
+- Full suite: 131 passed; combined branch coverage 82%.
+- CLI help exposes no credential argument.
+- Local and `origin/main` SHA matched after push.
+- Report: [Phase 3 Executable Workflow](./reports/phase-03-executable-workflow-report.md).
 
 ## Risk and Rollback
 
