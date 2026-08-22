@@ -1,5 +1,10 @@
 # Project Roadmap
 
+Production completion passed on 2026-08-22: bounded retrieval, production AI
+providers, executable persisted CLI, 80% coverage gate, wheel smoke, and GitHub
+Actions on Python 3.11/3.12. See the
+[final acceptance report](../plans/260822-2208-coding-agent-completion/reports/final-260822-coding-agent-acceptance.md).
+
 | Phase | Nội dung | Trạng thái |
 |---|---|---|
 | 0 | Audit, dọn generated/vendor artifacts, tạo layout tái lập | completed |

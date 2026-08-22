@@ -122,6 +122,7 @@ trên ổ D khi cần.
 - [Error Taxonomy and Recovery](docs/error-taxonomy.md)
 - [Structured Final Reporting](docs/structured-final-report.md)
 - [Batch 2 Acceptance Report](docs/batch-2-acceptance.md)
+- [Production Completion Acceptance](plans/260822-2208-coding-agent-completion/reports/final-260822-coding-agent-acceptance.md)
 - [Roadmap](docs/project-roadmap.md)
 - [Kế hoạch triển khai chi tiết](plans/260820-0915-coding-agent-restructure/plan.md)
 
