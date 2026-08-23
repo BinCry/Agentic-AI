@@ -109,6 +109,20 @@ python -B -m coding_agent --workspace D:\Agentic-AI baseline `
   --require-coverage
 ```
 
+Inspect one policy result without creating runtime state or executing a tool:
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI policy check `
+  --tool repo.create_file `
+  --arguments-json '{"path":"example.py","content":"value = 1"}' `
+  --mode ask `
+  --workspace-trust trusted
+```
+
+`run`, `approve-tool`, and `mcp-server` accept the same policy/trust options.
+Workspace policy files may only deny; an explicit `--policy-file` is treated as
+trusted input but still cannot override built-in or session safety decisions.
+
 ## Chạy test chỉ trên ổ D
 
 ```powershell

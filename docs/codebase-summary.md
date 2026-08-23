@@ -14,6 +14,8 @@
   bounded OpenAI HTTPS client, OpenAI Responses, and OpenRouter Responses adapters.
 - `src/coding_agent/tools`: allowlisted repository, test and read-only Git/MCP
   tools with approval and trace boundaries.
+- `src/coding_agent/policy`: typed risk/mode/trust models, strict TOML loading,
+  immutable safety baseline, deterministic precedence and redacted explanation.
 - `src/coding_agent/rag`: persistent repository index, grounded retrieval and
   stale-evidence recovery.
 - `src/coding_agent/storage`: workspace containment, atomic JSON task store,
@@ -23,8 +25,8 @@
 - `src/coding_agent/models/run_accounting.py`: typed future run budgets and
   aggregate provider usage without prompts, credentials, or reasoning text.
 - `src/coding_agent/observability`: append-only trace, output-size cap và redaction.
-- `src/coding_agent/cli.py` + `cli_baseline.py`: task operations, executable
-  `run`, approvals, MCP, reporting, evaluation, and reproducible baseline.
+- `src/coding_agent/cli.py` + focused CLI modules: task operations, executable
+  `run`, policy/project inspection, approvals, MCP, reporting, evaluation, and baseline.
 
 ## Tài sản tương thích được giữ
 

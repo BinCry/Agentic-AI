@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: "Policy Engine and Approval Modes"
-status: pending
+status: completed
 effort: "4-5 days"
 dependsOn: [1, 2]
 ---
@@ -82,11 +82,11 @@ Move general rule models/compilation into `coding_agent.policy`. Keep `ToolPermi
 
 ## Success Criteria
 
-- [ ] Existing tool requests retain or reduce their previous authority.
-- [ ] Every policy result is deterministic, explained, redacted, and serializable.
-- [ ] Workspace configuration cannot weaken built-in path, drive, read-only, or remote-effect restrictions.
-- [ ] `policy check` covers all registered tools without side effects.
-- [ ] Negative security matrix and full quality gate pass.
+- [x] Existing tool requests retain or reduce their previous authority.
+- [x] Every policy result is deterministic, explained, redacted, and serializable.
+- [x] Workspace configuration cannot weaken built-in path, drive, read-only, or remote-effect restrictions.
+- [x] `policy check` covers all registered tools without side effects.
+- [x] Negative security matrix and full quality gate pass.
 
 ## Risks and Rollback
 

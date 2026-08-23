@@ -65,6 +65,12 @@ giới hạn byte/file, giữ SHA-256 provenance và từ chối symlink thoát 
 Context đánh dấu toàn bộ instruction là `untrusted_repository_data`; controller
 policy, approval, read-only và workspace boundary luôn có quyền cao hơn.
 
+Layered policy giữ validation tool/path hiện hữu làm facade, sau đó đánh giá
+typed risk qua immutable built-ins, trusted explicit TOML, workspace deny-only
+rules và session mode. `WorkspaceTrust` độc lập `ApprovalMode`; một approval
+không được coi là process isolation. Mọi decision có rule/layer/reason ổn định
+và arguments đã redact để phục vụ event stream ở phase sau.
+
 Phase 5 bổ sung `ContextProjector`/`ContextCompactor`, `CheckpointStore` và
 `ApprovalLedger`. Checkpoint được ghi trước operation rủi ro, có snapshot file
 bytes để rollback, còn approval ledger độc lập với task JSON để chịu được gián

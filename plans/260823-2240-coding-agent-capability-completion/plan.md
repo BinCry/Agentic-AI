@@ -30,7 +30,7 @@ Scope is intentionally narrower than feature parity: retain the current state ma
 
 Research and gap matrix: [official coding-agent capability study](./research/official-coding-agent-capability-study.md).
 
-Progress: 2/9 phases completed (22%). Phase 3 is next.
+Progress: 3/9 phases completed (33%). Phase 4 is next.
 
 ## Phases
 
@@ -38,7 +38,7 @@ Progress: 2/9 phases completed (22%). Phase 3 is next.
 |-------|------|--------|
 | 1 | [Baseline and State Migration](./phase-01-baseline-and-state-migration.md) | Completed |
 | 2 | [Instruction Hierarchy and Project Discovery](./phase-02-instruction-hierarchy-and-project-discovery.md) | Completed |
-| 3 | [Policy Engine and Approval Modes](./phase-03-policy-engine-and-approval-modes.md) | Pending |
+| 3 | [Policy Engine and Approval Modes](./phase-03-policy-engine-and-approval-modes.md) | Completed |
 | 4 | [Safe Command and Test Harness](./phase-04-safe-command-and-test-harness.md) | Pending |
 | 5 | [Iterative Tool Loop and Context Ledger](./phase-05-iterative-tool-loop-and-context-ledger.md) | Pending |
 | 6 | [Event Stream and Session UX](./phase-06-event-stream-and-session-ux.md) | Pending |

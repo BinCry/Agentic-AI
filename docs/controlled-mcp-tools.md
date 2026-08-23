@@ -13,16 +13,45 @@ remain owned by the controller.
 | `repo.search_text` | Exact or explicitly requested regex line search | No | Same read states |
 | `repo.find_symbols` | Python AST class/function listing | No | Same read states |
 | `repo.retrieve` | Grounded hybrid retrieval with line citations | No | Same read states |
-| `repo.create_file` | Create a new file without overwrite | Yes | `EDITING`, `DEBUGGING` |
-| `repo.apply_patch` | Apply a single-file unified patch | Yes | `EDITING`, `DEBUGGING` |
+| `repo.create_file` | Create a new file without overwrite | Ask; auto-edit may allow | `EDITING`, `DEBUGGING` |
+| `repo.apply_patch` | Apply a single-file unified patch | Ask; auto-edit may allow | `EDITING`, `DEBUGGING` |
 | `test.detect_framework` | Detect bounded Python test conventions | No | Same read states |
-| `test.run` | Run an allowlisted `fixture` or `unit` profile | Yes | `TESTING`, `DEBUGGING` |
+| `test.run` | Run an allowlisted `fixture` or `unit` profile | Ask; never auto-edit | `TESTING`, `DEBUGGING` |
 | `git.status` | Read-only short status | No | Read states |
 | `git.diff` | Read-only diff, optionally scoped to paths | No | Read states |
 | `git.changed_files` | List files changed from `HEAD` | No | Read states |
 
 There is no arbitrary shell tool. Git mutation, network commands, credential
 access and destructive commands are outside the Phase 2 surface.
+
+## Layered policy and trust
+
+Policy decisions are exactly `allow`, `deny`, or `ask`. Built-in remote-write,
+destructive, read-only, path and drive invariants cannot be widened. An explicit
+trusted TOML can add typed equality/prefix/effect rules. `--workspace-policy`
+is workspace-contained and accepts deny rules only. No expression or code is
+evaluated from TOML.
+
+- `read-only`: deny every non-read effect.
+- `ask`: preserve approval for workspace writes and local processes.
+- `auto-edit`: allow bounded workspace create/patch after checkpoint; test
+  processes, network and remote effects still ask or deny.
+- `--workspace-trust untrusted`: deny local processes because approval is not
+  process isolation.
+
+Explain any registered tool without dispatch or `.coding-agent` creation:
+
+```powershell
+python -B -m coding_agent --workspace $repo policy check `
+  --tool test.run `
+  --arguments-json '{"profile":"unit"}' `
+  --state TESTING `
+  --mode ask `
+  --workspace-trust trusted
+```
+
+The output includes matched rule ID, layer, reason code, risk metadata, approval
+requirement, and redacted arguments.
 
 ## Safety invariants
 

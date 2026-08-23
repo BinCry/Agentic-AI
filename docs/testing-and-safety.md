@@ -23,6 +23,11 @@ Phase 2 adds policy, repository, patch, bounded subprocess, Git, executor and
 MCP contract coverage. The complete Phase 2 tool contract is documented in
 [Controlled MCP Tools](controlled-mcp-tools.md).
 
+The production completion roadmap Phase 3 adds layered `allow`/`deny`/`ask`
+decisions, strict TOML rules, independent approval mode/workspace trust,
+side-effect-free policy explanation, auto-edit checkpoint coverage, and
+negative tests for remote, destructive, untrusted-process and secret inputs.
+
 Phase 3 adds AST/Markdown chunking, ingestion filters, persistent SQLite
 indexing, hybrid retrieval, grounded citations, stale recovery and retrieval
 metrics. See [Repository RAG](repository-rag.md).
@@ -66,7 +71,7 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The latest full verification passed 131 tests with 82% combined branch
+The latest full verification passed 193 tests with 83.06% combined branch
 coverage. `pyproject.toml` enforces an 80% minimum and CI repeats the gate on
 Python 3.11 and 3.12 before wheel/installed-CLI smoke.
 
