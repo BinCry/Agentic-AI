@@ -1,0 +1,8 @@
+{
+  "name": "sample-node-repo",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test"
+  }
+}
