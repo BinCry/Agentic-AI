@@ -1,6 +1,7 @@
 """Provider-neutral LLM contracts and structured response validation."""
 
 from .provider import LLMMessage, LLMProvider, LLMResponse
+from .openrouter_provider import OpenRouterConfigurationError, OpenRouterResponsesProvider
 from .openai_client import (
     OpenAIClientError,
     OpenAIConfigurationError,
@@ -15,6 +16,8 @@ __all__ = [
     "LLMMessage",
     "LLMProvider",
     "LLMResponse",
+    "OpenRouterConfigurationError",
+    "OpenRouterResponsesProvider",
     "OpenAIClientError",
     "OpenAIConfigurationError",
     "OpenAIHttpClient",

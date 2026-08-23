@@ -8,6 +8,7 @@ from typing import Mapping
 from ..errors import ErrorCode
 from ..llm.openai_client import OpenAIClientError
 from ..llm.openai_provider import OpenAIResponsesProvider
+from ..llm.openrouter_provider import OpenRouterResponsesProvider
 from ..llm.provider import LLMProvider
 from ..models.task_state import CodingTaskState
 from ..rag.embeddings import EmbeddingProvider, OpenAIEmbeddingProvider
@@ -40,6 +41,7 @@ def run_workflow(
     maximum_steps: int = 40,
     structured_retries: int = 2,
     auto_approve: bool = False,
+    model_provider_name: str = "openai",
     embedding_provider_name: str = "deterministic",
     environment: Mapping[str, str] | None = None,
     provider: LLMProvider | None = None,
@@ -56,7 +58,7 @@ def run_workflow(
 
     root = paths.resolve_workspace_path(skill_root, must_exist=True)
     router = SkillRouter(SkillCatalog(root).load())
-    model_provider = provider or OpenAIResponsesProvider.from_env(environment)
+    model_provider = provider or _model_provider(model_provider_name, environment)
     embedding_provider = _embedding_provider(embedding_provider_name, environment)
     state = (
         _create_task(paths, store, router, issue, repository)
@@ -88,6 +90,17 @@ def run_workflow(
         store.save(state)
         result = OrchestrationResult(state.current_status, orchestrator.steps_run, str(exc))
     return WorkflowRunOutcome(state, result)
+
+
+def _model_provider(
+    name: str,
+    environment: Mapping[str, str] | None,
+) -> LLMProvider:
+    if name == "openai":
+        return OpenAIResponsesProvider.from_env(environment)
+    if name == "openrouter":
+        return OpenRouterResponsesProvider.from_env(environment)
+    raise ValueError(f"unsupported model provider: {name}")
 
 
 def _create_task(

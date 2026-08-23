@@ -51,6 +51,11 @@ def _parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--maximum-steps", type=int, default=40)
     run_parser.add_argument("--structured-retries", type=int, default=2)
     run_parser.add_argument(
+        "--model-provider",
+        choices=("openai", "openrouter"),
+        default="openai",
+    )
+    run_parser.add_argument(
         "--embedding-provider",
         choices=("deterministic", "openai"),
         default="deterministic",
@@ -194,6 +199,7 @@ def _run(args: argparse.Namespace) -> int:
         maximum_steps=args.maximum_steps,
         structured_retries=args.structured_retries,
         auto_approve=args.auto_approve,
+        model_provider_name=args.model_provider,
         embedding_provider_name=args.embedding_provider,
     )
     state = outcome.state

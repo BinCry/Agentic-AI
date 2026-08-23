@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 from coding_agent.cli import main
 from coding_agent.llm.openai_client import OpenAIConfigurationError
+from coding_agent.llm.openrouter_provider import OpenRouterConfigurationError
 from coding_agent.llm.provider import LLMMessage, LLMResponse
 from coding_agent.rag.index import RepositoryIndex
 from coding_agent.storage.task_store import JsonTaskStore
@@ -54,6 +55,24 @@ class WorkflowRuntimeTests(WorkspaceTestCase):
             code, payload, error = self.run_cli("run", "--issue", "Fix configuration")
         self.assertEqual((code, payload), (1, {}))
         self.assertEqual(json.loads(error)["error"], "OpenAIConfigurationError")
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        self.assertEqual(JsonTaskStore(paths).list_task_ids(), ())
+
+    def test_openrouter_provider_selection_uses_its_environment_contract(self) -> None:
+        self.write_skill("fix")
+        with patch(
+            "coding_agent.workflow.runtime.OpenRouterResponsesProvider.from_env",
+            side_effect=OpenRouterConfigurationError("OPENROUTER_API_KEY is required"),
+        ):
+            code, payload, error = self.run_cli(
+                "run",
+                "--issue",
+                "Fix configuration",
+                "--model-provider",
+                "openrouter",
+            )
+        self.assertEqual((code, payload), (1, {}))
+        self.assertEqual(json.loads(error)["error"], "OpenRouterConfigurationError")
         paths = WorkspacePaths.create(self.test_root).ensure()
         self.assertEqual(JsonTaskStore(paths).list_task_ids(), ())
 
