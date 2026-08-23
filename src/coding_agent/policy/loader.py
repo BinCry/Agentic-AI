@@ -25,7 +25,9 @@ class PolicyLoader:
     def __init__(self, paths: WorkspacePaths, *, maximum_bytes: int = 262_144) -> None:
         if not isinstance(maximum_bytes, int) or isinstance(maximum_bytes, bool) or maximum_bytes < 1:
             raise ValueError("maximum policy bytes must be positive")
-        self.paths = paths.ensure()
+        if not paths.workspace_root.is_dir():
+            raise PolicyConfigurationError("policy workspace does not exist")
+        self.paths = paths
         self.maximum_bytes = maximum_bytes
 
     def load_explicit(self, path: str | Path) -> tuple[PolicyRule, ...]:

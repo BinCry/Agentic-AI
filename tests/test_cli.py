@@ -11,6 +11,7 @@ from coding_agent.models.records import FinalReport, RepositoryEvidence, TestExe
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.storage.task_store import JsonTaskStore
 from coding_agent.storage.workspace import WorkspacePaths
+from coding_agent.tools.policy import DEFAULT_TOOL_SPECS
 from coding_agent.workflow.status import WorkflowStatus
 
 from tests.support import WorkspaceTestCase
@@ -78,6 +79,90 @@ class CliTests(WorkspaceTestCase):
         self.assertEqual((code, error), (0, ""))
         self.assertEqual(payload["ecosystems"], ["python"])
         self.assertEqual(payload["instructions"][0]["path"], "AGENTS.md")
+
+    def test_policy_check_explains_deny_without_execution_and_redacts_content(self) -> None:
+        arguments = {
+            "path": "blocked.py",
+            "content": "sk-" + "x" * 24,
+        }
+
+        code, payload, error = self.run_cli(
+            "policy",
+            "check",
+            "--tool",
+            "repo.create_file",
+            "--arguments-json",
+            json.dumps(arguments),
+            "--mode",
+            "read-only",
+        )
+
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(payload["decision"]["action"], "deny")
+        self.assertEqual(payload["decision"]["reason_code"], "READ_ONLY_MODE")
+        self.assertEqual(payload["decision"]["arguments"]["content"], "[REDACTED]")
+        self.assertFalse((self.test_root / "blocked.py").exists())
+        self.assertFalse((self.test_root / ".coding-agent").exists())
+
+    def test_policy_check_rejects_workspace_rule_that_widens_authority(self) -> None:
+        policy = self.test_root / "policy.toml"
+        policy.write_text(
+            "version=1\n[[rules]]\nid='widen'\naction='allow'\n"
+            "tool='repo.create_file'\nreason_code='WIDEN'\n",
+            encoding="utf-8",
+        )
+
+        code, payload, error = self.run_cli(
+            "policy",
+            "check",
+            "--tool",
+            "git.status",
+            "--workspace-policy",
+            "policy.toml",
+        )
+
+        self.assertEqual((code, payload), (1, {}))
+        self.assertEqual(json.loads(error)["error"], "PolicyConfigurationError")
+
+    def test_policy_check_covers_every_registered_tool_without_side_effects(self) -> None:
+        module = self.test_root / "module.py"
+        module.write_text("value = 1\n", encoding="utf-8")
+        cases = {
+            "repo.list_files": ({}, "EDITING"),
+            "repo.read_file": ({"path": "module.py"}, "EDITING"),
+            "repo.search_text": ({"query": "value"}, "EDITING"),
+            "repo.find_symbols": ({"path": "module.py"}, "EDITING"),
+            "repo.retrieve": ({"query": "value"}, "RETRIEVING"),
+            "repo.apply_patch": (
+                {"path": "module.py", "patch": "patch", "expected_sha256": "0" * 64},
+                "EDITING",
+            ),
+            "repo.create_file": ({"path": "new.py", "content": "value = 2\n"}, "EDITING"),
+            "test.detect_framework": ({}, "EDITING"),
+            "test.run": ({"profile": "unit"}, "TESTING"),
+            "git.status": ({}, "EDITING"),
+            "git.diff": ({"paths": ["module.py"]}, "EDITING"),
+            "git.changed_files": ({}, "EDITING"),
+        }
+        self.assertEqual(set(cases), {item.name for item in DEFAULT_TOOL_SPECS})
+
+        for tool, (arguments, state) in cases.items():
+            with self.subTest(tool=tool):
+                code, payload, error = self.run_cli(
+                    "policy",
+                    "check",
+                    "--tool",
+                    tool,
+                    "--arguments-json",
+                    json.dumps(arguments),
+                    "--state",
+                    state,
+                )
+                self.assertEqual((code, error), (0, ""))
+                self.assertIn(payload["decision"]["action"], {"allow", "ask"})
+
+        self.assertEqual(module.read_text(encoding="utf-8"), "value = 1\n")
+        self.assertFalse((self.test_root / "new.py").exists())
 
     def test_forced_limit_failure_returns_nonzero_and_failed_state(self) -> None:
         self.write_skill("fix")

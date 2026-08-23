@@ -11,6 +11,7 @@ from ..llm.openai_provider import OpenAIResponsesProvider
 from ..llm.openrouter_provider import OpenRouterResponsesProvider
 from ..llm.provider import LLMProvider
 from ..models.task_state import CodingTaskState
+from ..policy.factory import build_tool_policy
 from ..project.inspector import ProjectInspector
 from ..rag.embeddings import EmbeddingProvider, OpenAIEmbeddingProvider
 from ..skills.catalog import SkillCatalog
@@ -19,7 +20,6 @@ from ..storage.task_store import JsonTaskStore
 from ..storage.workspace import WorkspacePaths
 from ..tools.executor import ToolExecutor
 from ..tools.contracts import ToolRequest
-from ..tools.policy import ToolPermissionPolicy
 from .engine import WorkflowEngine
 from .orchestrator import CodingWorkflowOrchestrator, OrchestrationError, OrchestrationResult
 from .status import WorkflowStatus
@@ -43,6 +43,10 @@ def run_workflow(
     structured_retries: int = 2,
     auto_approve: bool = False,
     read_only: bool = False,
+    approval_mode: str | None = None,
+    workspace_trust: str = "trusted",
+    policy_file: str | None = None,
+    workspace_policy: str | None = None,
     model_provider_name: str = "openai",
     embedding_provider_name: str = "deterministic",
     environment: Mapping[str, str] | None = None,
@@ -64,6 +68,14 @@ def run_workflow(
 
     root = paths.resolve_readonly_path(skill_root, must_exist=True)
     router = SkillRouter(SkillCatalog(root).load())
+    tool_policy = build_tool_policy(
+        paths,
+        approval_mode=approval_mode,
+        workspace_trust=workspace_trust,
+        policy_file=policy_file,
+        workspace_policy=workspace_policy,
+        read_only=read_only,
+    )
     model_provider = provider or _model_provider(model_provider_name, environment)
     embedding_provider = _embedding_provider(embedding_provider_name, environment)
     state = (
@@ -71,10 +83,19 @@ def run_workflow(
         if issue is not None
         else store.load(task_id or "")
     )
+    if state.read_only and not read_only:
+        tool_policy = build_tool_policy(
+            paths,
+            approval_mode=approval_mode,
+            workspace_trust=workspace_trust,
+            policy_file=policy_file,
+            workspace_policy=workspace_policy,
+            read_only=True,
+        )
     if state.read_only and auto_approve:
         raise ValueError("auto_approve is not valid for a read_only task")
     executor = ToolExecutor(
-        ToolPermissionPolicy(paths),
+        tool_policy,
         embedding_provider=embedding_provider,
     )
     if auto_approve and state.pending_tool_call is not None:

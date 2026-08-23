@@ -24,10 +24,11 @@ from .workflow.status import WorkflowStatus
 from .mcp.server import McpToolServer
 from .tools.contracts import ToolRequest
 from .tools.executor import ToolExecutor
-from .tools.policy import ToolPermissionPolicy
+from .policy.factory import build_tool_policy
 from .evaluation.runner import EvaluationRunner
 from .cli_baseline import add_baseline_parser, run_baseline_command
 from .cli_project import add_project_parser, run_project_command
+from .cli_policy import add_policy_options, add_policy_parser, run_policy_command
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -72,6 +73,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Start a new analysis task that cannot plan mutations or run tests",
     )
+    add_policy_options(run_parser, optional_mode=True)
 
     show_parser = subparsers.add_parser("show", help="Show persisted task state")
     show_parser.add_argument("--task-id", required=True)
@@ -125,9 +127,11 @@ def _parser() -> argparse.ArgumentParser:
         "--arguments-json",
         help="Exact request arguments; defaults to the persisted pending request",
     )
+    add_policy_options(approve_tool_parser, optional_mode=True)
 
     mcp_parser = subparsers.add_parser("mcp-server", help="Serve controlled tools over JSON-RPC stdio")
     mcp_parser.add_argument("--task-id", required=True)
+    add_policy_options(mcp_parser, optional_mode=True)
 
     skills_parser = subparsers.add_parser("skills", help="List reusable skills by workflow state")
     skills_parser.add_argument("--skill-root", default=".claude/skills")
@@ -142,6 +146,7 @@ def _parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument("--task-id", action="append", default=[])
     add_baseline_parser(subparsers)
     add_project_parser(subparsers)
+    add_policy_parser(subparsers)
     return parser
 
 
@@ -209,6 +214,10 @@ def _run(args: argparse.Namespace) -> int:
         structured_retries=args.structured_retries,
         auto_approve=args.auto_approve,
         read_only=args.read_only,
+        approval_mode=args.approval_mode,
+        workspace_trust=args.workspace_trust,
+        policy_file=args.policy_file,
+        workspace_policy=args.workspace_policy,
         model_provider_name=args.model_provider,
         embedding_provider_name=args.embedding_provider,
     )
@@ -349,7 +358,15 @@ def _approve_tool(args: argparse.Namespace) -> int:
         arguments=arguments,
         workflow_state=pending.workflow_state,
     )
-    result = ToolExecutor(ToolPermissionPolicy(paths)).approve_and_execute(state, request)
+    policy = build_tool_policy(
+        paths,
+        approval_mode=args.approval_mode,
+        workspace_trust=args.workspace_trust,
+        policy_file=args.policy_file,
+        workspace_policy=args.workspace_policy,
+        read_only=state.read_only,
+    )
+    result = ToolExecutor(policy).approve_and_execute(state, request)
     store.save(state)
     _write_json(asdict(result))
     return 0 if result.success else 2
@@ -358,7 +375,15 @@ def _approve_tool(args: argparse.Namespace) -> int:
 def _mcp_server(args: argparse.Namespace) -> int:
     paths, store, _ = _runtime(args)
     state = store.load(args.task_id)
-    server = McpToolServer(state, ToolExecutor(ToolPermissionPolicy(paths)))
+    policy = build_tool_policy(
+        paths,
+        approval_mode=args.approval_mode,
+        workspace_trust=args.workspace_trust,
+        policy_file=args.policy_file,
+        workspace_policy=args.workspace_policy,
+        read_only=state.read_only,
+    )
+    server = McpToolServer(state, ToolExecutor(policy))
     server.serve_forever(state_saver=store.save)
     return 0
 
@@ -438,6 +463,14 @@ def _project(args: argparse.Namespace) -> int:
     return 0
 
 
+def _policy(args: argparse.Namespace) -> int:
+    paths = WorkspacePaths.create(args.workspace, args.runtime_dir)
+    if not paths.workspace_root.is_dir():
+        raise ValueError(f"workspace does not exist: {paths.workspace_root}")
+    _write_json(run_policy_command(args, paths))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
@@ -457,6 +490,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "evaluate": _evaluate,
         "baseline": _baseline,
         "project": _project,
+        "policy": _policy,
     }
     try:
         return handlers[args.command](args)

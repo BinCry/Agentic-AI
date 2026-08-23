@@ -126,6 +126,16 @@ class ToolPermissionPolicy:
             raise UnknownToolError(f"tool is not allowlisted: {tool_name}") from exc
 
     def evaluate(self, request: ToolRequest) -> PolicyDecision:
+        decision = self.explain(request)
+        if decision.explanation.action is PolicyAction.DENY:
+            explanation = decision.explanation
+            raise ToolAccessError(
+                f"policy denied {decision.spec.name}: {explanation.reason_code} "
+                f"({explanation.rule_id})"
+            )
+        return decision
+
+    def explain(self, request: ToolRequest) -> PolicyDecision:
         spec = self.spec(request.tool_name)
         if request.workflow_state not in spec.allowed_states:
             raise ToolStateError(
@@ -170,11 +180,6 @@ class ToolPermissionPolicy:
                     self.mode,
                     self.workspace_trust,
                 )
-            )
-        if explanation.action is PolicyAction.DENY:
-            raise ToolAccessError(
-                f"policy denied {spec.name}: {explanation.reason_code} "
-                f"({explanation.rule_id})"
             )
         return PolicyDecision(
             spec,
