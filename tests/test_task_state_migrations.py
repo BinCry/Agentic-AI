@@ -61,6 +61,37 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
         self.assertEqual(migrated["schema_version"], CURRENT_TASK_SCHEMA_VERSION)
         self.assertIsNone(migrated["project_profile"])
 
+    def test_legacy_usage_ledger_gains_explicit_known_call_counts(self) -> None:
+        state = CodingTaskState.create("Issue", "repo", task_id="legacy-usage")
+        state.usage_ledger.record(
+            provider="legacy",
+            model="fixture",
+            input_tokens=4,
+            output_tokens=2,
+            total_tokens=6,
+            latency_ms=3,
+        )
+        payload = state.to_dict()
+        payload["schema_version"] = 3
+        ledger = payload["usage_ledger"]
+        assert isinstance(ledger, dict)
+        for field in (
+            "usage_known_calls",
+            "usage_unknown_calls",
+            "latency_known_calls",
+            "input_tokens_known_calls",
+            "output_tokens_known_calls",
+            "reasoning_tokens_known_calls",
+            "total_tokens_known_calls",
+        ):
+            ledger.pop(field)
+
+        restored = CodingTaskState.from_dict(TaskStateMigrator().migrate(payload))
+
+        self.assertEqual(restored.usage_ledger.usage_known_calls, 1)
+        self.assertEqual(restored.usage_ledger.usage_unknown_calls, 0)
+        self.assertEqual(restored.usage_ledger.total_tokens_known_calls, 1)
+
     def test_load_then_save_creates_one_immutable_legacy_backup(self) -> None:
         store = self.make_store()
         payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
@@ -153,23 +184,23 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
             reasoning_tokens=2,
             latency_ms=80,
         )
-        state.usage_ledger.merge(
-            UsageLedger(
-                model_calls=1,
-                input_tokens=2,
-                output_tokens=3,
-                total_tokens=5,
-                latency_ms=20,
-                providers=["openai"],
-                models=["gpt-test"],
-            )
+        other = UsageLedger()
+        other.record(
+            provider="openai",
+            model="gpt-test",
+            input_tokens=2,
+            output_tokens=3,
+            total_tokens=5,
+            latency_ms=20,
         )
+        state.usage_ledger.merge(other)
 
         restored = CodingTaskState.from_dict(state.to_dict())
 
         self.assertEqual(restored.run_budget, state.run_budget)
         self.assertEqual(restored.usage_ledger.total_tokens, 20)
         self.assertEqual(restored.usage_ledger.model_calls, 2)
+        self.assertEqual(restored.usage_ledger.usage_known_calls, 2)
         self.assertEqual(restored.usage_ledger.providers, ["openai", "openrouter"])
         with self.assertRaisesRegex(ModelValidationError, "maximum_model_tokens"):
             RunBudget(maximum_model_tokens=True).validate()
@@ -179,6 +210,29 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
                 model="stealth/ox-alpha",
                 input_tokens="invalid",  # type: ignore[arg-type]
             )
+
+    def test_unknown_usage_is_counted_without_inventing_tokens(self) -> None:
+        ledger = UsageLedger()
+
+        ledger.record(
+            provider="fixture",
+            model="unknown-usage-model",
+            model_calls=2,
+            usage_known_calls=0,
+            usage_unknown_calls=2,
+            latency_known_calls=2,
+            input_tokens_known_calls=0,
+            output_tokens_known_calls=0,
+            reasoning_tokens_known_calls=0,
+            total_tokens_known_calls=0,
+            latency_ms=12,
+            total_tokens=0,
+        )
+
+        self.assertEqual(ledger.model_calls, 2)
+        self.assertEqual(ledger.usage_unknown_calls, 2)
+        self.assertEqual(ledger.total_tokens, 0)
+        self.assertEqual(ledger.total_tokens_known_calls, 0)
 
 
 if __name__ == "__main__":

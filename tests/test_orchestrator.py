@@ -302,6 +302,8 @@ class OrchestratorTests(WorkspaceTestCase):
         self.assertEqual(state.current_status, WorkflowStatus.FAILED)
         self.assertEqual(state.errors[-1].code, ErrorCode.INVALID_MODEL_OUTPUT.value)
         self.assertFalse(state.errors[-1].recoverable)
+        self.assertEqual(state.usage_ledger.model_calls, 1)
+        self.assertEqual(state.usage_ledger.usage_unknown_calls, 1)
 
     def test_final_report_conflict_fails_instead_of_claiming_success(self) -> None:
         state = CodingTaskState.create("Finalize safely", "fixture", task_id="final-conflict")

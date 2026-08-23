@@ -76,6 +76,13 @@ class UsageLedger:
     """Aggregate provider usage without prompts, credentials, or reasoning text."""
 
     model_calls: int = 0
+    usage_known_calls: int = 0
+    usage_unknown_calls: int = 0
+    latency_known_calls: int = 0
+    input_tokens_known_calls: int = 0
+    output_tokens_known_calls: int = 0
+    reasoning_tokens_known_calls: int = 0
+    total_tokens_known_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
     reasoning_tokens: int = 0
@@ -88,6 +95,13 @@ class UsageLedger:
         errors: list[str] = []
         for field_name in (
             "model_calls",
+            "usage_known_calls",
+            "usage_unknown_calls",
+            "latency_known_calls",
+            "input_tokens_known_calls",
+            "output_tokens_known_calls",
+            "reasoning_tokens_known_calls",
+            "total_tokens_known_calls",
             "input_tokens",
             "output_tokens",
             "reasoning_tokens",
@@ -95,7 +109,38 @@ class UsageLedger:
             "latency_ms",
         ):
             _validate_non_negative_integer(getattr(self, field_name), field_name, errors)
-        if not errors and self.total_tokens < self.input_tokens + self.output_tokens:
+        if not errors and self.usage_known_calls + self.usage_unknown_calls != self.model_calls:
+            errors.append("usage call accounting must equal model_calls")
+        if not errors and self.latency_known_calls > self.model_calls:
+            errors.append("latency_known_calls cannot exceed model_calls")
+        token_known_counts = (
+            self.input_tokens_known_calls,
+            self.output_tokens_known_calls,
+            self.reasoning_tokens_known_calls,
+            self.total_tokens_known_calls,
+        )
+        if not errors and any(
+            value > self.usage_known_calls for value in token_known_counts
+        ):
+            errors.append("token known-call counts cannot exceed usage_known_calls")
+        if not errors and any(
+            known_calls == 0 and tokens != 0
+            for known_calls, tokens in (
+                (self.input_tokens_known_calls, self.input_tokens),
+                (self.output_tokens_known_calls, self.output_tokens),
+                (self.reasoning_tokens_known_calls, self.reasoning_tokens),
+                (self.total_tokens_known_calls, self.total_tokens),
+            )
+        ):
+            errors.append("token totals require at least one known call")
+        if (
+            not errors
+            and self.usage_known_calls > 0
+            and self.input_tokens_known_calls == self.usage_known_calls
+            and self.output_tokens_known_calls == self.usage_known_calls
+            and self.total_tokens_known_calls == self.usage_known_calls
+            and self.total_tokens < self.input_tokens + self.output_tokens
+        ):
             errors.append("total_tokens must cover input_tokens and output_tokens")
         _validated_string_list(self.providers, "providers", errors)
         _validated_string_list(self.models, "models", errors)
@@ -112,6 +157,14 @@ class UsageLedger:
         reasoning_tokens: int = 0,
         total_tokens: int | None = None,
         latency_ms: int = 0,
+        model_calls: int = 1,
+        usage_known_calls: int | None = None,
+        usage_unknown_calls: int | None = None,
+        latency_known_calls: int | None = None,
+        input_tokens_known_calls: int | None = None,
+        output_tokens_known_calls: int | None = None,
+        reasoning_tokens_known_calls: int | None = None,
+        total_tokens_known_calls: int | None = None,
     ) -> None:
         self.validate()
         if not isinstance(provider, str) or not provider.strip():
@@ -123,20 +176,99 @@ class UsageLedger:
             "output_tokens": output_tokens,
             "reasoning_tokens": reasoning_tokens,
             "latency_ms": latency_ms,
+            "model_calls": model_calls,
         }
         errors: list[str] = []
         for field_name, value in values.items():
             _validate_non_negative_integer(value, field_name, errors)
         if total_tokens is not None:
             _validate_non_negative_integer(total_tokens, "total_tokens", errors)
+        resolved_usage_known = (
+            model_calls if usage_known_calls is None else usage_known_calls
+        )
+        resolved_usage_unknown = (
+            0 if usage_unknown_calls is None else usage_unknown_calls
+        )
+        resolved_latency_known = (
+            model_calls if latency_known_calls is None else latency_known_calls
+        )
+        resolved_input_known = (
+            resolved_usage_known
+            if input_tokens_known_calls is None
+            else input_tokens_known_calls
+        )
+        resolved_output_known = (
+            resolved_usage_known
+            if output_tokens_known_calls is None
+            else output_tokens_known_calls
+        )
+        resolved_reasoning_known = (
+            resolved_usage_known
+            if reasoning_tokens_known_calls is None
+            else reasoning_tokens_known_calls
+        )
+        resolved_total_known = (
+            resolved_usage_known
+            if total_tokens_known_calls is None
+            else total_tokens_known_calls
+        )
+        for field_name, value in (
+            ("usage_known_calls", resolved_usage_known),
+            ("usage_unknown_calls", resolved_usage_unknown),
+            ("latency_known_calls", resolved_latency_known),
+            ("input_tokens_known_calls", resolved_input_known),
+            ("output_tokens_known_calls", resolved_output_known),
+            ("reasoning_tokens_known_calls", resolved_reasoning_known),
+            ("total_tokens_known_calls", resolved_total_known),
+        ):
+            _validate_non_negative_integer(value, field_name, errors)
+        if resolved_usage_known + resolved_usage_unknown != model_calls:
+            errors.append("usage call accounting must equal model_calls")
+        if resolved_latency_known > model_calls:
+            errors.append("latency_known_calls cannot exceed model_calls")
+        if any(
+            value > resolved_usage_known
+            for value in (
+                resolved_input_known,
+                resolved_output_known,
+                resolved_reasoning_known,
+                resolved_total_known,
+            )
+        ):
+            errors.append("token known-call counts cannot exceed usage_known_calls")
+        if model_calls < 1:
+            errors.append("model_calls must be positive when recording usage")
         if errors:
             raise ModelValidationError(errors)
         resolved_total = input_tokens + output_tokens if total_tokens is None else total_tokens
-        if resolved_total < input_tokens + output_tokens:
+        if (
+            resolved_usage_known > 0
+            and resolved_input_known == resolved_usage_known
+            and resolved_output_known == resolved_usage_known
+            and resolved_total_known == resolved_usage_known
+            and resolved_total < input_tokens + output_tokens
+        ):
             errors.append("total_tokens must cover input_tokens and output_tokens")
+        if any(
+            known_calls == 0 and tokens != 0
+            for known_calls, tokens in (
+                (resolved_input_known, input_tokens),
+                (resolved_output_known, output_tokens),
+                (resolved_reasoning_known, reasoning_tokens),
+                (resolved_total_known, resolved_total),
+            )
+        ):
+            errors.append("token totals require at least one known call")
         if errors:
             raise ModelValidationError(errors)
-        self.model_calls += 1
+        self.model_calls += model_calls
+        self.usage_known_calls += resolved_usage_known
+        self.usage_unknown_calls += resolved_usage_unknown
+        self.latency_known_calls += resolved_latency_known
+        self.input_tokens_known_calls += resolved_input_known
+        self.output_tokens_known_calls += resolved_output_known
+        self.reasoning_tokens_known_calls += resolved_reasoning_known
+        self.total_tokens_known_calls += resolved_total_known
         self.input_tokens += input_tokens
         self.output_tokens += output_tokens
         self.reasoning_tokens += reasoning_tokens
@@ -152,6 +284,13 @@ class UsageLedger:
         self.validate()
         other.validate()
         self.model_calls += other.model_calls
+        self.usage_known_calls += other.usage_known_calls
+        self.usage_unknown_calls += other.usage_unknown_calls
+        self.latency_known_calls += other.latency_known_calls
+        self.input_tokens_known_calls += other.input_tokens_known_calls
+        self.output_tokens_known_calls += other.output_tokens_known_calls
+        self.reasoning_tokens_known_calls += other.reasoning_tokens_known_calls
+        self.total_tokens_known_calls += other.total_tokens_known_calls
         self.input_tokens += other.input_tokens
         self.output_tokens += other.output_tokens
         self.reasoning_tokens += other.reasoning_tokens
@@ -171,6 +310,13 @@ class UsageLedger:
             raise ModelValidationError(["usage_ledger must be an object"])
         allowed = {
             "model_calls",
+            "usage_known_calls",
+            "usage_unknown_calls",
+            "latency_known_calls",
+            "input_tokens_known_calls",
+            "output_tokens_known_calls",
+            "reasoning_tokens_known_calls",
+            "total_tokens_known_calls",
             "input_tokens",
             "output_tokens",
             "reasoning_tokens",

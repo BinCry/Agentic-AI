@@ -34,12 +34,33 @@ def _migrate_version_2_to_3(payload: dict[str, Any]) -> dict[str, Any]:
     return migrated
 
 
+def _migrate_version_3_to_4(payload: dict[str, Any]) -> dict[str, Any]:
+    migrated = deepcopy(payload)
+    ledger = migrated.get("usage_ledger")
+    if not isinstance(ledger, dict):
+        ledger = UsageLedger().to_dict()
+        migrated["usage_ledger"] = ledger
+    model_calls = ledger.get("model_calls", 0)
+    if not isinstance(model_calls, int) or isinstance(model_calls, bool):
+        model_calls = 0
+    ledger.setdefault("usage_known_calls", model_calls)
+    ledger.setdefault("usage_unknown_calls", 0)
+    ledger.setdefault("latency_known_calls", model_calls)
+    ledger.setdefault("input_tokens_known_calls", model_calls)
+    ledger.setdefault("output_tokens_known_calls", model_calls)
+    ledger.setdefault("reasoning_tokens_known_calls", model_calls)
+    ledger.setdefault("total_tokens_known_calls", model_calls)
+    migrated["schema_version"] = 4
+    return migrated
+
+
 class TaskStateMigrator:
     """Apply every required migration without mutating caller-owned data."""
 
     _migrations: dict[int, Migration] = {
         1: _migrate_version_1_to_2,
         2: _migrate_version_2_to_3,
+        3: _migrate_version_3_to_4,
     }
 
     @staticmethod

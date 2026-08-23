@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from ..errors import ErrorCode
-from ..llm.provider import LLMMessage, LLMProvider
+from ..llm.provider import LLMMessage, LLMProvider, ModelUsage
 from ..llm.structured_output import StructuredOutputError, StructuredOutputService
 from ..models.decisions import (
     AnalysisCompletionResult,
@@ -547,6 +547,9 @@ class CodingWorkflowOrchestrator:
                 self.prompts.assemble(self.state, model_type.__name__),
             )
         except StructuredOutputError as exc:
+            self._record_model_usage(
+                exc.model, exc.usage, exc.latency_ms, exc.attempts
+            )
             detail = exc.errors[-1] if exc.errors else "unknown validation error"
             message = (
                 f"{model_type.__name__} remained invalid after {exc.attempts} attempts: "
@@ -554,7 +557,32 @@ class CodingWorkflowOrchestrator:
             )
             WorkflowEngine(self.state).fail(ErrorCode.INVALID_MODEL_OUTPUT, message)
             raise OrchestrationError(message) from exc
+        self._record_model_usage(
+            result.model, result.usage, result.latency_ms, result.attempts
+        )
         return result.value
+
+    def _record_model_usage(
+        self, model: str, usage: ModelUsage, latency_ms: int, attempts: int
+    ) -> None:
+        self.state.usage_ledger.record(
+            provider=self.provider.provider_name,
+            model=model,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            reasoning_tokens=usage.reasoning_tokens,
+            total_tokens=usage.total_tokens,
+            latency_ms=latency_ms,
+            model_calls=attempts,
+            usage_known_calls=usage.known_calls,
+            usage_unknown_calls=usage.unknown_calls,
+            latency_known_calls=attempts,
+            input_tokens_known_calls=usage.input_tokens_known_calls,
+            output_tokens_known_calls=usage.output_tokens_known_calls,
+            reasoning_tokens_known_calls=usage.reasoning_tokens_known_calls,
+            total_tokens_known_calls=usage.total_tokens_known_calls,
+        )
+        self.state.touch()
 
     def _approve(self, request: ToolRequest) -> bool:
         return bool(self.approval_handler and self.approval_handler(self.state, request))
