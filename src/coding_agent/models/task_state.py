@@ -37,6 +37,8 @@ class CodingTaskState:
     task_id: str
     original_issue: str
     repository_identifier: str
+    task_type: str = ""
+    read_only: bool = False
     normalized_problem_statement: str = ""
     acceptance_criteria: list[str] = field(default_factory=list)
     current_status: WorkflowStatus = WorkflowStatus.CREATED
@@ -87,11 +89,13 @@ class CodingTaskState:
         maximum_iterations: int = 40,
         maximum_repair_iterations: int = 3,
         maximum_retrieval_retries: int = 3,
+        read_only: bool = False,
     ) -> "CodingTaskState":
         state = cls(
             task_id=task_id or str(uuid4()),
             original_issue=original_issue.strip(),
             repository_identifier=repository_identifier.strip(),
+            read_only=read_only,
             maximum_iterations=maximum_iterations,
             maximum_repair_iterations=maximum_repair_iterations,
             maximum_retrieval_retries=maximum_retrieval_retries,
@@ -107,6 +111,17 @@ class CodingTaskState:
             errors.append("original_issue must not be empty")
         if not isinstance(self.repository_identifier, str) or not self.repository_identifier.strip():
             errors.append("repository_identifier must not be empty")
+        if not isinstance(self.task_type, str) or self.task_type not in {
+            "",
+            "analysis",
+            "bug_fix",
+            "feature",
+            "refactor",
+            "test",
+        }:
+            errors.append("task_type is invalid")
+        if not isinstance(self.read_only, bool):
+            errors.append("read_only must be a boolean")
         if not isinstance(self.current_status, WorkflowStatus):
             errors.append("current_status must be a WorkflowStatus")
         if self.approval_return_status is not None and not isinstance(
@@ -211,7 +226,14 @@ class CodingTaskState:
             WorkflowStatus.FINALIZING,
             WorkflowStatus.COMPLETED,
         }
-        if self.current_status in plan_required_states and self.implementation_plan is None:
+        if (
+            self.current_status in plan_required_states
+            and not (
+                self.read_only
+                and self.current_status in {WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED}
+            )
+            and self.implementation_plan is None
+        ):
             errors.append(f"implementation_plan is required in {self.current_status.value}")
         if self.current_status is WorkflowStatus.WAITING_APPROVAL:
             if self.approval_return_status is None:
@@ -235,11 +257,11 @@ class CodingTaskState:
             item.exit_code == 0 and item.failed_count == 0 and not item.timed_out
             for item in current_tests
         )
-        if self.current_status in {
-            WorkflowStatus.REVIEWING,
-            WorkflowStatus.FINALIZING,
-            WorkflowStatus.COMPLETED,
-        } and not tests_passed:
+        tests_required = self.current_status is WorkflowStatus.REVIEWING or (
+            self.current_status in {WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED}
+            and not self.read_only
+        )
+        if tests_required and not tests_passed:
             errors.append(f"passing current test results are required in {self.current_status.value}")
         if (
             self.current_status is WorkflowStatus.WAITING_APPROVAL
@@ -263,17 +285,18 @@ class CodingTaskState:
         if self.current_status is WorkflowStatus.COMPLETED:
             if not self.final_summary.strip():
                 errors.append("COMPLETED requires final_summary")
-            if not self.final_diff.strip():
-                errors.append("COMPLETED requires final_diff")
-            if not self.pr_summary.strip():
-                errors.append("COMPLETED requires pr_summary")
+            if not self.read_only:
+                if not self.final_diff.strip():
+                    errors.append("COMPLETED requires final_diff")
+                if not self.pr_summary.strip():
+                    errors.append("COMPLETED requires pr_summary")
             if not self.final_citations:
                 errors.append("COMPLETED requires final_citations")
             if not any(item.strip() for item in self.acceptance_criteria):
                 errors.append("COMPLETED requires acceptance_criteria")
             if not self.retrieved_evidence:
                 errors.append("COMPLETED requires retrieved_evidence")
-            if not any(item.strip() for item in self.modified_files):
+            if not self.read_only and not any(item.strip() for item in self.modified_files):
                 errors.append("COMPLETED requires modified_files")
             if self.final_report is not None:
                 if self.final_report.status != "completed":
@@ -282,6 +305,16 @@ class CodingTaskState:
                     errors.append("final_report summary must match final_summary")
                 elif self.final_report.evidence != self.final_citations:
                     errors.append("final_report evidence must match final_citations")
+        if self.read_only and self.current_status in {
+            WorkflowStatus.FINALIZING,
+            WorkflowStatus.COMPLETED,
+        }:
+            if self.implementation_plan is not None:
+                errors.append("read_only finalization cannot contain an implementation_plan")
+            if self.modified_files or self.patches:
+                errors.append("read_only finalization cannot contain repository mutations")
+            if self.test_results:
+                errors.append("read_only finalization cannot contain test executions")
         if errors:
             raise ModelValidationError(errors)
 

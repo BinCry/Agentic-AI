@@ -72,6 +72,49 @@ class WorkflowEngineTests(unittest.TestCase):
         self.assertEqual(engine.state.current_status, WorkflowStatus.COMPLETED)
         self.assertEqual(engine.state.current_iteration, 9)
 
+    def test_read_only_analysis_reaches_completed_without_coding_artifacts(self) -> None:
+        engine = self.make_engine()
+        engine.state.task_type = "analysis"
+        engine.state.read_only = True
+        engine.transition(WorkflowStatus.ANALYZING, "test")
+        engine.transition(WorkflowStatus.RETRIEVING, "test")
+        engine.state.acceptance_criteria = ["Cite repository evidence"]
+        engine.state.retrieved_evidence = [
+            RepositoryEvidence("c1", "module.py", 1, 1, "VALUE = 1", 1.0, "exact")
+        ]
+        engine.transition(WorkflowStatus.VERIFYING_EVIDENCE, "test")
+        engine.transition(WorkflowStatus.FINALIZING, "read-only evidence verified")
+        engine.state.final_summary = "The module defines VALUE."
+        engine.state.final_citations = ["module.py:1-1"]
+        engine.state.final_report = FinalReport(
+            "completed",
+            engine.state.final_summary,
+            "Grounded repository analysis.",
+            ["No repository files changed; this was a read-only analysis."],
+            ["Not run; read-only analysis does not enter testing."],
+            ["Mutation review was not required."],
+            engine.state.final_citations,
+            ["No known limitations."],
+        )
+
+        engine.transition(WorkflowStatus.COMPLETED, "analysis complete")
+
+        self.assertEqual(engine.state.current_status, WorkflowStatus.COMPLETED)
+        self.assertIsNone(engine.state.implementation_plan)
+        self.assertFalse(engine.state.modified_files)
+        self.assertFalse(engine.state.test_results)
+
+    def test_coding_task_cannot_use_read_only_finalization_transition(self) -> None:
+        engine = self.make_engine()
+        engine.transition(WorkflowStatus.ANALYZING, "test")
+        engine.transition(WorkflowStatus.RETRIEVING, "test")
+        engine.transition(WorkflowStatus.VERIFYING_EVIDENCE, "test")
+
+        with self.assertRaisesRegex(TransitionPreconditionError, "read_only"):
+            engine.transition(WorkflowStatus.FINALIZING, "skip coding stages")
+
+        self.assertEqual(engine.state.current_status, WorkflowStatus.VERIFYING_EVIDENCE)
+
     def test_invalid_transition_is_rejected(self) -> None:
         engine = self.make_engine()
         with self.assertRaises(InvalidTransitionError):

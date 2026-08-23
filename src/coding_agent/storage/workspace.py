@@ -54,6 +54,19 @@ class WorkspacePaths:
             raise WorkspacePolicyError(f"path does not exist: {value}")
         return resolved
 
+    def resolve_readonly_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
+        """Resolve an explicit read-only dependency without granting write scope."""
+        candidate = Path(value)
+        resolved = (
+            candidate.resolve()
+            if candidate.is_absolute()
+            else (self.workspace_root / candidate).resolve()
+        )
+        self._validate_path(resolved, "read-only path")
+        if must_exist and not resolved.exists():
+            raise WorkspacePolicyError(f"read-only path does not exist: {value}")
+        return resolved
+
     def resolve_runtime_path(self, value: str | Path, *, must_exist: bool = False) -> Path:
         candidate = Path(value)
         resolved = candidate.resolve() if candidate.is_absolute() else (self.runtime_root / candidate).resolve()

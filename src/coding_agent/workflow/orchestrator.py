@@ -9,6 +9,7 @@ from ..errors import ErrorCode
 from ..llm.provider import LLMMessage, LLMProvider
 from ..llm.structured_output import StructuredOutputError, StructuredOutputService
 from ..models.decisions import (
+    AnalysisCompletionResult,
     DebugDecision,
     ImplementationPlan,
     IssueAnalysis,
@@ -22,7 +23,7 @@ from ..tools.executor import ToolExecutor
 from ..skills.router import SkillRouter
 from .engine import TransitionPreconditionError, WorkflowEngine
 from .context import ContextCompactor, ContextProjector
-from .reporting import FinalReportError, build_final_report
+from .reporting import FinalReportError, build_analysis_report, build_final_report
 from .status import WorkflowStatus
 
 
@@ -49,8 +50,9 @@ class PromptAssembler:
             LLMMessage(
                 role="system",
                 content=(
-                    "You are a bounded coding workflow decision maker. Return only the requested JSON "
-                    "object. Use exact repository evidence, never invent paths, and keep actions minimal."
+                    "You are a bounded coding workflow decision maker. Return exactly one JSON object "
+                    "matching output_schema in the user context, with no markdown fence or commentary. "
+                    "Use exact repository evidence, never invent paths, and keep actions minimal."
                 ),
             ),
             LLMMessage(role="user", content=content),
@@ -156,6 +158,7 @@ class CodingWorkflowOrchestrator:
 
     def _analyze(self) -> None:
         decision = self._decide(IssueAnalysis)
+        self.state.task_type = "analysis" if self.state.read_only else decision.task_type
         self.state.normalized_problem_statement = decision.problem
         self.state.acceptance_criteria = list(decision.acceptance_criteria)
         self.state.retrieval_queries = list(decision.search_queries)
@@ -220,7 +223,12 @@ class CodingWorkflowOrchestrator:
             ):
                 self._transition(WorkflowStatus.RETRIEVING, "retry stale repository evidence")
             return
-        self._transition(WorkflowStatus.PLANNING, "repository evidence verified")
+        target = (
+            WorkflowStatus.FINALIZING
+            if self.state.read_only
+            else WorkflowStatus.PLANNING
+        )
+        self._transition(target, "repository evidence verified")
 
     def _plan(self) -> None:
         self.state.implementation_plan = self._decide(ImplementationPlan)
@@ -480,6 +488,9 @@ class CodingWorkflowOrchestrator:
         )
 
     def _finalize(self) -> None:
+        if self.state.read_only:
+            self._finalize_analysis()
+            return
         completion = self._decide(TaskCompletionResult)
         if completion.status != "completed":
             self._transition(WorkflowStatus.FAILED, completion.summary)
@@ -509,6 +520,21 @@ class CodingWorkflowOrchestrator:
             raise OrchestrationError(message) from exc
         self._transition(WorkflowStatus.COMPLETED, "completion invariants satisfied")
 
+    def _finalize_analysis(self) -> None:
+        completion = self._decide(AnalysisCompletionResult)
+        if completion.status != "completed":
+            self._transition(WorkflowStatus.FAILED, completion.summary)
+            return
+        self.state.final_summary = completion.summary
+        self.state.final_citations = list(completion.citations)
+        try:
+            self.state.final_report = build_analysis_report(self.state, completion)
+        except FinalReportError as exc:
+            message = f"analysis report conflicts with verified workflow state: {exc}"
+            WorkflowEngine(self.state).fail(ErrorCode.INVALID_MODEL_OUTPUT, message)
+            raise OrchestrationError(message) from exc
+        self._transition(WorkflowStatus.COMPLETED, "read-only analysis invariants satisfied")
+
     def _build_pr_summary(self, summary: str) -> str:
         files = ", ".join(self.state.modified_files) or "none"
         citations = ", ".join(self.state.final_citations) or "none"
@@ -521,7 +547,11 @@ class CodingWorkflowOrchestrator:
                 self.prompts.assemble(self.state, model_type.__name__),
             )
         except StructuredOutputError as exc:
-            message = f"{model_type.__name__} remained invalid after {exc.attempts} attempts"
+            detail = exc.errors[-1] if exc.errors else "unknown validation error"
+            message = (
+                f"{model_type.__name__} remained invalid after {exc.attempts} attempts: "
+                f"{detail}"
+            )
             WorkflowEngine(self.state).fail(ErrorCode.INVALID_MODEL_OUTPUT, message)
             raise OrchestrationError(message) from exc
         return result.value

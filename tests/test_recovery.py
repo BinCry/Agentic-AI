@@ -89,6 +89,62 @@ class RecoveryTests(WorkspaceTestCase):
         self.assertIn("reasoning", requirements)
         self.assertIn("unresolved_findings", requirements)
 
+    def test_decision_context_includes_complete_issue_analysis_schema(self) -> None:
+        state = CodingTaskState.create(
+            "Analyze only", "fixture", task_id="schema-context", read_only=True
+        )
+
+        payload = json.loads(ContextProjector().project(state, "IssueAnalysis"))
+
+        schema = payload["output_schema"]
+        self.assertEqual(schema["type"], "object")
+        self.assertEqual(
+            set(schema["required"]),
+            {
+                "task_type",
+                "problem",
+                "expected_behavior",
+                "acceptance_criteria",
+                "search_queries",
+                "risks",
+            },
+        )
+        self.assertIn("analysis", schema["properties"]["task_type"]["enum"])
+
+    def test_compacted_context_preserves_schema_when_budget_allows_it(self) -> None:
+        state = CodingTaskState.create("x" * 10_000, "fixture", task_id="schema-compact")
+
+        payload = json.loads(ContextProjector(ContextCompactor(4_000)).project(state, "IssueAnalysis"))
+
+        self.assertTrue(payload["truncated"])
+        self.assertIn("output_schema", payload)
+        self.assertIn("task_type", payload["output_schema"]["properties"])
+
+    def test_every_model_decision_has_a_prompt_schema(self) -> None:
+        state = CodingTaskState.create("Validate schemas", "fixture", task_id="all-schemas")
+        decisions = (
+            "IssueAnalysis",
+            "ImplementationPlan",
+            "ToolDecision",
+            "DebugDecision",
+            "ReviewResult",
+            "TaskCompletionResult",
+            "AnalysisCompletionResult",
+        )
+
+        for decision in decisions:
+            with self.subTest(decision=decision):
+                payload = json.loads(ContextProjector().project(state, decision))
+                schema = payload["output_schema"]
+                self.assertEqual(schema["type"], "object")
+                self.assertTrue(schema["properties"])
+                self.assertTrue(schema["required"])
+        coding_analysis = json.loads(ContextProjector().project(state, "IssueAnalysis"))
+        self.assertNotIn(
+            "analysis",
+            coding_analysis["output_schema"]["properties"]["task_type"]["enum"],
+        )
+
     def test_checkpoint_failure_does_not_enter_pending_approval(self) -> None:
         target = self.test_root / "module.py"
         target.write_text("value = 1\n", encoding="utf-8")

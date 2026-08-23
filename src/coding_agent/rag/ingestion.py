@@ -105,7 +105,9 @@ class RepositoryIngestor:
         except (OSError, UnicodeDecodeError) as exc:
             raise IngestionError(f"cannot decode repository file {path}: {exc}") from exc
         digest = hashlib.sha256(raw).hexdigest()
-        relative = str(resolved.relative_to(self.paths.workspace_root))
+        # Repository identifiers are serialized into prompts, task state, and
+        # citations. Keep that public representation platform-independent.
+        relative = resolved.relative_to(self.paths.workspace_root).as_posix()
         chunker = self._python_chunker if resolved.suffix.lower() == ".py" else (
             self._markdown_chunker if resolved.suffix.lower() in {".md", ".markdown"} else self._text_chunker
         )

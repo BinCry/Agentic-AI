@@ -2,13 +2,56 @@
 
 from __future__ import annotations
 
-from ..models.decisions import TaskCompletionResult
+from ..models.decisions import AnalysisCompletionResult, TaskCompletionResult
 from ..models.records import FinalReport, TestExecution
 from ..models.task_state import CodingTaskState
 
 
 class FinalReportError(ValueError):
     """Raised when a model completion conflicts with persisted task evidence."""
+
+
+def build_analysis_report(
+    state: CodingTaskState,
+    completion: AnalysisCompletionResult,
+) -> FinalReport:
+    if not state.read_only:
+        raise FinalReportError("analysis report requires a read_only task")
+    if completion.status != "completed":
+        raise FinalReportError("a successful analysis report requires completed status")
+    if state.modified_files or any(item.applied for item in state.patches):
+        raise FinalReportError("read-only analysis cannot contain repository mutations")
+    if state.test_results:
+        raise FinalReportError("read-only analysis cannot contain test executions")
+    citations = _unique(completion.citations)
+    if not citations:
+        raise FinalReportError("a successful analysis report requires repository citations")
+    # New indexes use POSIX repository paths. Normalize persisted evidence too
+    # so tasks and indexes created by older Windows versions remain resumable.
+    evidence_paths = {
+        _normalize_repository_path(item.path) for item in state.retrieved_evidence
+    }
+    ungrounded = [
+        citation
+        for citation in citations
+        if _normalize_repository_path(citation.rsplit(":", 1)[0]) not in evidence_paths
+    ]
+    if ungrounded:
+        raise FinalReportError(
+            f"analysis citations are not grounded in retrieved evidence: {ungrounded}"
+        )
+    return FinalReport(
+        status="completed",
+        summary=completion.summary,
+        root_cause_or_reasoning=completion.reasoning,
+        changes=["No repository files changed; this was a read-only analysis."],
+        tests=["Not run; read-only analysis does not enter the testing stage."],
+        review=["Verified repository evidence only; mutation review was not required."],
+        evidence=citations,
+        remaining_limitations=(
+            _unique(completion.unresolved_findings) or ["No known limitations."]
+        ),
+    )
 
 
 def build_final_report(
@@ -110,3 +153,7 @@ def _test_passed(execution: TestExecution) -> bool:
 
 def _unique(values: list[str]) -> list[str]:
     return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+def _normalize_repository_path(value: str) -> str:
+    return value.strip().replace("\\", "/").removeprefix("./")

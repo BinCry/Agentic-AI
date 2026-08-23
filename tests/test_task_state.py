@@ -171,6 +171,17 @@ class CodingTaskStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelValidationError, "blocking review"):
             CodingTaskState.from_dict(state.to_dict())
 
+    def test_read_only_terminal_state_rejects_forged_mutation_evidence(self) -> None:
+        state = CodingTaskState.create(
+            "Analyze only", "repo", task_id="forged-analysis", read_only=True
+        )
+        state.task_type = "analysis"
+        state.current_status = WorkflowStatus.FINALIZING
+        state.modified_files = ["src/app.py"]
+
+        with self.assertRaisesRegex(ModelValidationError, "cannot contain repository mutations"):
+            state.validate()
+
 
 if __name__ == "__main__":
     unittest.main()

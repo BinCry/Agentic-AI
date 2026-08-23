@@ -50,6 +50,7 @@ class RepositoryRagTests(WorkspaceTestCase):
         ingestor = RepositoryIngestor(self.make_paths(), maximum_file_bytes=50)
         paths = {item.relative_to(self.test_root).as_posix() for item in ingestor.iter_files()}
         self.assertEqual(paths, {"src/module.py"})
+        self.assertEqual(ingestor.ingest(self.test_root / "src" / "module.py").path, "src/module.py")
 
     def test_persistent_hybrid_index_returns_grounded_citation_and_reuses_digest(self) -> None:
         target = self.test_root / "module.py"

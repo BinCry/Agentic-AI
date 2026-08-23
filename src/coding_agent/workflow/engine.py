@@ -234,9 +234,19 @@ class WorkflowEngine:
 
     def _validate_preconditions(self, target: WorkflowStatus) -> None:
         errors: list[str] = []
+        read_only = self.state.read_only
+        if (
+            self.state.current_status is WorkflowStatus.VERIFYING_EVIDENCE
+            and target is WorkflowStatus.FINALIZING
+            and not read_only
+        ):
+            errors.append("VERIFYING_EVIDENCE can finalize only a read_only task")
         if target is WorkflowStatus.EDITING and self.state.implementation_plan is None:
             errors.append("implementation plan is required before EDITING")
-        if target in {WorkflowStatus.REVIEWING, WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED}:
+        tests_required = target is WorkflowStatus.REVIEWING or (
+            target in {WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED} and not read_only
+        )
+        if tests_required:
             if not self._tests_passed():
                 errors.append(f"passing test results are required before {target.value}")
         if target in {WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED} and any(
@@ -245,9 +255,9 @@ class WorkflowEngine:
             errors.append(f"blocking review findings must be resolved before {target.value}")
         if target is WorkflowStatus.COMPLETED and not self.state.final_summary.strip():
             errors.append("final summary is required before COMPLETED")
-        if target is WorkflowStatus.COMPLETED and not self.state.final_diff.strip():
+        if target is WorkflowStatus.COMPLETED and not read_only and not self.state.final_diff.strip():
             errors.append("final diff is required before COMPLETED")
-        if target is WorkflowStatus.COMPLETED and not self.state.pr_summary.strip():
+        if target is WorkflowStatus.COMPLETED and not read_only and not self.state.pr_summary.strip():
             errors.append("PR summary is required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.final_citations:
             errors.append("final citations are required before COMPLETED")
@@ -257,8 +267,15 @@ class WorkflowEngine:
             errors.append("acceptance criteria are required before COMPLETED")
         if target is WorkflowStatus.COMPLETED and not self.state.retrieved_evidence:
             errors.append("repository evidence is required before COMPLETED")
-        if target is WorkflowStatus.COMPLETED and not self.state.modified_files:
+        if target is WorkflowStatus.COMPLETED and not read_only and not self.state.modified_files:
             errors.append("modified files are required before COMPLETED")
+        if read_only and target in {WorkflowStatus.FINALIZING, WorkflowStatus.COMPLETED}:
+            if self.state.implementation_plan is not None:
+                errors.append("read_only finalization cannot contain an implementation plan")
+            if self.state.modified_files or self.state.patches:
+                errors.append("read_only finalization cannot contain repository mutations")
+            if self.state.test_results:
+                errors.append("read_only finalization cannot contain test executions")
         if errors:
             raise TransitionPreconditionError("; ".join(errors))
 

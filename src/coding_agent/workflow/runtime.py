@@ -41,6 +41,7 @@ def run_workflow(
     maximum_steps: int = 40,
     structured_retries: int = 2,
     auto_approve: bool = False,
+    read_only: bool = False,
     model_provider_name: str = "openai",
     embedding_provider_name: str = "deterministic",
     environment: Mapping[str, str] | None = None,
@@ -51,20 +52,26 @@ def run_workflow(
         raise ValueError("exactly one of issue or task_id is required")
     if task_id is not None and repository is not None:
         raise ValueError("repository is valid only when starting a new task")
+    if task_id is not None and read_only:
+        raise ValueError("read_only is valid only when starting a new task")
+    if read_only and auto_approve:
+        raise ValueError("read_only cannot be combined with auto_approve")
     if not 1 <= maximum_steps <= 200:
         raise ValueError("maximum_steps must be between 1 and 200")
     if not 0 <= structured_retries <= 8:
         raise ValueError("structured_retries must be between 0 and 8")
 
-    root = paths.resolve_workspace_path(skill_root, must_exist=True)
+    root = paths.resolve_readonly_path(skill_root, must_exist=True)
     router = SkillRouter(SkillCatalog(root).load())
     model_provider = provider or _model_provider(model_provider_name, environment)
     embedding_provider = _embedding_provider(embedding_provider_name, environment)
     state = (
-        _create_task(paths, store, router, issue, repository)
+        _create_task(paths, store, router, issue, repository, read_only=read_only)
         if issue is not None
         else store.load(task_id or "")
     )
+    if state.read_only and auto_approve:
+        raise ValueError("auto_approve is not valid for a read_only task")
     executor = ToolExecutor(
         ToolPermissionPolicy(paths),
         embedding_provider=embedding_provider,
@@ -109,8 +116,14 @@ def _create_task(
     router: SkillRouter,
     issue: str,
     repository: str | None,
+    *,
+    read_only: bool,
 ) -> CodingTaskState:
-    state = CodingTaskState.create(issue, repository or paths.workspace_root.name)
+    state = CodingTaskState.create(
+        issue,
+        repository or paths.workspace_root.name,
+        read_only=read_only,
+    )
     definition = router.select(WorkflowStatus.ANALYZING)
     active_skill = router.as_active_skill(definition, paths.workspace_root)
     WorkflowEngine(state).transition(

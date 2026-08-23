@@ -6,6 +6,7 @@ import json
 from dataclasses import asdict
 from typing import Any
 
+from ..models.decision_schemas import decision_output_schema
 from ..models.task_state import CodingTaskState
 
 
@@ -32,11 +33,29 @@ class ContextCompactor:
         content = self._encode(working)
         if len(content) <= self.maximum_chars:
             return content
-        prefix = content[: max(1, self.maximum_chars - 64)]
-        compacted = self._encode({"truncated": True, "context_prefix": prefix})
+        preserved = {
+            key: working[key]
+            for key in ("decision", "output_schema")
+            if key in working
+        }
+        remainder = {key: value for key, value in working.items() if key not in preserved}
+        prefix = self._encode(remainder)
+        compacted = self._encode(
+            {**preserved, "truncated": True, "context_prefix": prefix}
+        )
+        if len(self._encode({**preserved, "truncated": True, "context_prefix": ""})) > self.maximum_chars:
+            prefix = content[: max(1, self.maximum_chars - 64)]
+            compacted = self._encode({"truncated": True, "context_prefix": prefix})
         while len(compacted) > self.maximum_chars and prefix:
             prefix = prefix[: max(1, len(prefix) - 256)]
-            compacted = self._encode({"truncated": True, "context_prefix": prefix})
+            compacted_payload = (
+                {**preserved, "truncated": True, "context_prefix": prefix}
+                if preserved and len(
+                    self._encode({**preserved, "truncated": True, "context_prefix": ""})
+                ) <= self.maximum_chars
+                else {"truncated": True, "context_prefix": prefix}
+            )
+            compacted = self._encode(compacted_payload)
         return compacted
 
     @staticmethod
@@ -51,8 +70,17 @@ class ContextProjector:
         self.compactor = compactor or ContextCompactor()
 
     def project(self, state: CodingTaskState, decision_name: str) -> str:
+        output_schema = decision_output_schema(decision_name)
+        if decision_name == "IssueAnalysis":
+            output_schema["properties"]["task_type"]["enum"] = (
+                ["analysis"]
+                if state.read_only
+                else ["bug_fix", "feature", "refactor", "test"]
+            )
         payload: dict[str, Any] = {
             "decision": decision_name,
+            "output_schema": output_schema,
+            "workflow_mode": "read_only" if state.read_only else "coding",
             "task_id": state.task_id,
             "issue": state.original_issue,
             "problem": state.normalized_problem_statement,

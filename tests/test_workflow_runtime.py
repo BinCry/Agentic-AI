@@ -12,9 +12,12 @@ from coding_agent.cli import main
 from coding_agent.llm.openai_client import OpenAIConfigurationError
 from coding_agent.llm.openrouter_provider import OpenRouterConfigurationError
 from coding_agent.llm.provider import LLMMessage, LLMResponse
+from coding_agent.models.task_state import CodingTaskState
 from coding_agent.rag.index import RepositoryIndex
 from coding_agent.storage.task_store import JsonTaskStore
 from coding_agent.storage.workspace import WorkspacePaths
+from coding_agent.workflow.engine import WorkflowEngine
+from coding_agent.workflow.runtime import run_workflow
 from coding_agent.workflow.status import WorkflowStatus
 
 from tests.support import WorkspaceTestCase
@@ -58,6 +61,30 @@ class WorkflowRuntimeTests(WorkspaceTestCase):
         paths = WorkspacePaths.create(self.test_root).ensure()
         self.assertEqual(JsonTaskStore(paths).list_task_ids(), ())
 
+    def test_run_accepts_explicit_external_read_only_skill_root(self) -> None:
+        workspace = self.test_root / "target-repository"
+        skill_root = self.test_root / "shared-skills"
+        workspace.mkdir()
+        skill_file = skill_root / "fix" / "SKILL.md"
+        skill_file.parent.mkdir(parents=True)
+        skill_file.write_text(
+            "---\nname: fix\ndescription: test skill\nkeywords: [test]\n---\n",
+            encoding="utf-8",
+        )
+        paths = WorkspacePaths.create(workspace).ensure()
+        store = JsonTaskStore(paths)
+
+        outcome = run_workflow(
+            paths,
+            store,
+            issue="Analyze target",
+            skill_root=str(skill_root),
+            provider=FixtureProvider([{}, {}, {}]),
+        )
+
+        self.assertEqual(outcome.result.status, WorkflowStatus.FAILED)
+        self.assertIn("IssueAnalysis", outcome.result.reason)
+
     def test_openrouter_provider_selection_uses_its_environment_contract(self) -> None:
         self.write_skill("fix")
         with patch(
@@ -90,6 +117,95 @@ class WorkflowRuntimeTests(WorkspaceTestCase):
             str(payload["task_id"])
         )
         self.assertEqual(state.current_status, WorkflowStatus.FAILED)
+        self.assertIn("task_type", state.errors[-1].message)
+
+    def test_read_only_analysis_completes_without_mutation_or_tests(self) -> None:
+        self.write_runtime_skills()
+        module = self.test_root / "module.py"
+        original = "VALUE = 1\n"
+        module.write_text(original, encoding="utf-8")
+        provider = FixtureProvider(
+            [
+                {
+                    "task_type": "feature",
+                    "problem": "Explain the repository structure without changing files.",
+                    "expected_behavior": "Return a grounded read-only analysis.",
+                    "acceptance_criteria": ["Cite repository evidence", "Do not modify files"],
+                    "search_queries": ["VALUE"],
+                    "risks": ["Do not enter mutation or test stages"],
+                },
+                {
+                    "status": "completed",
+                    "summary": "The repository contains a single VALUE module.",
+                    "reasoning": "Grounded retrieval found the module declaration.",
+                    "citations": ["module.py:1-1"],
+                    "unresolved_findings": [],
+                },
+            ]
+        )
+
+        with patch(
+            "coding_agent.workflow.runtime.OpenAIResponsesProvider.from_env",
+            return_value=provider,
+        ):
+            code, payload, error = self.run_cli(
+                "run",
+                "--issue",
+                "Analyze the repository structure without changing files",
+                "--read-only",
+            )
+
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(payload["status"], "COMPLETED")
+        state = JsonTaskStore(WorkspacePaths.create(self.test_root).ensure()).load(
+            str(payload["task_id"])
+        )
+        self.assertEqual(state.task_type, "analysis")
+        self.assertTrue(state.read_only)
+        self.assertEqual(state.modified_files, [])
+        self.assertEqual(state.test_results, [])
+        self.assertIsNone(state.implementation_plan)
+        self.assertEqual(module.read_text(encoding="utf-8"), original)
+        self.assertIn("read-only", state.final_report.changes[0].lower())
+
+    def test_read_only_rejects_auto_approve_before_creating_task(self) -> None:
+        self.write_skill("fix")
+
+        code, payload, error = self.run_cli(
+            "run",
+            "--issue",
+            "Analyze only",
+            "--read-only",
+            "--auto-approve",
+        )
+
+        self.assertEqual((code, payload), (1, {}))
+        self.assertIn("cannot be combined", json.loads(error)["message"])
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        self.assertEqual(JsonTaskStore(paths).list_task_ids(), ())
+
+    def test_persisted_read_only_task_rejects_auto_approve_on_resume(self) -> None:
+        self.write_skill("fix")
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        state = CodingTaskState.create(
+            "Analyze only", "fixture", task_id="read-only-resume", read_only=True
+        )
+        WorkflowEngine(state).transition(WorkflowStatus.ANALYZING, "ready")
+        JsonTaskStore(paths).save(state)
+
+        with patch(
+            "coding_agent.workflow.runtime.OpenAIResponsesProvider.from_env",
+            return_value=FixtureProvider([]),
+        ):
+            code, payload, error = self.run_cli(
+                "run",
+                "--task-id",
+                state.task_id,
+                "--auto-approve",
+            )
+
+        self.assertEqual((code, payload), (1, {}))
+        self.assertIn("not valid", json.loads(error)["message"])
 
     def test_default_pause_external_approval_and_resume_to_completion(self) -> None:
         self.write_runtime_skills()

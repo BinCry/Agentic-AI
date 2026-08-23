@@ -65,6 +65,11 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Explicitly approve policy-gated mutations and tests during this run",
     )
+    run_parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Start a new analysis task that cannot plan mutations or run tests",
+    )
 
     show_parser = subparsers.add_parser("show", help="Show persisted task state")
     show_parser.add_argument("--task-id", required=True)
@@ -142,7 +147,7 @@ def _runtime(args: argparse.Namespace) -> tuple[WorkspacePaths, JsonTaskStore, J
 
 
 def _catalog(paths: WorkspacePaths, skill_root: str) -> tuple[SkillCatalog, SkillRouter]:
-    root = paths.resolve_workspace_path(skill_root, must_exist=True)
+    root = paths.resolve_readonly_path(skill_root, must_exist=True)
     catalog = SkillCatalog(root).load()
     return catalog, SkillRouter(catalog)
 
@@ -199,6 +204,7 @@ def _run(args: argparse.Namespace) -> int:
         maximum_steps=args.maximum_steps,
         structured_retries=args.structured_retries,
         auto_approve=args.auto_approve,
+        read_only=args.read_only,
         model_provider_name=args.model_provider,
         embedding_provider_name=args.embedding_provider,
     )

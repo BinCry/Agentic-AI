@@ -28,7 +28,11 @@ class IssueAnalysis:
     def from_dict(cls, payload: dict[str, Any]) -> "IssueAnalysis":
         data = require_mapping(payload)
         return cls(
-            task_type=require_choice(data, "task_type", {"bug_fix", "feature", "refactor", "test"}),
+            task_type=require_choice(
+                data,
+                "task_type",
+                {"analysis", "bug_fix", "feature", "refactor", "test"},
+            ),
             problem=require_string(data, "problem"),
             expected_behavior=require_string(data, "expected_behavior"),
             acceptance_criteria=require_string_list(data, "acceptance_criteria", allow_empty=False),
@@ -195,6 +199,33 @@ class ReviewResult:
         if approved and any(item.severity in {"high", "critical"} for item in findings):
             raise ModelValidationError(["approved review cannot contain high or critical findings"])
         return cls(approved=approved, findings=findings, summary=require_string(data, "summary"))
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalysisCompletionResult:
+    status: str
+    summary: str
+    reasoning: str
+    citations: list[str]
+    unresolved_findings: list[str]
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "AnalysisCompletionResult":
+        data = require_mapping(payload)
+        status = require_choice(data, "status", {"completed", "failed"})
+        citations = require_string_list(data, "citations")
+        if status == "completed" and not citations:
+            raise ModelValidationError(["completed analysis requires citations"])
+        return cls(
+            status=status,
+            summary=require_string(data, "summary"),
+            reasoning=require_string(data, "reasoning"),
+            citations=citations,
+            unresolved_findings=require_string_list(data, "unresolved_findings"),
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from coding_agent.models.decisions import (
+    AnalysisCompletionResult,
     DebugDecision,
     ImplementationPlan,
     IssueAnalysis,
@@ -13,6 +14,29 @@ from coding_agent.models.validation import ModelValidationError
 
 
 class DecisionModelTests(unittest.TestCase):
+    def test_read_only_analysis_contract_requires_grounded_citations(self) -> None:
+        analysis = IssueAnalysis.from_dict(
+            {
+                "task_type": "analysis",
+                "problem": "Explain the repository without changing it.",
+                "expected_behavior": "Return a grounded read-only result.",
+                "acceptance_criteria": ["Cite repository evidence"],
+                "search_queries": ["project structure"],
+                "risks": [],
+            }
+        )
+        self.assertEqual(analysis.task_type, "analysis")
+        with self.assertRaisesRegex(ModelValidationError, "requires citations"):
+            AnalysisCompletionResult.from_dict(
+                {
+                    "status": "completed",
+                    "summary": "Analyzed.",
+                    "reasoning": "Repository evidence was inspected.",
+                    "citations": [],
+                    "unresolved_findings": [],
+                }
+            )
+
     def test_debug_decision_requires_root_cause_evidence_and_bounded_action(self) -> None:
         decision = DebugDecision.from_dict(
             {

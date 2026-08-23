@@ -3,17 +3,84 @@ from __future__ import annotations
 import unittest
 
 from coding_agent.models.decisions import (
+    AnalysisCompletionResult,
     ImplementationPlan,
     ImplementationStep,
     ReviewFinding,
     TaskCompletionResult,
 )
-from coding_agent.models.records import TestExecution
+from coding_agent.models.records import RepositoryEvidence, TestExecution
 from coding_agent.models.task_state import CodingTaskState
-from coding_agent.workflow.reporting import FinalReportError, build_final_report
+from coding_agent.workflow.reporting import (
+    FinalReportError,
+    build_analysis_report,
+    build_final_report,
+)
 
 
 class FinalReportingTests(unittest.TestCase):
+    def test_builds_read_only_analysis_report_and_rejects_mutation(self) -> None:
+        state = CodingTaskState.create("Analyze only", "repo", task_id="analysis-report")
+        state.task_type = "analysis"
+        state.read_only = True
+        state.retrieved_evidence = [
+            RepositoryEvidence("c1", "module.py", 1, 1, "VALUE = 1", 1.0, "exact")
+        ]
+        completion = AnalysisCompletionResult(
+            "completed",
+            "The module defines VALUE.",
+            "The conclusion is grounded in the retrieved declaration.",
+            ["module.py:1-1"],
+            [],
+        )
+
+        report = build_analysis_report(state, completion)
+
+        self.assertIn("read-only", report.changes[0].lower())
+        self.assertIn("not run", report.tests[0].lower())
+        ungrounded = AnalysisCompletionResult(
+            "completed",
+            completion.summary,
+            completion.reasoning,
+            ["missing.py:1-1"],
+            [],
+        )
+        with self.assertRaisesRegex(FinalReportError, "not grounded"):
+            build_analysis_report(state, ungrounded)
+        state.modified_files = ["module.py"]
+        with self.assertRaisesRegex(FinalReportError, "cannot contain repository mutations"):
+            build_analysis_report(state, completion)
+
+    def test_read_only_analysis_accepts_posix_citation_for_legacy_windows_evidence(self) -> None:
+        state = CodingTaskState.create("Analyze only", "repo", task_id="windows-citation")
+        state.task_type = "analysis"
+        state.read_only = True
+        state.retrieved_evidence = [
+            RepositoryEvidence(
+                "c1",
+                r"plans\phase-02-controlled-mcp-tools.md",
+                1,
+                57,
+                "# Phase 02",
+                1.0,
+                "exact",
+            )
+        ]
+        completion = AnalysisCompletionResult(
+            "completed",
+            "The plan describes controlled tools.",
+            "The conclusion uses the retrieved plan evidence.",
+            ["plans/phase-02-controlled-mcp-tools.md:45-53"],
+            [],
+        )
+
+        report = build_analysis_report(state, completion)
+
+        self.assertEqual(
+            report.evidence,
+            ["plans/phase-02-controlled-mcp-tools.md:45-53"],
+        )
+
     def make_state(self) -> CodingTaskState:
         state = CodingTaskState.create("Fix the parser", "repo", task_id="report-task")
         state.normalized_problem_statement = "The parser accepts an invalid empty token."

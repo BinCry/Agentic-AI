@@ -35,6 +35,17 @@ class StorageAndTraceTests(WorkspaceTestCase):
         with self.assertRaisesRegex(WorkspacePolicyError, "inside workspace"):
             WorkspacePaths.create(self.test_root, outside)
 
+    def test_explicit_read_only_path_may_be_outside_workspace(self) -> None:
+        workspace = self.test_root / "target-repository"
+        skill_root = self.test_root / "shared-skills"
+        workspace.mkdir()
+        skill_root.mkdir()
+        paths = WorkspacePaths.create(workspace).ensure()
+
+        resolved = paths.resolve_readonly_path(skill_root, must_exist=True)
+
+        self.assertEqual(resolved, skill_root.resolve())
+
     def test_task_directory_symlink_cannot_redirect_storage(self) -> None:
         paths = self.make_paths()
         outside = self.test_root.parent / f"outside-{self.test_root.name}"
@@ -54,6 +65,9 @@ class StorageAndTraceTests(WorkspaceTestCase):
     def test_forbidden_c_drive_is_rejected_without_writing(self) -> None:
         with self.assertRaisesRegex(WorkspacePolicyError, "forbidden drive C"):
             WorkspacePaths.create(self.test_root, "C:/unsafe-coding-agent-runtime")
+        paths = self.make_paths()
+        with self.assertRaisesRegex(WorkspacePolicyError, "forbidden drive C"):
+            paths.resolve_readonly_path("C:/unsafe-skill-root")
 
     def test_atomic_store_round_trip_and_safe_ids(self) -> None:
         store = JsonTaskStore(self.make_paths())
