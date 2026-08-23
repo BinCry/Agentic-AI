@@ -1,0 +1,7 @@
+version = 1
+
+[[rules]]
+id = "workspace-auto-create"
+action = "allow"
+tool = "repo.create_file"
+reason_code = "INVALID_WIDENING"

@@ -16,6 +16,15 @@ class ToolCategory(StrEnum):
     GIT = "git"
 
 
+class ToolRisk(StrEnum):
+    READ = "read"
+    WORKSPACE_WRITE = "workspace-write"
+    DESTRUCTIVE = "destructive"
+    PROCESS = "process"
+    NETWORK = "network"
+    REMOTE_WRITE = "remote-write"
+
+
 @dataclass(slots=True, frozen=True)
 class ToolSpec:
     name: str
@@ -25,11 +34,13 @@ class ToolSpec:
     allowed_states: frozenset[str]
     timeout_seconds: float = 30.0
     maximum_output_bytes: int = 64_000
+    risks: frozenset[ToolRisk] = frozenset({ToolRisk.READ})
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["category"] = self.category.value
         payload["allowed_states"] = sorted(self.allowed_states)
+        payload["risks"] = sorted(item.value for item in self.risks)
         return payload
 
 

@@ -1,0 +1,15 @@
+version = 1
+
+[[rules]]
+id = "trusted-read"
+action = "allow"
+tool_prefix = "repo."
+effects = ["read"]
+reason_code = "TRUSTED_READ"
+
+[[rules]]
+id = "deny-secret-profile"
+action = "deny"
+tool = "test.run"
+argument_equals = { profile = "secret" }
+reason_code = "PROFILE_DENIED"

@@ -1,0 +1,7 @@
+version = 1
+
+[[rules]]
+id = "workspace-no-create"
+action = "deny"
+tool = "repo.create_file"
+reason_code = "WORKSPACE_CREATE_DENIED"
