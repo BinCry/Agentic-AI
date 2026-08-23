@@ -364,7 +364,6 @@ class CodingWorkflowOrchestrator:
         return True
 
     def _test(self) -> bool:
-        profiles = self._test_profiles()
         current_results = self.state.test_results[self.state.test_run_start_index :]
         if any(
             item.exit_code != 0 or item.failed_count or item.timed_out
@@ -372,6 +371,7 @@ class CodingWorkflowOrchestrator:
         ):
             self._transition(WorkflowStatus.DEBUGGING, "approved test execution failed")
             return True
+        profiles = self._test_profiles()
         stage_index = len(current_results)
         if stage_index >= len(profiles):
             self._advance_after_tests()
@@ -445,17 +445,7 @@ class CodingWorkflowOrchestrator:
     def _test_profiles(self) -> list[str]:
         plan = self.state.implementation_plan
         configured = plan.expected_tests if plan else []
-        allowlisted = self.executor.tests.PROFILES
-        targeted = next(
-            (
-                profile
-                for value in configured
-                for profile in allowlisted
-                if value.strip().lower() == profile
-            ),
-            "unit",
-        )
-        return [targeted] if targeted == "unit" else [targeted, "unit"]
+        return self.executor.tests.select_profiles(configured)
 
     def _complete_plan_step(self, step_id: str) -> None:
         if step_id not in self.state.completed_plan_step_ids:

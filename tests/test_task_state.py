@@ -70,6 +70,26 @@ class CodingTaskStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelValidationError, "passed_count"):
             CodingTaskState.from_dict(payload)
 
+    def test_legacy_test_result_defaults_missing_truncation_flag(self) -> None:
+        payload = CodingTaskState.create("Issue", "repo").to_dict()
+        payload["test_results"] = [
+            {
+                "command": ["python"],
+                "target": "unit",
+                "exit_code": 0,
+                "passed_count": 1,
+                "failed_count": 0,
+                "duration_ms": 1,
+                "stdout_summary": "ok",
+                "stderr_summary": "",
+                "timed_out": False,
+            }
+        ]
+
+        restored = CodingTaskState.from_dict(payload)
+
+        self.assertFalse(restored.test_results[0].output_truncated)
+
     def test_plan_step_verification_and_progress_round_trip(self) -> None:
         state = CodingTaskState.create("Issue", "repo")
         state.implementation_plan = ImplementationPlan(

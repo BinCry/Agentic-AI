@@ -56,5 +56,25 @@ class VerificationRegistry:
         prepared = self.commands.prepare(profile.command)
         return self.commands.execute(prepared, trust=trust)
 
+    def select(self, configured: list[str] | tuple[str, ...]) -> tuple[str, ...]:
+        profiles = {item.name for item in self.list()}
+        aliases = {"unit"} if profiles & {"python.test", "node.test"} else set()
+        if "fixture" in profiles:
+            aliases.add("fixture")
+        available = profiles | aliases
+        selected = next(
+            (
+                value.strip().lower()
+                for value in configured
+                if isinstance(value, str) and value.strip().lower() in available
+            ),
+            "unit" if "unit" in available else "",
+        )
+        if not selected:
+            raise VerificationProfileNotFoundError("unit", tuple(sorted(available)))
+        if selected == "fixture" and "unit" in available:
+            return ("fixture", "unit")
+        return (selected,)
+
     def _alternatives(self) -> tuple[str, ...]:
         return tuple(item.name for item in self.list())

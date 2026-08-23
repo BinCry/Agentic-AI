@@ -70,7 +70,14 @@ class AllowlistedTestRunner:
             stdout_summary=result.stdout_excerpt,
             stderr_summary=result.stderr_excerpt,
             timed_out=result.timed_out,
+            output_truncated=result.truncated,
         )
+
+    def select_profiles(self, configured: list[str]) -> list[str]:
+        try:
+            return list(self.registry.select(configured))
+        except VerificationProfileNotFoundError as exc:
+            raise TestProfileNotFoundError(str(exc)) from exc
 
     def detect_framework(self) -> dict[str, object]:
         """Detect only known Python test conventions using bounded source reads."""
@@ -94,7 +101,15 @@ class AllowlistedTestRunner:
                 frameworks.add("pytest")
             if relative.startswith("tests/"):
                 roots.add("tests")
-        return {"frameworks": sorted(frameworks), "test_roots": sorted(roots)}
+        profiles = self.registry.list()
+        if any(item.ecosystem == "node" for item in profiles):
+            frameworks.add("node:test")
+            roots.add(".")
+        return {
+            "frameworks": sorted(frameworks),
+            "test_roots": sorted(roots),
+            "profiles": [item.name for item in profiles],
+        }
 
 
 def _first_int(pattern: str, text: str) -> int | None:

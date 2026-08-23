@@ -100,11 +100,15 @@ class TestExecution:
     stdout_summary: str
     stderr_summary: str
     timed_out: bool = False
+    output_truncated: bool = False
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "TestExecution":
         payload = require_mapping(data, "test_execution")
         command = require_string_list(payload, "command", allow_empty=False)
+        output_truncated = payload.get("output_truncated", False)
+        if not isinstance(output_truncated, bool):
+            raise ModelValidationError(["output_truncated must be a boolean"])
         return cls(
             command=command,
             target=require_string(payload, "target"),
@@ -115,6 +119,7 @@ class TestExecution:
             stdout_summary=require_string(payload, "stdout_summary", allow_empty=True),
             stderr_summary=require_string(payload, "stderr_summary", allow_empty=True),
             timed_out=require_boolean(payload, "timed_out"),
+            output_truncated=output_truncated,
         )
 
 

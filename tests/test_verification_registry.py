@@ -55,6 +55,18 @@ class VerificationRegistryTests(WorkspaceTestCase):
         self.assertEqual(profile.command.executable, "node")
         self.assertEqual(profile.command.arguments, ("--test",))
         self.assertNotIn("npm", profile.command.arguments)
+        self.assertEqual(registry.select(["node.test"]), ("node.test",))
+
+    def test_fixture_selection_keeps_targeted_then_broad_compatibility(self) -> None:
+        tests = self.test_root / "tests"
+        fixture = tests / "fixtures" / "sample_repo"
+        fixture.mkdir(parents=True)
+        (tests / "test_broad.py").write_text("import unittest\n", encoding="utf-8")
+        (fixture / "test_fixture.py").write_text("import unittest\n", encoding="utf-8")
+
+        selected = self.make_registry().select(["fixture"])
+
+        self.assertEqual(selected, ("fixture", "unit"))
 
     def test_shell_backed_node_script_and_unknown_profile_are_not_executable(self) -> None:
         (self.test_root / "package.json").write_text(

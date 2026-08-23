@@ -330,6 +330,7 @@ class ToolExecutor:
                     error_code=ErrorCode.TEST_TIMEOUT.value,
                     error_message=f"test profile timed out: {arguments['profile']}",
                     timed_out=True,
+                    truncated=execution.output_truncated,
                 )
             if execution.exit_code != 0 or execution.failed_count:
                 return ToolResult(
@@ -338,8 +339,14 @@ class ToolExecutor:
                     output=asdict(execution),
                     error_code=ErrorCode.TEST_FAILED.value,
                     error_message=f"test profile failed: {arguments['profile']}",
+                    truncated=execution.output_truncated,
                 )
-            return ToolResult(request.tool_name, True, asdict(execution))
+            return ToolResult(
+                request.tool_name,
+                True,
+                asdict(execution),
+                truncated=execution.output_truncated,
+            )
         if request.tool_name == "process.run":
             command = ProcessCommandRequest(
                 executable=arguments["executable"],
