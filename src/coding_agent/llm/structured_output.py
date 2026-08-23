@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol, Sequence, TypeVar
 
 from ..models.validation import ModelValidationError
-from .provider import LLMMessage, LLMProvider
+from .provider import LLMMessage, LLMProvider, ModelUsage
 
 T = TypeVar("T")
 
@@ -21,9 +22,20 @@ class StructuredModel(Protocol):
 class StructuredOutputError(RuntimeError):
     """Raised after all structured response attempts fail."""
 
-    def __init__(self, errors: Sequence[str], attempts: int) -> None:
+    def __init__(
+        self,
+        errors: Sequence[str],
+        attempts: int,
+        *,
+        model: str,
+        usage: ModelUsage,
+        latency_ms: int,
+    ) -> None:
         self.errors = tuple(errors)
         self.attempts = attempts
+        self.model = model
+        self.usage = usage
+        self.latency_ms = latency_ms
         super().__init__(f"structured output invalid after {attempts} attempts: {errors[-1]}")
 
 
@@ -32,6 +44,8 @@ class StructuredOutputResult(Generic[T]):
     value: T
     attempts: int
     model: str
+    usage: ModelUsage
+    latency_ms: int
 
 
 class StructuredOutputService:
@@ -48,8 +62,15 @@ class StructuredOutputService:
     ) -> StructuredOutputResult[T]:
         conversation = list(messages)
         errors: list[str] = []
+        usage = ModelUsage.empty()
+        latency_ms = 0
+        model = "unknown"
         for attempt in range(1, self.maximum_retries + 2):
+            started = time.perf_counter()
             response = self.provider.complete(conversation)
+            latency_ms += max(0, int((time.perf_counter() - started) * 1000))
+            usage = usage.merge(response.usage)
+            model = response.model
             try:
                 payload = json.loads(
                     response.content,
@@ -59,12 +80,24 @@ class StructuredOutputService:
                 if not isinstance(payload, dict):
                     raise ModelValidationError(["top-level JSON value must be an object"])
                 value = model_type.from_dict(payload)  # type: ignore[attr-defined]
-                return StructuredOutputResult(value=value, attempts=attempt, model=response.model)
+                return StructuredOutputResult(
+                    value=value,
+                    attempts=attempt,
+                    model=response.model,
+                    usage=usage,
+                    latency_ms=latency_ms,
+                )
             except (json.JSONDecodeError, ModelValidationError, TypeError, ValueError) as exc:
                 error = str(exc)
                 errors.append(error)
                 if attempt > self.maximum_retries:
-                    raise StructuredOutputError(errors, attempt) from exc
+                    raise StructuredOutputError(
+                        errors,
+                        attempt,
+                        model=model,
+                        usage=usage,
+                        latency_ms=latency_ms,
+                    ) from exc
                 conversation.extend(
                     [
                         LLMMessage(role="assistant", content=response.content),

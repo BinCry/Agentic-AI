@@ -6,7 +6,7 @@ import os
 from typing import Any, Mapping, Sequence
 
 from .openai_client import OpenAIConfigurationError, OpenAIHttpClient, OpenAIResponseError
-from .provider import LLMMessage, LLMResponse
+from .provider import LLMMessage, LLMResponse, ModelUsage
 
 
 class OpenAIResponsesProvider:
@@ -69,18 +69,12 @@ class OpenAIResponsesProvider:
         model = payload.get("model")
         if not isinstance(model, str) or not model:
             raise OpenAIResponseError("Responses API result omitted the model")
-        usage = payload.get("usage")
-        normalized_usage = {
-            key: value
-            for key, value in (usage.items() if isinstance(usage, dict) else [])
-            if isinstance(key, str) and isinstance(value, int) and not isinstance(value, bool)
-        }
         status = payload.get("status")
         return LLMResponse(
             content=content,
             model=model,
             finish_reason=status if isinstance(status, str) else None,
-            usage=normalized_usage,
+            usage=ModelUsage.from_payload(payload.get("usage")),
             provider_metadata={"response_id": payload.get("id")},
         )
 

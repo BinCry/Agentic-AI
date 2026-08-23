@@ -38,8 +38,10 @@ class OpenRouterProviderTests(WorkspaceTestCase):
                             "input_tokens": 9,
                             "output_tokens": 4,
                             "total_tokens": 13,
+                            "output_tokens_details": {"reasoning_tokens": 2},
                             "ignored": "value",
                         },
+                        "reasoning_details": [{"private": "must-not-survive"}],
                         "output": [
                             {
                                 "type": "message",
@@ -66,7 +68,10 @@ class OpenRouterProviderTests(WorkspaceTestCase):
         self.assertEqual(provider.provider_name, "openrouter-responses")
         self.assertEqual(result.content, '{"ok":true}')
         self.assertEqual(result.model, "stealth/ox-alpha")
-        self.assertEqual(result.usage["total_tokens"], 13)
+        self.assertEqual(result.usage.total_tokens, 13)
+        self.assertEqual(result.usage.reasoning_tokens, 2)
+        self.assertEqual(result.usage.known_calls, 1)
+        self.assertNotIn("reasoning_details", result.provider_metadata)
         call = transport.calls[0]
         self.assertEqual(call["url"], "https://openrouter.ai/api/v1/responses")
         payload = call["payload"]

@@ -114,7 +114,10 @@ class OpenAIClientTests(WorkspaceTestCase):
         )
         result = provider.complete([LLMMessage("user", "Return JSON")])
         self.assertEqual(result.content, '{"ok":true}')
-        self.assertEqual(result.usage, {"input_tokens": 10, "output_tokens": 4})
+        self.assertEqual(result.usage.input_tokens, 10)
+        self.assertEqual(result.usage.output_tokens, 4)
+        self.assertEqual(result.usage.input_tokens_known_calls, 1)
+        self.assertEqual(result.usage.total_tokens_known_calls, 0)
         request_payload = transport.calls[0]["payload"]
         assert isinstance(request_payload, dict)
         self.assertEqual(request_payload["model"], "gpt-5.6")
