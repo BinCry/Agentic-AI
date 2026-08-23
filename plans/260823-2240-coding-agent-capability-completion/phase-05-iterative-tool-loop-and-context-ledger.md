@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Iterative Tool Loop and Context Ledger"
-status: pending
+status: in-progress
 effort: "6-8 days"
 dependsOn: [1, 3, 4]
 ---
@@ -86,6 +86,14 @@ Keep `WorkflowEngine` and terminal statuses as the durable control plane. Extrac
 - [ ] Grounded citations remain valid after compaction.
 - [ ] Usage and latency are durable for supported providers and explicitly unknown otherwise.
 - [ ] Existing read-only scenario still completes; edit/debug scenarios can adapt across multiple observations.
+
+## Checkpoint
+
+Core contracts, durable observations/idempotency, provider accounting, grounded
+context budgeting, and the bounded stage loop are implemented and verified. The
+outer orchestrator still uses the legacy stage flow, so Phase 5 remains open.
+
+Resume from the [Phase 5 checkpoint report](./reports/pm-260824-0056-phase-05-checkpoint.md).
 
 ## Risks and Rollback
 

@@ -30,7 +30,8 @@ Scope is intentionally narrower than feature parity: retain the current state ma
 
 Research and gap matrix: [official coding-agent capability study](./research/official-coding-agent-capability-study.md).
 
-Progress: 4/9 phases completed (44%). Phase 5 is next.
+Progress: 4/9 phases completed (44%). Phase 5 is in progress with its bounded
+turn-loop core checkpointed; orchestrator integration remains.
 
 ## Phases
 
@@ -40,7 +41,7 @@ Progress: 4/9 phases completed (44%). Phase 5 is next.
 | 2 | [Instruction Hierarchy and Project Discovery](./phase-02-instruction-hierarchy-and-project-discovery.md) | Completed |
 | 3 | [Policy Engine and Approval Modes](./phase-03-policy-engine-and-approval-modes.md) | Completed |
 | 4 | [Safe Command and Test Harness](./phase-04-safe-command-and-test-harness.md) | Completed |
-| 5 | [Iterative Tool Loop and Context Ledger](./phase-05-iterative-tool-loop-and-context-ledger.md) | Pending |
+| 5 | [Iterative Tool Loop and Context Ledger](./phase-05-iterative-tool-loop-and-context-ledger.md) | In progress (core checkpoint) |
 | 6 | [Event Stream and Session UX](./phase-06-event-stream-and-session-ux.md) | Pending |
 | 7 | [MCP Client and Extension Hooks](./phase-07-mcp-client-and-extension-hooks.md) | Pending |
 | 8 | [Git Delivery Workflow](./phase-08-git-delivery-workflow.md) | Pending |
