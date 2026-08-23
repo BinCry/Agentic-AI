@@ -107,6 +107,43 @@ class ToolResult:
     truncated: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, payload: object) -> "ToolResult":
+        if not isinstance(payload, dict):
+            raise ValueError("tool result must be an object")
+        allowed = {
+            "tool_name",
+            "success",
+            "output",
+            "error_code",
+            "error_message",
+            "timed_out",
+            "truncated",
+            "metadata",
+        }
+        unknown = set(payload) - allowed
+        if unknown or set(payload) != allowed:
+            raise ValueError("tool result fields are invalid")
+        if not isinstance(payload["tool_name"], str) or not payload["tool_name"]:
+            raise ValueError("tool result tool_name is invalid")
+        if not isinstance(payload["success"], bool):
+            raise ValueError("tool result success is invalid")
+        if any(
+            value is not None and not isinstance(value, str)
+            for value in (payload["error_code"], payload["error_message"])
+        ):
+            raise ValueError("tool result error fields are invalid")
+        if not isinstance(payload["timed_out"], bool) or not isinstance(
+            payload["truncated"], bool
+        ):
+            raise ValueError("tool result flags are invalid")
+        if not isinstance(payload["metadata"], dict):
+            raise ValueError("tool result metadata is invalid")
+        return cls(**payload)
+
     @classmethod
     def failure(
         cls,

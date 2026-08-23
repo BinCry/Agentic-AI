@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from uuid import uuid4
 
 from ..errors import ErrorCode
-from ..models.records import ApprovalDecisionRecord, ToolTraceRecord
+from ..models.records import (
+    ApprovalDecisionRecord,
+    PatchRecord,
+    RepositoryEvidence,
+    TestExecution,
+    ToolTraceRecord,
+)
+from ..models.observation import ObservationConflictError, ObservationStoreError
 from ..models.task_state import CodingTaskState, utc_now
 from ..storage.workspace import WorkspacePolicyError
 from ..workflow.engine import InvalidTransitionError, WorkflowEngine
@@ -32,6 +39,7 @@ from ..rag.index import RepositoryIndex, StaleEvidenceError
 from ..rag.embeddings import EmbeddingProvider
 from ..storage.approval_store import ApprovalLedger
 from ..storage.checkpoint_store import CheckpointStore
+from ..storage.observation_store import ObservationStore
 
 
 class ToolExecutionError(ValueError):
@@ -58,6 +66,7 @@ class ToolExecutor:
         self.git = ReadOnlyGitService(policy.paths)
         self.checkpoints = CheckpointStore(policy.paths)
         self.approvals = ApprovalLedger(policy.paths)
+        self.observations = ObservationStore(policy.paths)
 
     def request_execution(
         self,
@@ -81,6 +90,9 @@ class ToolExecutor:
             state.touch()
             state.validate()
             return result
+        observed = self._reuse_or_block_observation(state, request)
+        if observed is not None:
+            return observed
         if decision.requires_approval:
             if state.pending_tool_call is not None:
                 raise ToolExecutionError("another tool approval is already pending")
@@ -179,6 +191,38 @@ class ToolExecutor:
         request: ToolRequest,
         decision: PolicyDecision,
     ) -> ToolResult:
+        try:
+            reservation, created = self.observations.claim(
+                request.task_id,
+                request.request_id,
+                request.tool_name,
+                request.arguments_hash(),
+            )
+        except ObservationConflictError as exc:
+            return self._finish_observed_result(
+                state,
+                request,
+                ToolResult.failure(
+                    request.tool_name,
+                    ErrorCode.TOOL_REQUEST_INVALID.value,
+                    str(exc),
+                ),
+            )
+        except ObservationStoreError as exc:
+            return self._finish_observed_result(
+                state,
+                request,
+                ToolResult.failure(
+                    request.tool_name,
+                    ErrorCode.TOOL_IO_ERROR.value,
+                    str(exc),
+                ),
+            )
+        if not created:
+            observed = self._reuse_or_block_observation(state, request)
+            if observed is not None:
+                return observed
+            raise ToolExecutionError("existing observation could not be resolved")
         started = time.perf_counter()
         try:
             result = self._dispatch(state, request, decision)
@@ -216,11 +260,146 @@ class ToolExecutor:
             )
         except OSError as exc:
             result = ToolResult.failure(request.tool_name, ErrorCode.TOOL_IO_ERROR.value, str(exc))
+        result = replace(
+            result,
+            metadata={
+                **result.metadata,
+                "observation_id": reservation.observation_id,
+            },
+        )
+        try:
+            self.observations.complete(
+                reservation,
+                result.to_dict(),
+                summary=self._observation_summary(result),
+                truncated=result.truncated,
+            )
+        except ObservationStoreError as exc:
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.TOOL_EXECUTION_INDETERMINATE.value,
+                f"tool completed but its durable observation failed: {exc}",
+            )
         self._trace(state, request, result, int((time.perf_counter() - started) * 1000))
         self._record_result_error(state, result)
         state.touch()
         state.validate()
         return result
+
+    def _reuse_or_block_observation(
+        self, state: CodingTaskState, request: ToolRequest
+    ) -> ToolResult | None:
+        try:
+            record = self.observations.find_by_idempotency_key(
+                request.task_id, request.request_id
+            )
+        except ObservationStoreError as exc:
+            return self._finish_observed_result(
+                state,
+                request,
+                ToolResult.failure(
+                    request.tool_name,
+                    ErrorCode.TOOL_REQUEST_INVALID.value,
+                    str(exc),
+                ),
+            )
+        if record is None:
+            return None
+        if (
+            record.tool_name != request.tool_name
+            or record.request_sha256 != request.arguments_hash()
+        ):
+            return self._finish_observed_result(
+                state,
+                request,
+                ToolResult.failure(
+                    request.tool_name,
+                    ErrorCode.TOOL_REQUEST_INVALID.value,
+                    "idempotency key is bound to another tool request",
+                ),
+            )
+        if record.status == "pending":
+            return self._finish_observed_result(
+                state,
+                request,
+                ToolResult.failure(
+                    request.tool_name,
+                    ErrorCode.TOOL_EXECUTION_INDETERMINATE.value,
+                    "a prior execution has no durable result; refusing to repeat it",
+                ),
+            )
+        try:
+            result = ToolResult.from_dict(self.observations.get_result(record))
+            if result.tool_name != request.tool_name:
+                raise ValueError("durable tool result identity does not match request")
+            self._rehydrate_result_state(state, request, result)
+        except (ObservationStoreError, ValueError) as exc:
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.TOOL_IO_ERROR.value,
+                f"durable tool result is invalid: {exc}",
+            )
+        else:
+            result = replace(
+                result,
+                metadata={
+                    **result.metadata,
+                    "observation_id": record.observation_id,
+                    "idempotency_reused": True,
+                },
+            )
+        return self._finish_observed_result(state, request, result, deduplicate_error=True)
+
+    def _finish_observed_result(
+        self,
+        state: CodingTaskState,
+        request: ToolRequest,
+        result: ToolResult,
+        *,
+        deduplicate_error: bool = False,
+    ) -> ToolResult:
+        self._trace(state, request, result, 0)
+        self._record_result_error(state, result, deduplicate=deduplicate_error)
+        state.touch()
+        state.validate()
+        return result
+
+    def _rehydrate_result_state(
+        self, state: CodingTaskState, request: ToolRequest, result: ToolResult
+    ) -> None:
+        if request.tool_name in {"repo.create_file", "repo.apply_patch"} and isinstance(
+            result.output, dict
+        ):
+            record = PatchRecord.from_dict(result.output)
+            self._record_modified_file(state, record.path)
+            if record not in state.patches:
+                state.patches.append(record)
+        elif request.tool_name == "test.run" and isinstance(result.output, dict):
+            execution = TestExecution.from_dict(result.output)
+            if execution not in state.test_results:
+                state.test_results.append(execution)
+        elif request.tool_name == "repo.retrieve" and isinstance(result.output, list):
+            for item in result.output:
+                if not isinstance(item, dict):
+                    continue
+                evidence = RepositoryEvidence.from_dict(item)
+                if not any(
+                    existing.chunk_id == evidence.chunk_id
+                    for existing in state.retrieved_evidence
+                ):
+                    state.retrieved_evidence.append(evidence)
+            state.retrieved_evidence.sort(
+                key=lambda item: (-item.score, item.path, item.start_line, item.chunk_id)
+            )
+            query = request.arguments.get("query")
+            if isinstance(query, str) and query not in state.retrieval_queries:
+                state.retrieval_queries.append(query)
+
+    @staticmethod
+    def _observation_summary(result: ToolResult) -> str:
+        outcome = "succeeded" if result.success else "failed"
+        detail = f": {result.error_code}" if result.error_code else ""
+        return f"{result.tool_name} {outcome}{detail}"
 
     def _dispatch(
         self,
@@ -269,6 +448,10 @@ class ToolExecutor:
             )
             if arguments["query"] not in state.retrieval_queries:
                 state.retrieval_queries.append(arguments["query"])
+            retrieval_metrics = asdict(retrieval.metrics)
+            retrieval_metrics["retrieval_methods"] = list(
+                retrieval.metrics.retrieval_methods
+            )
             if not hits:
                 return ToolResult(
                     request.tool_name,
@@ -278,7 +461,7 @@ class ToolExecutor:
                     error_message=f"no grounded repository evidence found for query: {arguments['query']}",
                     metadata={
                         "matches": 0,
-                        "retrieval_metrics": asdict(retrieval.metrics),
+                        "retrieval_metrics": retrieval_metrics,
                     },
                 )
             return ToolResult(
@@ -293,7 +476,10 @@ class ToolExecutor:
                     }
                     for hit in hits
                 ],
-                metadata={"matches": len(hits), "retrieval_metrics": asdict(retrieval.metrics)},
+                metadata={
+                    "matches": len(hits),
+                    "retrieval_metrics": retrieval_metrics,
+                },
             )
         if request.tool_name == "repo.create_file":
             record = self.patch.create_file(arguments["path"], arguments["content"])
@@ -412,10 +598,22 @@ class ToolExecutor:
             state.modified_files.append(path)
 
     @staticmethod
-    def _record_result_error(state: CodingTaskState, result: ToolResult) -> None:
+    def _record_result_error(
+        state: CodingTaskState,
+        result: ToolResult,
+        *,
+        deduplicate: bool = False,
+    ) -> None:
         if result.success or not result.error_code:
             return
         if result.error_code == ErrorCode.APPROVAL_REQUIRED.value:
+            return
+        if deduplicate and any(
+            item.code == result.error_code
+            and item.message == (result.error_message or f"{result.tool_name} failed")
+            and item.workflow_state == state.current_status.value
+            for item in state.errors
+        ):
             return
         WorkflowEngine(state).record_error(
             result.error_code,
@@ -454,6 +652,10 @@ class ToolExecutor:
                     "error_code": result.error_code,
                     "timed_out": result.timed_out,
                     "truncated": result.truncated,
+                    "observation_id": result.metadata.get("observation_id"),
+                    "idempotency_reused": bool(
+                        result.metadata.get("idempotency_reused", False)
+                    ),
                 },
                 error=result.error_message,
             )

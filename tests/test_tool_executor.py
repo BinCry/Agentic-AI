@@ -125,6 +125,103 @@ class ToolExecutorTests(WorkspaceTestCase):
         self.assertEqual((self.test_root / "new.py").read_text(encoding="utf-8"), "x = 1\n")
         self.assertEqual(len(CheckpointStore(paths).list_records(state.task_id)), 1)
 
+    def test_completed_mutation_is_reused_after_state_save_crash(self) -> None:
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        initial = self.make_state()
+        persisted_before_execution = initial.to_dict()
+        request = ToolRequest(
+            "create-replay",
+            initial.task_id,
+            "repo.create_file",
+            {"path": "replayed.py", "content": "value = 1\n"},
+            WorkflowStatus.EDITING.value,
+        )
+        first_executor = ToolExecutor(
+            ToolPermissionPolicy(paths, mode=ApprovalMode.AUTO_EDIT)
+        )
+
+        first = first_executor.request_execution(initial, request)
+        recovered = CodingTaskState.from_dict(persisted_before_execution)
+        second_executor = ToolExecutor(
+            ToolPermissionPolicy(paths, mode=ApprovalMode.AUTO_EDIT)
+        )
+        second = second_executor.request_execution(recovered, request)
+
+        self.assertTrue(first.success)
+        self.assertTrue(second.success)
+        self.assertTrue(second.metadata["idempotency_reused"])
+        self.assertEqual(recovered.modified_files, ["replayed.py"])
+        self.assertEqual(len(recovered.patches), 1)
+        self.assertEqual(
+            (self.test_root / "replayed.py").read_text(encoding="utf-8"),
+            "value = 1\n",
+        )
+        self.assertTrue(
+            recovered.tool_execution_trace[-1].result_metadata[
+                "idempotency_reused"
+            ]
+        )
+
+    def test_pending_observation_refuses_to_repeat_mutation(self) -> None:
+        state = self.make_state()
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(paths, mode=ApprovalMode.AUTO_EDIT)
+        )
+        request = ToolRequest(
+            "create-uncertain",
+            state.task_id,
+            "repo.create_file",
+            {"path": "uncertain.py", "content": "value = 1\n"},
+            WorkflowStatus.EDITING.value,
+        )
+        executor.observations.reserve(
+            request.task_id,
+            request.request_id,
+            request.tool_name,
+            request.arguments_hash(),
+        )
+
+        with patch.object(executor.patch, "create_file") as create_file:
+            result = executor.request_execution(state, request)
+
+        create_file.assert_not_called()
+        self.assertEqual(
+            result.error_code, ErrorCode.TOOL_EXECUTION_INDETERMINATE.value
+        )
+        self.assertTrue(state.errors[-1].recoverable)
+        self.assertFalse((self.test_root / "uncertain.py").exists())
+
+    def test_reused_idempotency_key_rejects_changed_mutation(self) -> None:
+        state = self.make_state()
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(paths, mode=ApprovalMode.AUTO_EDIT)
+        )
+        original = ToolRequest(
+            "create-bound",
+            state.task_id,
+            "repo.create_file",
+            {"path": "bound.py", "content": "value = 1\n"},
+            WorkflowStatus.EDITING.value,
+        )
+        changed = ToolRequest(
+            original.request_id,
+            original.task_id,
+            original.tool_name,
+            {"path": "bound.py", "content": "value = 2\n"},
+            original.workflow_state,
+        )
+
+        self.assertTrue(executor.request_execution(state, original).success)
+        result = executor.request_execution(state, changed)
+
+        self.assertEqual(result.error_code, ErrorCode.TOOL_REQUEST_INVALID.value)
+        self.assertEqual(
+            (self.test_root / "bound.py").read_text(encoding="utf-8"),
+            "value = 1\n",
+        )
+
     def test_invalid_tool_call_is_rejected_and_traced(self) -> None:
         state = self.make_state()
         result = self.make_executor().request_execution(

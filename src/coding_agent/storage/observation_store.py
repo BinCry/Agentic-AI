@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import os
+from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -58,6 +59,19 @@ class ObservationStore:
         tool_name: str,
         request_sha256: str,
     ) -> ObservationRecord:
+        record, _ = self.claim(
+            task_id, idempotency_key, tool_name, request_sha256
+        )
+        return record
+
+    def claim(
+        self,
+        task_id: str,
+        idempotency_key: str,
+        tool_name: str,
+        request_sha256: str,
+    ) -> tuple[ObservationRecord, bool]:
+        """Reserve a call and report whether this caller owns the new claim."""
         self._validate_identity(task_id, idempotency_key, request_sha256)
         if not isinstance(tool_name, str) or not tool_name.strip() or len(tool_name) > 128:
             raise ObservationStoreError("tool_name is invalid")
@@ -65,7 +79,7 @@ class ObservationStore:
         if existing is not None:
             if existing.request_sha256 != request_sha256 or existing.tool_name != tool_name:
                 raise ObservationConflictError("idempotency key is bound to another request")
-            return existing
+            return existing, False
         records = self.list(task_id)
         if len(records) >= self.maximum_observations:
             raise ObservationQuotaError("observation count limit exceeded")
@@ -86,7 +100,7 @@ class ObservationStore:
         )
         record.validate()
         self._write_index(task_id, [*records, record])
-        return record
+        return record, True
 
     def complete(
         self,
@@ -290,17 +304,22 @@ class ObservationStore:
 
     @staticmethod
     def _atomic_write(target: Path, payload: object) -> None:
-        target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.with_name(f".{target.name}.{os.getpid()}.{uuid4().hex}.tmp")
         try:
+            target.parent.mkdir(parents=True, exist_ok=True)
             with temporary.open("x", encoding="utf-8", newline="\n") as handle:
                 json.dump(payload, handle, ensure_ascii=False, allow_nan=False, indent=2)
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, target)
+        except (OSError, TypeError, ValueError) as exc:
+            raise ObservationStoreError(
+                f"observation write failed: {target.name}"
+            ) from exc
         finally:
-            temporary.unlink(missing_ok=True)
+            with suppress(OSError):
+                temporary.unlink(missing_ok=True)
 
 
 def _is_canonical_json(value: object) -> bool:
