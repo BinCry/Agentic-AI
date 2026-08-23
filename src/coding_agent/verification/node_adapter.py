@@ -55,8 +55,6 @@ def _direct_node_test_arguments(value: object) -> tuple[str, ...] | None:
         tokens = tuple(shlex.split(value, posix=True))
     except ValueError:
         return None
-    if tokens[:2] != ("node", "--test"):
+    if tokens != ("node", "--test"):
         return None
-    if any(not token or "\x00" in token for token in tokens[1:]):
-        return None
-    return tokens[1:]
+    return ("--test",)

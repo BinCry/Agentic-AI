@@ -79,6 +79,12 @@ class VerificationRegistryTests(WorkspaceTestCase):
         with self.assertRaisesRegex(VerificationProfileNotFoundError, "available: none"):
             registry.detect("unit")
 
+        (self.test_root / "package.json").write_text(
+            json.dumps({"scripts": {"test": "node --test extra.test.js"}}),
+            encoding="utf-8",
+        )
+        self.assertEqual(self.make_registry().list(), ())
+
     def test_untrusted_registry_run_has_no_local_execution_boundary(self) -> None:
         tests = self.test_root / "tests"
         tests.mkdir()

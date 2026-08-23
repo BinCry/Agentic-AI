@@ -22,6 +22,7 @@ _SAFE_ENVIRONMENT_NAMES = frozenset({"CI", "FORCE_COLOR", "LANG", "LC_ALL", "NO_
 _SENSITIVE_NAME_PARTS = ("AUTH", "CREDENTIAL", "KEY", "PASSWORD", "SECRET", "TOKEN")
 _SHELL_META = re.compile(r"[&|<>`$\r\n\x00]")
 _DIRECT_EXECUTABLES = frozenset({"node"})
+_UNITTEST_PATTERN = re.compile(r"[A-Za-z0-9_*?.-]{1,128}")
 
 
 class CommandService:
@@ -40,8 +41,10 @@ class CommandService:
 
     def prepare(self, request: CommandRequest) -> PreparedCommand:
         executable = self._resolve_executable(request.executable)
-        arguments = self._validate_arguments(request.executable, request.arguments)
         cwd = self._resolve_cwd(request.cwd)
+        arguments = self._validate_arguments(
+            request.executable, request.arguments, cwd
+        )
         environment = self._validate_environment(request.environment)
         timeout = request.timeout_seconds
         if (
@@ -90,7 +93,12 @@ class CommandService:
             raise CommandValidationError(f"registered executable is unavailable: {value}")
         return str(Path(resolved).resolve())
 
-    def _validate_arguments(self, executable: str, values: tuple[str, ...]) -> tuple[str, ...]:
+    def _validate_arguments(
+        self,
+        executable: str,
+        values: tuple[str, ...],
+        cwd: Path,
+    ) -> tuple[str, ...]:
         if not isinstance(values, tuple) or any(
             not isinstance(item, str) or not item or "\x00" in item or "\r" in item or "\n" in item
             for item in values
@@ -99,12 +107,55 @@ class CommandService:
         normalized = executable.casefold()
         if normalized in {"python", "python3", "py"}:
             offset = 1 if values[:1] == ("-B",) else 0
-            if values[offset : offset + 2] not in {("-m", "unittest"), ("-m", "pytest")}:
-                raise CommandValidationError("Python execution is limited to registered test modules")
+            if values[offset : offset + 2] != ("-m", "unittest"):
+                raise CommandValidationError(
+                    "Python execution is limited to the registered unittest module"
+                )
+            self._validate_unittest_arguments(values[offset + 2 :], cwd)
             return values
-        if not values or values[0] != "--test":
+        if values != ("--test",):
             raise CommandValidationError("Node execution is limited to the built-in test runner")
         return values
+
+    def _validate_unittest_arguments(self, values: tuple[str, ...], cwd: Path) -> None:
+        if not values:
+            return
+        if values[0] != "discover":
+            raise CommandValidationError("unittest is limited to discovery mode")
+        index = 1
+        while index < len(values):
+            flag = values[index]
+            if flag in {"-v", "--verbose"}:
+                index += 1
+                continue
+            if flag in {"-s", "--start-directory", "-t", "--top-level-directory"}:
+                if index + 1 >= len(values):
+                    raise CommandValidationError(f"missing path value for unittest flag: {flag}")
+                self._validate_test_directory(cwd, values[index + 1])
+                index += 2
+                continue
+            if flag in {"-p", "--pattern"}:
+                if (
+                    index + 1 >= len(values)
+                    or not _UNITTEST_PATTERN.fullmatch(values[index + 1])
+                ):
+                    raise CommandValidationError("unittest pattern is invalid")
+                index += 2
+                continue
+            raise CommandValidationError(f"unsupported unittest argument: {flag}")
+
+    def _validate_test_directory(self, cwd: Path, value: str) -> None:
+        candidate = Path(value)
+        if candidate.is_absolute():
+            raise CommandValidationError("unittest paths must be workspace-relative")
+        try:
+            resolved = self.paths.resolve_workspace_path(
+                (cwd / candidate).resolve(), must_exist=True
+            )
+        except WorkspacePolicyError as exc:
+            raise CommandValidationError(str(exc)) from exc
+        if not resolved.is_dir():
+            raise CommandValidationError("unittest path must resolve to a directory")
 
     def _resolve_cwd(self, value: str) -> Path:
         if not isinstance(value, str) or not value:

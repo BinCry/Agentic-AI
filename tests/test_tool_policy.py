@@ -73,7 +73,7 @@ class ToolPermissionPolicyTests(WorkspaceTestCase):
             "process.run",
             {
                 "executable": "python",
-                "arguments": ["-B", "-m", "unittest", "discover", "-s", "tests"],
+                "arguments": ["-B", "-m", "unittest"],
             },
             "TESTING",
         )
@@ -96,7 +96,7 @@ class ToolPermissionPolicyTests(WorkspaceTestCase):
             {"executable": "python", "arguments": ["-c", "print('no')"]},
             "TESTING",
         )
-        with self.assertRaisesRegex(ToolArgumentError, "registered test modules"):
+        with self.assertRaisesRegex(ToolArgumentError, "registered unittest module"):
             ToolPermissionPolicy(paths).evaluate(unsafe)
 
         valid = self.request(

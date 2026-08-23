@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import shutil
 import unittest
 from unittest.mock import patch
 
@@ -14,6 +15,10 @@ from tests.support import WorkspaceTestCase
 
 
 class CommandServiceTests(WorkspaceTestCase):
+    def setUp(self) -> None:
+        super().setUp()
+        (self.test_root / "tests").mkdir()
+
     def make_service(self) -> CommandService:
         paths = WorkspacePaths.create(self.test_root).ensure()
         return CommandService(paths, boundary=LocalTrustedBoundary(paths))
@@ -46,6 +51,10 @@ class CommandServiceTests(WorkspaceTestCase):
             self.unittest_request(executable="powershell"),
             self.unittest_request(arguments=("-c", "print('unsafe')")),
             self.unittest_request(arguments=("-m", "pip", "install", "package")),
+            self.unittest_request(arguments=("-m", "pytest")),
+            self.unittest_request(
+                arguments=("-m", "unittest", "discover", "-s", "..")
+            ),
             self.unittest_request(executable="npm", arguments=("test",)),
             self.unittest_request(executable="npm", arguments=("install",)),
             self.unittest_request(executable="npm", arguments=("exec", "tool")),
@@ -53,6 +62,16 @@ class CommandServiceTests(WorkspaceTestCase):
         for request in cases:
             with self.subTest(request=request), self.assertRaises(CommandValidationError):
                 self.make_service().prepare(request)
+
+    @unittest.skipUnless(shutil.which("node"), "node unavailable")
+    def test_node_test_rejects_extra_targets_or_options(self) -> None:
+        service = self.make_service()
+        with self.assertRaises(CommandValidationError):
+            service.prepare(
+                self.unittest_request(
+                    executable="node", arguments=("--test", "../outside.test.js")
+                )
+            )
 
     def test_cwd_escape_and_secret_environment_are_rejected(self) -> None:
         cases = (
@@ -76,7 +95,7 @@ class CommandServiceTests(WorkspaceTestCase):
 
     def test_trusted_execution_returns_redacted_digest_backed_excerpts(self) -> None:
         tests = self.test_root / "tests"
-        tests.mkdir()
+        tests.mkdir(exist_ok=True)
         (tests / "test_sample.py").write_text(
             "import unittest\n"
             "class Sample(unittest.TestCase):\n"
