@@ -1,7 +1,8 @@
 # Project Roadmap
 
-OpenRouter Ox Alpha provider completed on 2026-08-23: live Responses API,
-environment-only credential, bounded reasoning/output, 136 tests, and 82%
+OpenRouter Ox Alpha provider and structured-output startup hardening completed
+on 2026-08-23: live Responses API, environment-only credential, complete decision
+schemas, a mutation-free analysis path, bounded reasoning/output, 150 tests, and 82%
 coverage. See the
 [completion report](../plans/260823-1730-openrouter-provider/reports/pm-260823-1841-openrouter-provider.md).
 

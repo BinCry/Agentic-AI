@@ -16,6 +16,7 @@ semantic embeddings tùy chọn, CLI `run`, coverage gate và CI packaging smoke
 
 - Runtime mặc định ghi vào `<workspace>/.coding-agent`.
 - Mọi đường dẫn ghi phải nằm trong workspace.
+- `--skill-root` tuyệt đối có thể nằm ngoài workspace nhưng chỉ được đọc.
 - Ổ `C:` bị từ chối theo mặc định trên Windows.
 - Test dùng temp/cache dưới `D:\Agentic-AI\.tmp`; không cần cài dependency Python ngoài.
 
@@ -48,6 +49,29 @@ Mutation/test dừng xin duyệt theo mặc định. Xem start/resume, exit code
 OpenRouter Responses dùng `--model-provider openrouter` và đọc key từ biến môi
 trường `OPENROUTER_API_KEY`; model mặc định là `stealth/ox-alpha`. OpenAI vẫn là
 mặc định; lựa chọn model provider độc lập với repository embeddings.
+
+Structured decisions now include their complete JSON schema in the first model
+turn. A request that explicitly asks for inspection or explanation without file
+changes is classified as read-only analysis: it retrieves and verifies repository
+evidence, then completes without planning, mutation, tests, or approval.
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI run `
+  --issue 'Phan tich cau truc du an va khong chinh sua file' `
+  --model-provider openrouter `
+  --read-only
+```
+
+Khi phân tích repository khác, giữ skill catalog ở Agentic-AI bằng một đường
+dẫn tuyệt đối. Ví dụ workspace đích `D:\Studocu`:
+
+```powershell
+python -B -m coding_agent --workspace D:\Studocu run `
+  --issue 'Phan tich toan bo cau truc du an va khong chinh sua file' `
+  --skill-root D:\Agentic-AI\.claude\skills `
+  --model-provider openrouter `
+  --read-only
+```
 
 Sau khi task đạt `COMPLETED`, xuất báo cáo đã xác minh bằng:
 

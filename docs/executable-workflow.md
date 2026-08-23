@@ -38,6 +38,39 @@ python -B -m coding_agent --workspace D:\Agentic-AI run `
 Repeat `--model-provider openrouter` when resuming an OpenRouter-backed task;
 provider selection is run-scoped and is not persisted with task state.
 
+## Read-only analysis
+
+Every structured model turn includes the complete required JSON schema. When
+the issue explicitly requests repository inspection, explanation, or analysis
+without changes, start it with controller-owned `--read-only`. The persisted
+task then pins `IssueAnalysis.task_type` to `analysis`. That path performs
+grounded retrieval and evidence verification, then produces a cited final report
+without entering planning, mutation, testing, review, or approval states.
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI run `
+  --issue 'Phan tich cau truc du an va khong chinh sua file' `
+  --model-provider openrouter `
+  --read-only
+```
+
+`--read-only` cannot be combined with `--auto-approve` and is valid only when
+starting a new `--issue`; the mode is persisted for later resume. A failed
+terminal task cannot be resumed, so start a new `--issue` after correcting a
+provider or structured-output failure.
+
+When the target workspace does not contain the runtime's reusable skills, pass
+the skill catalog explicitly. Absolute skill roots are read-only dependencies;
+they do not broaden the target workspace's write boundary:
+
+```powershell
+python -B -m coding_agent --workspace D:\Studocu run `
+  --issue 'Phan tich toan bo cau truc du an va khong chinh sua file' `
+  --skill-root D:\Agentic-AI\.claude\skills `
+  --model-provider openrouter `
+  --read-only
+```
+
 ## Approval and Resume
 
 Mutation and test tools pause by default. A paused run returns exit code `3`,
@@ -90,8 +123,11 @@ before exit.
 - `--structured-retries`: 0 through 8; default 2.
 - `--model-provider`: `openai` or `openrouter`; default `openai`.
 - `--embedding-provider`: `deterministic` or `openai`.
+- `--read-only`: controller-owned analysis mode for a new task; incompatible with `--auto-approve`.
+- `--skill-root`: workspace-relative by default; an explicit absolute path is read-only and may be outside the workspace.
 - `--repository` is valid only with a new `--issue` run.
 - `--issue` and `--task-id` are mutually exclusive.
 
 Runtime state stays under `<workspace>/.coding-agent`; writable paths remain
-inside the workspace and drive `C:` remains forbidden by default on Windows.
+inside the workspace. Workspace, runtime, and external read-only dependencies
+still reject drive `C:` by default on Windows.

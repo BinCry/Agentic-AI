@@ -17,6 +17,11 @@ flowchart LR
 
 Task state là nguồn sự thật của workflow. Conversation không giữ độc quyền trạng thái. Skill được chọn theo trạng thái và lưu kèm path/content digest để lần chạy sau có thể phát hiện prompt drift.
 
+Workspace policy tách write scope khỏi dependency chỉ-đọc: repository tools,
+runtime state và patches luôn bị giữ trong target workspace; skill catalog tuyệt
+đối do người vận hành chỉ định có thể nằm ngoài workspace nhưng không được trao
+cho mutation tools. Cả hai loại đường dẫn vẫn áp dụng forbidden-drive policy.
+
 ## State flow
 
 ```mermaid
@@ -26,6 +31,7 @@ stateDiagram-v2
     ANALYZING --> RETRIEVING
     RETRIEVING --> VERIFYING_EVIDENCE
     VERIFYING_EVIDENCE --> PLANNING
+    VERIFYING_EVIDENCE --> FINALIZING: read-only analysis
     PLANNING --> EDITING
     PLANNING --> WAITING_APPROVAL
     EDITING --> TESTING
@@ -72,6 +78,13 @@ Model provider selection is run-scoped: OpenAI remains default, while OpenRouter
 uses `--model-provider openrouter` and `OPENROUTER_API_KEY`. Both pass through the
 same bounded structured-output and orchestration contracts; model selection does
 not change the embedding provider or controlled-tool policy.
+
+`ContextProjector` includes an explicit schema for each decision type. Coding
+tasks retain the plan/edit/test/review/final-diff invariants. Explicit read-only
+analysis is pinned by controller-owned `read_only=true`, stores
+`task_type=analysis`, skips all mutation-capable stages, and uses
+an analysis-specific completion contract whose controller-built report rejects
+any recorded mutation or test execution.
 
 ## Phase 4 orchestration boundary
 

@@ -8,6 +8,11 @@ All production providers use the standard library HTTPS stack, bounded
 response reads, explicit timeouts, bounded retry, typed errors, and dependency
 injection for offline tests.
 
+The provider-neutral prompt boundary supplies a complete JSON schema for every
+workflow decision on the first attempt. Repair retries remain bounded, but are
+reserved for genuinely malformed provider output instead of discovering required
+fields one validation error at a time.
+
 Deterministic embeddings remain the default until production embedding
 configuration is explicitly selected by the runtime caller.
 
@@ -57,6 +62,8 @@ so do not send repository content that its retention terms do not permit.
 - Missing OpenRouter credentials and invalid OpenRouter settings raise
   `OpenRouterConfigurationError`; request/response failures retain the shared
   bounded and redacted OpenAI-compatible error contract.
+- Exhausted structured-output retries persist the final validation detail without
+  persisting the raw provider response.
 
 ## Verification
 

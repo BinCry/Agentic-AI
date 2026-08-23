@@ -2,7 +2,8 @@
 
 ## Runtime mới
 
-- `src/coding_agent/models`: state, decision output và embedded records.
+- `src/coding_agent/models`: state, decision output, prompt-facing JSON schemas,
+  read-only analysis completion, và embedded records.
 - `src/coding_agent/workflow`: trạng thái hợp lệ và bounded transition engine.
 - `src/coding_agent/workflow/orchestrator.py`: autonomous bounded workflow,
   skill routing and finalization DoD.
@@ -34,6 +35,7 @@ install state, runtime task/trace và backup là artifact sinh tự động, kh�
 
 ## Test layout
 
-`tests/` kiểm tra model validation, task-state round trip, workflow bounds,
+`tests/` kiểm tra model validation, complete decision schemas, read-only analysis,
+task-state round trip, workflow bounds,
 provider retry/redaction, skill routing, storage/path policy, trace redaction,
 approval/crash resume, executable CLI và installed workflow contracts.
