@@ -67,6 +67,18 @@ class CliTests(WorkspaceTestCase):
         self.assertEqual(payload, {})
         self.assertEqual(json.loads(error)["error"], "InvalidTransitionError")
 
+    def test_project_inspect_is_model_free_and_json_serializable(self) -> None:
+        (self.test_root / "pyproject.toml").write_text(
+            "[project]\nname='cli-fixture'\n", encoding="utf-8"
+        )
+        (self.test_root / "AGENTS.md").write_text("Keep changes small", encoding="utf-8")
+
+        code, payload, error = self.run_cli("project", "inspect", "--format", "json")
+
+        self.assertEqual((code, error), (0, ""))
+        self.assertEqual(payload["ecosystems"], ["python"])
+        self.assertEqual(payload["instructions"][0]["path"], "AGENTS.md")
+
     def test_forced_limit_failure_returns_nonzero_and_failed_state(self) -> None:
         self.write_skill("fix")
         paths = WorkspacePaths.create(self.test_root).ensure()

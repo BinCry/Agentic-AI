@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 import unittest
 
-from coding_agent.project.instructions import InstructionResolver
+from coding_agent.project.inspector import ProjectInspector
+from coding_agent.project.instructions import InstructionResolver, merge_scoped_instructions
 from coding_agent.storage.workspace import WorkspacePaths, WorkspacePolicyError
 
 from tests.support import WorkspaceTestCase
@@ -72,6 +73,22 @@ class InstructionResolverTests(WorkspaceTestCase):
 
         (self.test_root / "AGENTS.md").write_bytes(b"invalid-utf8-\xff")
         self.assertEqual(InstructionResolver(self.make_paths()).resolve(), ())
+
+    def test_merges_scoped_instructions_for_verified_target_paths(self) -> None:
+        self.write_instruction("AGENTS.md", "root")
+        self.write_instruction("src/AGENTS.md", "source")
+        self.write_instruction("tests/AGENTS.md", "tests")
+        self.write_instruction("src/app.py", "VALUE = 1")
+        paths = self.make_paths()
+        profile = ProjectInspector(paths).inspect()
+
+        merged = merge_scoped_instructions(
+            profile, InstructionResolver(paths), ["src/app.py", "src/app.py"]
+        )
+
+        self.assertEqual(
+            [item.path for item in merged.instructions], ["AGENTS.md", "src/AGENTS.md"]
+        )
 
     def make_paths(self) -> WorkspacePaths:
         return WorkspacePaths.create(self.test_root).ensure()

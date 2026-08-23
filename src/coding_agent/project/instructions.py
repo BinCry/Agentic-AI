@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
+from typing import Iterable
 
 from ..storage.workspace import WorkspacePaths
-from .profile import InstructionBlock
+from .profile import InstructionBlock, ProjectProfile
 
 
 class InstructionResolver:
@@ -83,3 +85,25 @@ class InstructionResolver:
             current /= part
             scopes.append(current)
         return tuple(scopes)
+
+
+def merge_scoped_instructions(
+    profile: ProjectProfile,
+    resolver: InstructionResolver,
+    targets: Iterable[str],
+) -> ProjectProfile:
+    """Return a profile containing deterministic instructions for observed targets."""
+    blocks = {item.path: item for item in profile.instructions}
+    for target in sorted(set(targets)):
+        for block in resolver.resolve(target):
+            blocks[block.path] = block
+    ordered = sorted(
+        blocks.values(),
+        key=lambda item: (
+            0 if item.scope == "." else len(Path(item.scope).parts),
+            item.scope,
+            0 if Path(item.path).name == "CLAUDE.md" else 1,
+            item.path,
+        ),
+    )
+    return replace(profile, instructions=tuple(ordered))

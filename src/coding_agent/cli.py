@@ -27,6 +27,7 @@ from .tools.executor import ToolExecutor
 from .tools.policy import ToolPermissionPolicy
 from .evaluation.runner import EvaluationRunner
 from .cli_baseline import add_baseline_parser, run_baseline_command
+from .cli_project import add_project_parser, run_project_command
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -140,6 +141,7 @@ def _parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument("--top-k", type=int, default=5)
     evaluate_parser.add_argument("--task-id", action="append", default=[])
     add_baseline_parser(subparsers)
+    add_project_parser(subparsers)
     return parser
 
 
@@ -430,6 +432,12 @@ def _baseline(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "passed" else 2
 
 
+def _project(args: argparse.Namespace) -> int:
+    paths, _, _ = _runtime(args)
+    _write_json(run_project_command(args, paths))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
@@ -448,6 +456,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "skills": _skills,
         "evaluate": _evaluate,
         "baseline": _baseline,
+        "project": _project,
     }
     try:
         return handlers[args.command](args)

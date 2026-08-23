@@ -86,6 +86,7 @@ class ContextProjector:
             "problem": state.normalized_problem_statement,
             "status": state.current_status.value,
             "active_skill": asdict(state.active_skill) if state.active_skill else None,
+            "project": self._project_context(state),
             "acceptance_criteria": state.acceptance_criteria,
             "retrieval_queries": state.retrieval_queries[-8:],
             "evidence": [
@@ -149,3 +150,28 @@ class ContextProjector:
                 "pr_summary": "optional pull-request summary",
             }
         return self.compactor.compact(payload)
+
+    @staticmethod
+    def _project_context(state: CodingTaskState) -> dict[str, Any] | None:
+        profile = state.project_profile
+        if profile is None:
+            return None
+        return {
+            "schema_version": profile.schema_version,
+            "workspace_name": profile.workspace_name,
+            "ecosystems": list(profile.ecosystems),
+            "package_managers": list(profile.package_managers),
+            "manifests": [item.to_dict() for item in profile.manifests],
+            "candidate_commands": [item.to_dict() for item in profile.commands],
+            "instructions": [
+                {
+                    "path": item.path,
+                    "scope": item.scope,
+                    "sha256": item.sha256,
+                    "content": item.content[:2_000],
+                    "truncated": item.truncated or len(item.content) > 2_000,
+                    "trust": "untrusted_repository_data",
+                }
+                for item in profile.instructions[:4]
+            ],
+        }

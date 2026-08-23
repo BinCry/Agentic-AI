@@ -48,7 +48,18 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
         self.assertFalse(state.read_only)
         self.assertEqual(state.run_budget, RunBudget())
         self.assertEqual(state.usage_ledger, UsageLedger())
+        self.assertIsNone(state.project_profile)
         self.assertEqual(TaskStateMigrator().migrate(migrated), migrated)
+
+    def test_version_2_state_adds_empty_project_profile(self) -> None:
+        payload = CodingTaskState.create("Issue", "repo", task_id="legacy-v2").to_dict()
+        payload["schema_version"] = 2
+        payload.pop("project_profile")
+
+        migrated = TaskStateMigrator().migrate(payload)
+
+        self.assertEqual(migrated["schema_version"], CURRENT_TASK_SCHEMA_VERSION)
+        self.assertIsNone(migrated["project_profile"])
 
     def test_load_then_save_creates_one_immutable_legacy_backup(self) -> None:
         store = self.make_store()

@@ -11,6 +11,7 @@ from ..llm.openai_provider import OpenAIResponsesProvider
 from ..llm.openrouter_provider import OpenRouterResponsesProvider
 from ..llm.provider import LLMProvider
 from ..models.task_state import CodingTaskState
+from ..project.inspector import ProjectInspector
 from ..rag.embeddings import EmbeddingProvider, OpenAIEmbeddingProvider
 from ..skills.catalog import SkillCatalog
 from ..skills.router import SkillRouter
@@ -124,6 +125,7 @@ def _create_task(
         repository or paths.workspace_root.name,
         read_only=read_only,
     )
+    state.project_profile = ProjectInspector(paths).inspect()
     definition = router.select(WorkflowStatus.ANALYZING)
     active_skill = router.as_active_skill(definition, paths.workspace_root)
     WorkflowEngine(state).transition(

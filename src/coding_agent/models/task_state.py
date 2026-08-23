@@ -11,6 +11,7 @@ from uuid import uuid4
 from .decisions import ImplementationPlan, ReviewFinding
 from .run_accounting import RunBudget, UsageLedger
 from .task_state_schema import CURRENT_TASK_SCHEMA_VERSION
+from ..project.profile import ProjectProfile
 from .records import (
     ActiveSkill,
     ApprovalDecisionRecord,
@@ -77,6 +78,7 @@ class CodingTaskState:
     final_report: FinalReport | None = None
     approval_return_status: WorkflowStatus | None = None
     pending_tool_call: PendingToolCall | None = None
+    project_profile: ProjectProfile | None = None
     run_budget: RunBudget = field(default_factory=RunBudget)
     usage_ledger: UsageLedger = field(default_factory=UsageLedger)
     schema_version: int = CURRENT_TASK_SCHEMA_VERSION
@@ -134,6 +136,10 @@ class CodingTaskState:
             errors.append("approval_return_status must be a WorkflowStatus or null")
         if self.pending_tool_call is not None and not isinstance(self.pending_tool_call, PendingToolCall):
             errors.append("pending_tool_call must be a PendingToolCall or null")
+        if self.project_profile is not None and not isinstance(
+            self.project_profile, ProjectProfile
+        ):
+            errors.append("project_profile must be a ProjectProfile or null")
         for current, maximum, label in (
             (self.current_iteration, self.maximum_iterations, "iteration"),
             (self.current_repair_iteration, self.maximum_repair_iterations, "repair iteration"),
@@ -361,6 +367,9 @@ class CodingTaskState:
         data["pending_tool_call"] = (
             asdict(self.pending_tool_call) if self.pending_tool_call else None
         )
+        data["project_profile"] = (
+            self.project_profile.to_dict() if self.project_profile else None
+        )
         return data
 
     @classmethod
@@ -398,6 +407,10 @@ class CodingTaskState:
         payload["final_report"] = FinalReport.from_dict(final_report) if final_report else None
         pending = payload.get("pending_tool_call")
         payload["pending_tool_call"] = PendingToolCall.from_dict(pending) if pending else None
+        project_profile = payload.get("project_profile")
+        payload["project_profile"] = (
+            ProjectProfile.from_dict(project_profile) if project_profile else None
+        )
         payload["run_budget"] = RunBudget.from_dict(payload.get("run_budget", {}))
         payload["usage_ledger"] = UsageLedger.from_dict(payload.get("usage_ledger", {}))
         state = cls(**payload)

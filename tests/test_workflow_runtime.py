@@ -118,6 +118,8 @@ class WorkflowRuntimeTests(WorkspaceTestCase):
         )
         self.assertEqual(state.current_status, WorkflowStatus.FAILED)
         self.assertIn("task_type", state.errors[-1].message)
+        self.assertIsNotNone(state.project_profile)
+        self.assertEqual(state.project_profile.workspace_name, self.test_root.name)
 
     def test_read_only_analysis_completes_without_mutation_or_tests(self) -> None:
         self.write_runtime_skills()

@@ -27,10 +27,20 @@ def _migrate_version_1_to_2(payload: dict[str, Any]) -> dict[str, Any]:
     return migrated
 
 
+def _migrate_version_2_to_3(payload: dict[str, Any]) -> dict[str, Any]:
+    migrated = deepcopy(payload)
+    migrated.setdefault("project_profile", None)
+    migrated["schema_version"] = 3
+    return migrated
+
+
 class TaskStateMigrator:
     """Apply every required migration without mutating caller-owned data."""
 
-    _migrations: dict[int, Migration] = {1: _migrate_version_1_to_2}
+    _migrations: dict[int, Migration] = {
+        1: _migrate_version_1_to_2,
+        2: _migrate_version_2_to_3,
+    }
 
     @staticmethod
     def version_of(payload: object) -> int:
