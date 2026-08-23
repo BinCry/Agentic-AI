@@ -100,6 +100,15 @@ tả trong [Structured Final Reporting](docs/structured-final-report.md).
 Benchmark, metric và failure analysis được mô tả trong
 [Evaluation and Benchmarking](docs/evaluation.md).
 
+Run the no-API-key capability baseline (tests, coverage, wheel smoke, read-only
+workflow, D-drive audit, and retrieval evaluation) with:
+
+```powershell
+python -B -m coding_agent --workspace D:\Agentic-AI baseline `
+  --output .tmp/quality/baseline.json `
+  --require-coverage
+```
+
 ## Chạy test chỉ trên ổ D
 
 ```powershell

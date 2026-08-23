@@ -1,8 +1,8 @@
 ---
 phase: 1
-title: "Baseline and State Migration"
-status: pending
-effort: "2-3 days"
+title: Baseline and State Migration
+status: completed
+effort: 2-3 days
 dependsOn: []
 ---
 
@@ -30,13 +30,17 @@ Freeze a reproducible baseline, introduce explicit saved-state migration, and de
 |---|---|---|
 | Modify | `src/coding_agent/models/task_state.py` | Use shared schema version; persist typed budget/usage fields |
 | Create | `src/coding_agent/models/run_accounting.py` | `RunBudget`, `UsageLedger`, validation, serialization |
+| Create | `src/coding_agent/models/task_state_schema.py` | Single current/minimum schema-version owner |
 | Create | `src/coding_agent/storage/task_state_migrations.py` | Ordered v1-to-v2 migration registry |
 | Modify | `src/coding_agent/storage/task_store.py` | Backup, migrate, validate, atomic persistence |
-| Modify | `src/coding_agent/evaluation/runner.py` | Emit versioned baseline metadata |
-| Modify | `src/coding_agent/cli.py` | Add narrow `baseline` entry point; begin parser decomposition |
+| Modify | `src/coding_agent/storage/checkpoint_store.py` | Restore/list legacy checkpoints through the migration chain |
+| Create | `src/coding_agent/evaluation/baseline*.py` | Versioned baseline orchestration and isolated quality gates |
+| Create | `src/coding_agent/cli_baseline.py` | Narrow baseline CLI parser/handler |
+| Modify | `src/coding_agent/cli.py` | Register `baseline` while preserving existing commands |
 | Create | `tests/fixtures/task_states/version-1-task.json` | Golden compatibility fixture with no secrets |
 | Create | `tests/test_task_state_migrations.py` | Migration and future-version rejection |
-| Modify | `tests/test_task_state.py`, `tests/test_evaluation.py`, `tests/test_cli.py` | Accounting and baseline contracts |
+| Create | `tests/test_baseline.py` | Gate aggregation, optional tooling, metrics, CLI exit contract |
+| Modify | `src/coding_agent/tools/repository_service.py`, `tests/test_repository_tools.py` | Correct ignore filtering for nested workspace roots |
 | Update | `docs/reliability-and-recovery.md`, `docs/evaluation.md` | User-visible schema/recovery commands |
 
 ## Test Scenario Matrix
@@ -74,11 +78,11 @@ Freeze a reproducible baseline, introduce explicit saved-state migration, and de
 
 ## Success Criteria
 
-- [ ] All historical fixtures load, migrate, and round-trip deterministically.
-- [ ] Unknown future schemas cannot be silently rewritten.
-- [ ] Baseline JSON records test count, branch coverage, wheel smoke, runtime roots, and evaluation metrics.
-- [ ] Existing read-only and approval workflows remain behaviorally unchanged.
-- [ ] Full suite, branch coverage threshold, wheel smoke, and secret scan pass.
+- [x] All historical fixtures load, migrate, and round-trip deterministically.
+- [x] Unknown future schemas cannot be silently rewritten.
+- [x] Baseline JSON records test count, branch coverage, wheel smoke, runtime roots, and evaluation metrics.
+- [x] Existing read-only and approval workflows remain behaviorally unchanged.
+- [x] Full suite, branch coverage threshold, wheel smoke, and secret scan pass.
 
 ## Risks and Rollback
 

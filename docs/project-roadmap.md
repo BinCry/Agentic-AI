@@ -1,5 +1,12 @@
 # Project Roadmap
 
+Production coding-agent capability roadmap started on 2026-08-23. Phase 1/9
+completed: saved-task schema migration with immutable legacy backup, typed run
+accounting, and a real no-API-key baseline command. Verified 164 tests, 82.49%
+branch coverage, wheel smoke, read-only workflow, D-drive runtime policy, and
+retrieval recall/citation correctness 1.0. See the
+[Phase 1 report](../plans/260823-2240-coding-agent-capability-completion/reports/pm-260823-2316-phase-01-completion.md).
+
 OpenRouter Ox Alpha provider and structured-output startup hardening completed
 on 2026-08-23: live Responses API, environment-only credential, complete decision
 schemas, a mutation-free analysis path, bounded reasoning/output, 150 tests, and 82%

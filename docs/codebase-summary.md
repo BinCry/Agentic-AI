@@ -16,12 +16,15 @@
   tools with approval and trace boundaries.
 - `src/coding_agent/rag`: persistent repository index, grounded retrieval and
   stale-evidence recovery.
-- `src/coding_agent/storage`: workspace containment và atomic JSON task store.
-- `src/coding_agent/evaluation`: versioned retrieval benchmark and honest
-  coding-agent metrics.
+- `src/coding_agent/storage`: workspace containment, atomic JSON task store,
+  ordered schema migration, immutable legacy backup, and checkpoint compatibility.
+- `src/coding_agent/evaluation`: versioned retrieval benchmark, honest
+  coding-agent metrics, and isolated unit/coverage/wheel/runtime baseline gates.
+- `src/coding_agent/models/run_accounting.py`: typed future run budgets and
+  aggregate provider usage without prompts, credentials, or reasoning text.
 - `src/coding_agent/observability`: append-only trace, output-size cap và redaction.
-- `src/coding_agent/cli.py`: task operations, executable `run`, approvals, MCP,
-  reporting and evaluation.
+- `src/coding_agent/cli.py` + `cli_baseline.py`: task operations, executable
+  `run`, approvals, MCP, reporting, evaluation, and reproducible baseline.
 
 ## Tài sản tương thích được giữ
 

@@ -36,6 +36,16 @@ class RepositoryToolTests(WorkspaceTestCase):
         files = RepositoryReadService(self.make_paths()).list_files("src")
         self.assertEqual(files, ["src/module.py"])
 
+    def test_ignored_name_in_workspace_ancestor_does_not_hide_repository(self) -> None:
+        workspace = self.test_root / ".coding-agent" / "nested-workspace"
+        (workspace / "src").mkdir(parents=True)
+        (workspace / "src" / "module.py").write_text("value = 1\n", encoding="utf-8")
+        paths = WorkspacePaths.create(workspace).ensure()
+
+        files = RepositoryReadService(paths).list_files("src")
+
+        self.assertEqual(files, ["src/module.py"])
+
     def test_patch_requires_matching_digest_and_applies_atomically(self) -> None:
         target = self.test_root / "module.py"
         original = "a = 1\nb = 2\n"

@@ -1,14 +1,22 @@
 ---
-title: "Production Coding Agent Capability Completion"
-description: "Incrementally close verified coding-agent gaps without replacing the durable Python core."
-status: pending
+title: Production Coding Agent Capability Completion
+description: >-
+  Incrementally close verified coding-agent gaps without replacing the durable
+  Python core.
+status: in-progress
 priority: P1
-branch: "main"
-tags: [coding-agent, safety, execution, context, mcp, evaluation]
+branch: main
+tags:
+  - coding-agent
+  - safety
+  - execution
+  - context
+  - mcp
+  - evaluation
 blockedBy: []
 blocks: []
-created: "2026-08-23T15:43:12.311Z"
-createdBy: "ck:plan"
+created: '2026-08-23T15:43:12.311Z'
+createdBy: 'ck:plan'
 source: skill
 ---
 
@@ -22,11 +30,13 @@ Scope is intentionally narrower than feature parity: retain the current state ma
 
 Research and gap matrix: [official coding-agent capability study](./research/official-coding-agent-capability-study.md).
 
+Progress: 1/9 phases completed (11%). Phase 2 is next.
+
 ## Phases
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | [Baseline and State Migration](./phase-01-baseline-and-state-migration.md) | Pending |
+| 1 | [Baseline and State Migration](./phase-01-baseline-and-state-migration.md) | Completed |
 | 2 | [Instruction Hierarchy and Project Discovery](./phase-02-instruction-hierarchy-and-project-discovery.md) | Pending |
 | 3 | [Policy Engine and Approval Modes](./phase-03-policy-engine-and-approval-modes.md) | Pending |
 | 4 | [Safe Command and Test Harness](./phase-04-safe-command-and-test-harness.md) | Pending |

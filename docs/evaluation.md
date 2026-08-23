@@ -4,6 +4,31 @@ Phase 6 provides a dependency-free evaluation runner and a versioned benchmark
 fixture. It measures retrieval and, when task-state samples are explicitly
 provided, coding-agent outcomes.
 
+## Reproducible capability baseline
+
+The `baseline` command runs the full unit suite, focused read-only workflow,
+branch coverage, isolated wheel build/install/import, runtime-drive audit, and
+local retrieval evaluation. It does not require an AI-provider API key. Raw
+process output is not persisted; the JSON report stores bounded metadata and
+SHA-256 output digests.
+
+```powershell
+$env:PYTHONPATH = 'D:\Agentic-AI\src'
+python -B -m coding_agent --workspace D:\Agentic-AI baseline `
+  --benchmark tests/fixtures/benchmarks/retrieval_cases.json `
+  --output .tmp/quality/baseline.json `
+  --require-coverage
+```
+
+`--output` must be workspace-relative. Writable test, build, pip-cache, wheel,
+and report artifacts remain inside the D-drive workspace. Missing optional
+coverage tooling is reported as `unavailable`; `--require-coverage` turns that
+condition into a failed required gate.
+
+Verified on 2026-08-23: 164 tests passed, branch coverage 82.49% against the
+80% threshold, wheel smoke passed, read-only workflow passed, and retrieval
+recall/citation correctness were both 1.0. No writable path targeted C.
+
 ## Run evaluation
 
 From PowerShell in `D:\Agentic-AI`:

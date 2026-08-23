@@ -154,7 +154,8 @@ class RepositoryReadService:
         ignored = {".git", ".coding-agent", "node_modules", "__pycache__"}
         files: list[Path] = []
         for candidate in root.rglob("*"):
-            if any(part in ignored for part in candidate.parts):
+            relative_parts = candidate.relative_to(self.paths.workspace_root).parts
+            if any(part in ignored for part in relative_parts):
                 continue
             if not candidate.is_file():
                 continue

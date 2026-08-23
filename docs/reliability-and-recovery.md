@@ -36,6 +36,18 @@ before it replaces the current task state, and all recorded file snapshots are
 restored atomically. Iteration, repair and retrieval counters come from the
 checkpoint; recovery never resets limits.
 
+## Saved-state migration
+
+Task state schema version 2 adds typed `run_budget` and `usage_ledger` records.
+`JsonTaskStore` and `CheckpointStore` migrate version-1 JSON through the same
+pure, ordered migration chain before strict model validation. Unknown future
+versions fail without rewriting the source.
+
+Loading a legacy task is read-only. On its first later save, the original bytes
+are written once to `.coding-agent/task-backups/<task-id>.v1.json` before the
+current state is atomically replaced. An existing backup with different bytes
+blocks the save instead of destroying recovery evidence.
+
 ## Verification
 
 Failure-injection tests cover checkpoint write failure, state/file rollback,
