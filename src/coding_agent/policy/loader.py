@@ -48,7 +48,14 @@ class PolicyLoader:
             raise PolicyConfigurationError(f"invalid policy TOML: {type(exc).__name__}") from exc
         unknown_top = set(payload) - self._top_keys
         rules = payload.get("rules")
-        if unknown_top or payload.get("version") != 1 or not isinstance(rules, list):
+        version = payload.get("version")
+        if (
+            unknown_top
+            or not isinstance(version, int)
+            or isinstance(version, bool)
+            or version != 1
+            or not isinstance(rules, list)
+        ):
             raise PolicyConfigurationError("policy requires version 1, rules, and no unknown keys")
         parsed = tuple(self._parse_rule(item, layer) for item in rules)
         ids = [item.id for item in parsed]

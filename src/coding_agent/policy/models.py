@@ -51,6 +51,10 @@ class PolicyInput:
             raise ValueError("policy input requires tool, state, and argument mapping")
         if not self.risks or any(not isinstance(item, ToolRisk) for item in self.risks):
             raise ValueError("policy input requires typed risks")
+        if not isinstance(self.mode, ApprovalMode) or not isinstance(
+            self.workspace_trust, WorkspaceTrust
+        ):
+            raise ValueError("policy input requires typed mode and workspace trust")
 
 
 @dataclass(slots=True, frozen=True)
@@ -72,6 +76,20 @@ class PolicyRule:
             raise ValueError("policy rule id is invalid")
         if not self.reason_code or (self.tool and self.tool_prefix):
             raise ValueError("policy rule reason or tool matcher is invalid")
+        if (
+            not isinstance(self.layer, PolicyLayer)
+            or not isinstance(self.action, PolicyAction)
+            or not isinstance(self.reason_code, str)
+            or (self.tool is not None and not isinstance(self.tool, str))
+            or (self.tool_prefix is not None and not isinstance(self.tool_prefix, str))
+        ):
+            raise ValueError("policy rule requires typed layer, action, reason, and tool matcher")
+        if (
+            any(not isinstance(item, ToolRisk) for item in self.effects)
+            or any(not isinstance(item, ApprovalMode) for item in self.modes)
+            or any(not isinstance(item, WorkspaceTrust) for item in self.workspace_trust)
+        ):
+            raise ValueError("policy rule effect, mode, and trust matchers must be typed")
         if not (self.tool or self.tool_prefix or self.effects):
             raise ValueError("policy rule requires a tool or effect matcher")
         if any(not key or not isinstance(value, (str, int, float, bool)) for key, value in self.argument_equals):

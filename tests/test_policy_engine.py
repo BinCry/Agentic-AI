@@ -127,6 +127,66 @@ class PolicyEngineTests(WorkspaceTestCase):
         self.assertEqual(payload["risks"], ["workspace-write"])
         json.dumps(payload)
 
+    def test_command_prefix_mode_and_trust_matchers_are_typed_and_conjunctive(self) -> None:
+        rule = PolicyRule(
+            "deny-git-push-command",
+            PolicyLayer.TRUSTED,
+            PolicyAction.DENY,
+            "COMMAND_PREFIX_DENIED",
+            tool="command.run",
+            modes=frozenset({ApprovalMode.AUTO_EDIT}),
+            workspace_trust=frozenset({WorkspaceTrust.TRUSTED}),
+            command_prefix=("git", "push"),
+        )
+        engine = PolicyEngine((rule,))
+
+        denied = engine.evaluate(
+            self.policy_input(
+                ToolRisk.PROCESS,
+                tool="command.run",
+                mode=ApprovalMode.AUTO_EDIT,
+                arguments={"command": ["git", "push", "origin", "main"]},
+            )
+        )
+        unmatched = engine.evaluate(
+            self.policy_input(
+                ToolRisk.PROCESS,
+                tool="command.run",
+                mode=ApprovalMode.ASK,
+                arguments={"command": ["git", "push", "origin", "main"]},
+            )
+        )
+
+        self.assertEqual(denied.reason_code, "COMMAND_PREFIX_DENIED")
+        self.assertEqual(unmatched.action, PolicyAction.ASK)
+        self.assertEqual(unmatched.rule_id, "session.process")
+
+    def test_public_models_reject_stringly_typed_authority_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "typed mode"):
+            PolicyInput(
+                "repo.create_file",
+                {},
+                "EDITING",
+                frozenset({ToolRisk.WORKSPACE_WRITE}),
+                "read-only",  # type: ignore[arg-type]
+                WorkspaceTrust.TRUSTED,
+            )
+        with self.assertRaisesRegex(ValueError, "typed layer"):
+            PolicyRule(
+                "bad-layer",
+                "trusted",  # type: ignore[arg-type]
+                PolicyAction.DENY,
+                "BAD_LAYER",
+                tool="repo.create_file",
+            )
+
+    def test_loader_rejects_boolean_schema_version(self) -> None:
+        policy = self.test_root / "boolean-version.toml"
+        policy.write_text("version=true\nrules=[]\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(PolicyConfigurationError, "version 1"):
+            PolicyLoader(WorkspacePaths.create(self.test_root).ensure()).load_explicit(policy)
+
 
 if __name__ == "__main__":
     unittest.main()
