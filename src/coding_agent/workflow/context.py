@@ -2,72 +2,137 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 from typing import Any
 
 from ..models.decision_schemas import decision_output_schema
+from ..models.records import RepositoryEvidence
 from ..models.task_state import CodingTaskState
+from ..storage.observation_store import ObservationStore
+from .context_budget import ContextBudget, ContextBudgeter, ContextSection
 
 
 class ContextCompactor:
-    """Keep decision context useful while enforcing a hard serialized bound."""
+    """Compatibility wrapper over priority-based context budgeting."""
 
     def __init__(self, maximum_chars: int = 24_000) -> None:
         if maximum_chars < 1_000:
             raise ValueError("maximum context must be at least 1000 characters")
         self.maximum_chars = maximum_chars
+        self.budgeter = ContextBudgeter()
+        self.budget = ContextBudget(
+            maximum_tokens=max(1, maximum_chars // 3),
+            maximum_chars=maximum_chars,
+        )
 
     def compact(self, payload: dict[str, Any]) -> str:
-        working = dict(payload)
-        content = self._encode(working)
-        if len(content) <= self.maximum_chars:
-            return content
-        evidence = list(working.get("evidence", []))
-        for item in evidence:
-            item["content"] = item.get("content", "")[:1_000]
-        working["evidence"] = evidence[:4]
-        working["recent_errors"] = list(working.get("recent_errors", []))[-2:]
-        working["recent_tools"] = list(working.get("recent_tools", []))[-3:]
-        working["recent_tests"] = list(working.get("recent_tests", []))[-2:]
-        content = self._encode(working)
-        if len(content) <= self.maximum_chars:
-            return content
-        preserved = {
-            key: working[key]
-            for key in ("decision", "output_schema")
-            if key in working
-        }
-        remainder = {key: value for key, value in working.items() if key not in preserved}
-        prefix = self._encode(remainder)
-        compacted = self._encode(
-            {**preserved, "truncated": True, "context_prefix": prefix}
-        )
-        if len(self._encode({**preserved, "truncated": True, "context_prefix": ""})) > self.maximum_chars:
-            prefix = content[: max(1, self.maximum_chars - 64)]
-            compacted = self._encode({"truncated": True, "context_prefix": prefix})
-        while len(compacted) > self.maximum_chars and prefix:
-            prefix = prefix[: max(1, len(prefix) - 256)]
-            compacted_payload = (
-                {**preserved, "truncated": True, "context_prefix": prefix}
-                if preserved and len(
-                    self._encode({**preserved, "truncated": True, "context_prefix": ""})
-                ) <= self.maximum_chars
-                else {"truncated": True, "context_prefix": prefix}
+        if not isinstance(payload, dict):
+            raise TypeError("context payload must be an object")
+        sections = [
+            ContextSection(
+                key,
+                value,
+                self._priority(key),
+                required=key in self._required_keys(),
+                fallback=self._fallback(key, value),
             )
-            compacted = self._encode(compacted_payload)
-        return compacted
+            for key, value in payload.items()
+            if key != "truncated"
+        ]
+        return self.budgeter.project(sections, self.budget).to_json()
 
     @staticmethod
-    def _encode(payload: dict[str, Any]) -> str:
-        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    def _priority(key: str) -> int:
+        return {
+            "decision": 110,
+            "output_schema": 109,
+            "workflow_mode": 105,
+            "task_id": 104,
+            "issue": 103,
+            "problem": 102,
+            "status": 101,
+            "acceptance_criteria": 100,
+            "limits": 99,
+            "active_skill": 96,
+            "project": 95,
+            "evidence": 90,
+            "retrieval_queries": 85,
+            "plan": 80,
+            "plan_progress": 79,
+            "debug": 78,
+            "modified_files": 77,
+            "observations": 70,
+            "output_requirements": 108,
+            "recent_tests": 40,
+            "recent_errors": 30,
+            "recent_tools": 20,
+        }.get(key, 10)
+
+    @staticmethod
+    def _required_keys() -> frozenset[str]:
+        return frozenset(
+            {
+                "decision",
+                "output_schema",
+                "workflow_mode",
+                "task_id",
+                "issue",
+                "status",
+                "evidence",
+            }
+        )
+
+    @staticmethod
+    def _fallback(key: str, value: Any) -> Any:
+        if key == "issue" and isinstance(value, str):
+            return value[:1_000]
+        if key == "evidence" and isinstance(value, list):
+            provenance_fields = (
+                "chunk_id",
+                "path",
+                "lines",
+                "digest",
+                "score",
+                "retrieval_method",
+            )
+            return [
+                {name: item.get(name) for name in provenance_fields}
+                for item in value
+                if isinstance(item, dict)
+            ]
+        if key == "project" and isinstance(value, dict):
+            instructions = []
+            for item in value.get("instructions", []):
+                if isinstance(item, dict):
+                    instructions.append(
+                        {
+                            **item,
+                            "content": str(item.get("content", ""))[:500],
+                            "truncated": True,
+                        }
+                    )
+            return {
+                "workspace_name": value.get("workspace_name"),
+                "ecosystems": value.get("ecosystems", []),
+                "instructions": instructions,
+            }
+        if key in {"recent_tests", "recent_errors", "recent_tools"} and isinstance(
+            value, list
+        ):
+            return value[-1:]
+        return None
 
 
 class ContextProjector:
     """Project state into bounded, decision-relevant fields without raw history."""
 
-    def __init__(self, compactor: ContextCompactor | None = None) -> None:
+    def __init__(
+        self,
+        compactor: ContextCompactor | None = None,
+        observation_store: ObservationStore | None = None,
+    ) -> None:
         self.compactor = compactor or ContextCompactor()
+        self.observation_store = observation_store
 
     def project(self, state: CodingTaskState, decision_name: str) -> str:
         output_schema = decision_output_schema(decision_name)
@@ -101,7 +166,7 @@ class ContextProjector:
                 }
                 for item in sorted(
                     state.retrieved_evidence,
-                    key=lambda item: (-item.score, item.path, item.start_line, item.chunk_id),
+                    key=lambda item: self._evidence_priority(state, item),
                 )[:8]
             ],
             "plan": asdict(state.implementation_plan) if state.implementation_plan else None,
@@ -132,6 +197,7 @@ class ContextProjector:
             ],
             "recent_errors": [asdict(item) for item in state.errors[-4:]],
             "recent_tools": [asdict(item) for item in state.tool_execution_trace[-6:]],
+            "observations": self._observation_references(state),
             "limits": {
                 "iteration": [state.current_iteration, state.maximum_iterations],
                 "repair": [state.current_repair_iteration, state.maximum_repair_iterations],
@@ -150,6 +216,38 @@ class ContextProjector:
                 "pr_summary": "optional pull-request summary",
             }
         return self.compactor.compact(payload)
+
+    def _observation_references(self, state: CodingTaskState) -> list[dict[str, Any]]:
+        if self.observation_store is None:
+            return []
+        records = self.observation_store.list(state.task_id)[-8:]
+        return [
+            {
+                "observation_id": item.observation_id,
+                "tool": item.tool_name,
+                "status": item.status,
+                "summary": item.summary,
+                "result_sha256": item.result_sha256,
+                "artifact_path": item.artifact_path,
+                "result_bytes": item.result_bytes,
+                "truncated": item.truncated,
+            }
+            for item in records
+        ]
+
+    @staticmethod
+    def _evidence_priority(
+        state: CodingTaskState, item: RepositoryEvidence
+    ) -> tuple[bool, float, str, int, str]:
+        citations = list(state.final_citations)
+        citations.extend(state.debug_evidence)
+        if state.implementation_plan is not None:
+            citations.extend(state.implementation_plan.evidence_citations)
+        cited = any(
+            citation.replace("\\", "/").startswith(f"{item.path}:")
+            for citation in citations
+        )
+        return (not cited, -item.score, item.path, item.start_line, item.chunk_id)
 
     @staticmethod
     def _project_context(state: CodingTaskState) -> dict[str, Any] | None:

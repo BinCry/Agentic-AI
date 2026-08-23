@@ -19,6 +19,7 @@ from ..models.decisions import (
 )
 from ..models.task_state import CodingTaskState
 from ..project.instructions import InstructionResolver, merge_scoped_instructions
+from ..storage.observation_store import ObservationStore
 from ..tools.contracts import ToolRequest, ToolResult
 from ..tools.executor import ToolExecutor
 from ..skills.router import SkillRouter
@@ -42,8 +43,15 @@ class OrchestrationResult:
 class PromptAssembler:
     """Build bounded, source-grounded prompts without leaking raw large state."""
 
-    def __init__(self, *, maximum_context_chars: int = 24_000) -> None:
-        self.projector = ContextProjector(ContextCompactor(maximum_context_chars))
+    def __init__(
+        self,
+        *,
+        maximum_context_chars: int = 24_000,
+        observation_store: ObservationStore | None = None,
+    ) -> None:
+        self.projector = ContextProjector(
+            ContextCompactor(maximum_context_chars), observation_store
+        )
 
     def assemble(self, state: CodingTaskState, decision_name: str) -> list[LLMMessage]:
         content = self.projector.project(state, decision_name)
@@ -98,7 +106,9 @@ class CodingWorkflowOrchestrator:
         self.maximum_steps = maximum_steps
         self.approval_handler = approval_handler
         self.save_state = save_state
-        self.prompts = prompt_assembler or PromptAssembler()
+        self.prompts = prompt_assembler or PromptAssembler(
+            observation_store=executor.observations
+        )
         self.skill_router = skill_router
         self.skill_workspace = executor.policy.paths.workspace_root
         self.structured = StructuredOutputService(provider, maximum_retries=structured_retries)
