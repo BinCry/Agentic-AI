@@ -103,6 +103,26 @@ python -B -m coding_agent --workspace D:\Agentic-AI run `
 `--auto-approve` does not broaden the tool allowlist, path boundary, grounding
 requirements, test profiles, retry limits, or completion invariants.
 
+## Safe local verification
+
+Verification discovery maps observed repositories to typed profiles. Python
+repositories with `tests/test*.py` expose `python.test`; the compatibility name
+`unit` resolves to it. A Node `scripts.test` entry is executable only when it is
+exactly reducible to direct `node --test`; npm/yarn/pnpm script shells are not
+used. The legacy `fixture` profile remains available for regression workflows.
+
+`process.run` accepts a registered executable plus argv, a contained cwd, a
+small environment allowlist, and limits no larger than the tool's 60-second and
+64-KB budgets. `python -c`, pytest plugins, package install/exec, shell syntax,
+outside-workspace test paths, unknown executables, and credential-like
+environment values are rejected before approval or spawn.
+
+Local execution requires explicit `--workspace-trust trusted` and still pauses
+for approval in `auto-edit`. Approval is not isolation: trusted repository test
+code runs with the current user process authority and may itself perform side
+effects. Untrusted repositories remain non-executable until a future isolated
+boundary is configured.
+
 ## Exit Contract
 
 | Exit | Meaning | Output |

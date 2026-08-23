@@ -28,6 +28,12 @@ decisions, strict TOML rules, independent approval mode/workspace trust,
 side-effect-free policy explanation, auto-edit checkpoint coverage, and
 negative tests for remote, destructive, untrusted-process and secret inputs.
 
+The production completion roadmap Phase 4 adds a trusted-local execution
+boundary, strict argv/cwd/environment/time/output validation, structured
+process results, direct shell-free Python/Node test profiles, typed profile
+selection, and denial tests for interpreter, package-manager, shell, path,
+credential, budget, and untrusted-workspace escapes.
+
 Phase 3 adds AST/Markdown chunking, ingestion filters, persistent SQLite
 indexing, hybrid retrieval, grounded citations, stale recovery and retrieval
 metrics. See [Repository RAG](repository-rag.md).
@@ -71,7 +77,7 @@ Bộ test Phase 1 bao phủ:
 - bounded end-to-end orchestration with deterministic fixture provider;
 - Windows path-separator normalization and raw-byte patch digest checks.
 
-The latest full verification passed 193 tests with 83.06% combined branch
+The latest full verification passed 210 tests with 83.11% combined branch
 coverage. `pyproject.toml` enforces an 80% minimum and CI repeats the gate on
 Python 3.11 and 3.12 before wheel/installed-CLI smoke.
 

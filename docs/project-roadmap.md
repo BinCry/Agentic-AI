@@ -1,12 +1,13 @@
 # Project Roadmap
 
-Production coding-agent capability roadmap started on 2026-08-23. Phases 1–3/9
+Production coding-agent capability roadmap started on 2026-08-23. Phases 1–4/9
 completed: state migration/baseline, bounded scoped instructions and offline
-project discovery, then layered policy/trust/approval modes. Verified 193 tests, 83.06%
+project discovery, layered policy/trust/approval modes, then safe argv execution
+and shell-free Python/Node verification. Verified 210 tests, 83.11%
 branch coverage, wheel smoke, read-only workflow, D-drive runtime policy, and
 retrieval recall/citation correctness 1.0. See the
 [Phase 1 report](../plans/260823-2240-coding-agent-capability-completion/reports/pm-260823-2316-phase-01-completion.md)
-and [Phase 3 report](../plans/260823-2240-coding-agent-capability-completion/reports/pm-260823-2348-phase-03-completion.md).
+and [Phase 4 report](../plans/260823-2240-coding-agent-capability-completion/reports/pm-260824-0013-phase-04-completion.md).
 
 OpenRouter Ox Alpha provider and structured-output startup hardening completed
 on 2026-08-23: live Responses API, environment-only credential, complete decision

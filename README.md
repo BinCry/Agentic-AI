@@ -123,6 +123,13 @@ python -B -m coding_agent --workspace D:\Agentic-AI policy check `
 Workspace policy files may only deny; an explicit `--policy-file` is treated as
 trusted input but still cannot override built-in or session safety decisions.
 
+Local verification is intentionally narrower than a terminal. The agent can
+run discovered Python `unittest` profiles and Node's built-in `node --test`
+through argv with `shell=False`. Every process remains approval-gated, requires
+`--workspace-trust trusted`, uses D-drive temp/home roots, and returns bounded,
+redacted excerpts plus output digests. Package install/exec, `python -c`, npm
+scripts, shell syntax, path escape, and secret environment forwarding are denied.
+
 ## Chạy test chỉ trên ổ D
 
 ```powershell
@@ -146,6 +153,10 @@ src/coding_agent/
   workflow/        trạng thái, transition và giới hạn vòng lặp
   skills/          đọc/routing các SKILL.md hiện hữu
   llm/             provider-neutral interface và JSON validation
+  policy/          allow/deny/ask, mode, trust và layered rules
+  execution/       trusted-local argv boundary, không shell parser
+  verification/    Python/Node test profile discovery và execution
+  tools/           repository, process, test và Git facade có approval
   storage/         workspace policy và atomic task store
   observability/   append-only JSONL trace có redaction
 tests/             unit và CLI integration tests

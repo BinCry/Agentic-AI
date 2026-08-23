@@ -15,14 +15,15 @@ remain owned by the controller.
 | `repo.retrieve` | Grounded hybrid retrieval with line citations | No | Same read states |
 | `repo.create_file` | Create a new file without overwrite | Ask; auto-edit may allow | `EDITING`, `DEBUGGING` |
 | `repo.apply_patch` | Apply a single-file unified patch | Ask; auto-edit may allow | `EDITING`, `DEBUGGING` |
-| `test.detect_framework` | Detect bounded Python test conventions | No | Same read states |
-| `test.run` | Run an allowlisted `fixture` or `unit` profile | Ask; never auto-edit | `TESTING`, `DEBUGGING` |
+| `test.detect_framework` | Detect bounded Python/Node test profiles | No | Same read states |
+| `test.run` | Run a discovered `unit`, `fixture`, `python.test`, or `node.test` profile | Ask; never auto-edit | `TESTING`, `DEBUGGING` |
+| `process.run` | Run registered verification argv with structured output | Ask; never auto-edit | `TESTING`, `DEBUGGING` |
 | `git.status` | Read-only short status | No | Read states |
 | `git.diff` | Read-only diff, optionally scoped to paths | No | Read states |
 | `git.changed_files` | List files changed from `HEAD` | No | Read states |
 
-There is no arbitrary shell tool. Git mutation, network commands, credential
-access and destructive commands are outside the Phase 2 surface.
+There is no arbitrary shell tool. Package install/exec, generic network tools,
+credential access and destructive commands remain outside the surface.
 
 ## Layered policy and trust
 
@@ -61,6 +62,11 @@ requirement, and redacted arguments.
   allowlisted. Unknown fields and unknown tools are rejected.
 - Subprocesses use fixed argument arrays with `shell=False`, a reduced
   environment, bounded stdout/stderr, hard timeouts and process-tree cleanup.
+- Local process execution requires explicit workspace trust. Python is limited
+  to contained `unittest` discovery; Node is limited to direct `node --test`.
+  Package-manager scripts are inspected but never passed to a shell.
+- Process results contain exit/timeout/truncation/duration, SHA-256 digests and
+  redacted excerpts. Full environment maps and unbounded output are not returned.
 - Patch operations require the caller's SHA-256 digest of the source file.
   A stale digest or mismatched hunk is rejected before writing.
 - Mutating and test requests enter `WAITING_APPROVAL`. Approval is bound to the

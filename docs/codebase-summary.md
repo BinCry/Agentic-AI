@@ -16,6 +16,10 @@
   tools with approval and trace boundaries.
 - `src/coding_agent/policy`: typed risk/mode/trust models, strict TOML loading,
   immutable safety baseline, deterministic precedence and redacted explanation.
+- `src/coding_agent/execution`: explicit trusted-local boundary over the bounded
+  argv process primitive; untrusted workspaces have no local execution path.
+- `src/coding_agent/verification`: deterministic Python/Node profile discovery,
+  shell-free command translation, typed selection, and structured execution.
 - `src/coding_agent/rag`: persistent repository index, grounded retrieval and
   stale-evidence recovery.
 - `src/coding_agent/storage`: workspace containment, atomic JSON task store,

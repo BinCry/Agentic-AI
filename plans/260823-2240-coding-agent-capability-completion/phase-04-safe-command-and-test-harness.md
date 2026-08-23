@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Safe Command and Test Harness"
-status: pending
+status: completed
 effort: "5-6 days"
 dependsOn: [2, 3]
 ---
@@ -86,12 +86,12 @@ Add the missing agent-computer interface: a bounded argv-based command tool and 
 
 ## Success Criteria
 
-- [ ] No supported path invokes a shell parser.
-- [ ] Approval cannot make an untrusted workspace executable without an isolation boundary.
-- [ ] Injection/path/environment/timeout/output negative tests all pass.
-- [ ] Python and Node fixtures can run local verification with structured results.
-- [ ] Network, install, destructive, and unknown commands never auto-execute.
-- [ ] Existing `test.run` callers and MCP server remain compatible.
+- [x] No supported path invokes a shell parser.
+- [x] Approval cannot make an untrusted workspace executable without an isolation boundary.
+- [x] Injection/path/environment/timeout/output negative tests all pass.
+- [x] Python and Node fixtures can run local verification with structured results.
+- [x] Network, install, destructive, and unknown commands never auto-execute.
+- [x] Existing `test.run` callers and MCP server remain compatible.
 
 ## Risks and Rollback
 

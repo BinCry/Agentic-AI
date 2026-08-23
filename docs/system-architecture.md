@@ -99,6 +99,15 @@ analysis is pinned by controller-owned `read_only=true`, stores
 an analysis-specific completion contract whose controller-built report rejects
 any recorded mutation or test execution.
 
+## Safe command boundary
+
+Safe execution is split into `CommandService` and `ExecutionBoundary`.
+`CommandService.prepare()` performs side-effect-free argv, cwd, environment and
+budget validation. `LocalTrustedBoundary` revalidates cwd immediately before a
+`shell=False` spawn and refuses untrusted workspaces. `VerificationRegistry`
+translates only contained Python unittest discovery and exact direct Node test
+profiles; package-manager script shells are not an execution boundary.
+
 ## Phase 4 orchestration boundary
 
 ```mermaid
