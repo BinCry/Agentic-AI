@@ -19,7 +19,7 @@ class BoundedProcessResult:
     timed_out: bool
     stdout_truncated: bool
     stderr_truncated: bool
-    duration_ms: int
+    duration_ms: int = 0
 
 
 def run_bounded(
