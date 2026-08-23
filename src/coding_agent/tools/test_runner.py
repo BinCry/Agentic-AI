@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 from ..models.records import TestExecution
 from ..policy.models import WorkspaceTrust
@@ -37,13 +38,10 @@ class AllowlistedTestRunner:
         try:
             detected = self.registry.detect(profile)
             command = detected.command
-            command = type(command)(
-                command.executable,
-                command.arguments,
-                command.cwd,
-                command.environment,
-                timeout_seconds,
-                self.maximum_output_bytes,
+            command = replace(
+                command,
+                timeout_seconds=timeout_seconds,
+                maximum_output_bytes=self.maximum_output_bytes,
             )
             result = self.registry.commands.execute(
                 self.registry.commands.prepare(command),

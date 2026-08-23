@@ -109,6 +109,23 @@ class ToolPermissionPolicyTests(WorkspaceTestCase):
                 paths, workspace_trust=WorkspaceTrust.UNTRUSTED
             ).evaluate(valid)
 
+    def test_process_request_cannot_widen_tool_timeout_or_output_limits(self) -> None:
+        base = {
+            "executable": "python",
+            "arguments": ["-m", "unittest"],
+        }
+        cases = (
+            ({**base, "timeout_seconds": 60.01}, "timeout_seconds exceeds"),
+            ({**base, "maximum_output_bytes": 64_001}, "maximum_output_bytes exceeds"),
+        )
+        for arguments, message in cases:
+            with self.subTest(arguments=arguments), self.assertRaisesRegex(
+                ToolArgumentError, message
+            ):
+                self.make_policy().evaluate(
+                    self.request("process.run", arguments, "TESTING")
+                )
+
     def test_legacy_custom_spec_cannot_silently_lose_approval(self) -> None:
         (self.test_root / "module.py").write_text("value = 1\n", encoding="utf-8")
         legacy = ToolSpec(

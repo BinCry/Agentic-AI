@@ -158,6 +158,18 @@ class ToolPermissionPolicy:
         self._validate_arguments(spec.name, normalized)
         self._validate_paths(spec, normalized)
         if spec.name == "process.run":
+            requested_timeout = normalized.get("timeout_seconds", spec.timeout_seconds)
+            requested_output = normalized.get(
+                "maximum_output_bytes", spec.maximum_output_bytes
+            )
+            if requested_timeout > spec.timeout_seconds:
+                raise ToolArgumentError(
+                    f"timeout_seconds exceeds tool limit: {spec.timeout_seconds:g}"
+                )
+            if requested_output > spec.maximum_output_bytes:
+                raise ToolArgumentError(
+                    f"maximum_output_bytes exceeds tool limit: {spec.maximum_output_bytes}"
+                )
             try:
                 CommandService(self.paths).prepare(
                     ProcessCommandRequest(
@@ -165,12 +177,8 @@ class ToolPermissionPolicy:
                         arguments=tuple(normalized.get("arguments", ())),
                         cwd=normalized.get("cwd", "."),
                         environment=normalized.get("environment", {}),
-                        timeout_seconds=normalized.get(
-                            "timeout_seconds", spec.timeout_seconds
-                        ),
-                        maximum_output_bytes=normalized.get(
-                            "maximum_output_bytes", spec.maximum_output_bytes
-                        ),
+                        timeout_seconds=requested_timeout,
+                        maximum_output_bytes=requested_output,
                     )
                 )
             except CommandValidationError as exc:

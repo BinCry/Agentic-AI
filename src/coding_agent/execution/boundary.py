@@ -31,11 +31,14 @@ class LocalTrustedBoundary:
             raise ExecutionBoundaryError(
                 "local process execution requires an explicitly trusted workspace"
             )
+        cwd = self.paths.resolve_workspace_path(request.cwd, must_exist=True)
+        if not cwd.is_dir():
+            raise ExecutionBoundaryError("command cwd no longer resolves to a directory")
         environment = safe_environment(self.paths.workspace_root, self.paths.runtime_root)
         environment.update(dict(request.environment))
         result = run_bounded(
             list(request.argv),
-            cwd=request.cwd,
+            cwd=cwd,
             timeout_seconds=request.timeout_seconds,
             maximum_output_bytes=request.maximum_output_bytes,
             environment=environment,
