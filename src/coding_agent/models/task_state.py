@@ -9,6 +9,8 @@ from typing import Any
 from uuid import uuid4
 
 from .decisions import ImplementationPlan, ReviewFinding
+from .run_accounting import RunBudget, UsageLedger
+from .task_state_schema import CURRENT_TASK_SCHEMA_VERSION
 from .records import (
     ActiveSkill,
     ApprovalDecisionRecord,
@@ -75,7 +77,9 @@ class CodingTaskState:
     final_report: FinalReport | None = None
     approval_return_status: WorkflowStatus | None = None
     pending_tool_call: PendingToolCall | None = None
-    schema_version: int = 1
+    run_budget: RunBudget = field(default_factory=RunBudget)
+    usage_ledger: UsageLedger = field(default_factory=UsageLedger)
+    schema_version: int = CURRENT_TASK_SCHEMA_VERSION
     created_at: str = field(default_factory=utc_now)
     updated_at: str = field(default_factory=utc_now)
 
@@ -160,8 +164,22 @@ class CodingTaskState:
             errors.append("invalid current_plan_step_index")
         if not isinstance(self.schema_version, int) or isinstance(self.schema_version, bool):
             errors.append("schema_version must be an integer")
-        elif self.schema_version != 1:
+        elif self.schema_version != CURRENT_TASK_SCHEMA_VERSION:
             errors.append(f"unsupported schema_version: {self.schema_version}")
+        if not isinstance(self.run_budget, RunBudget):
+            errors.append("run_budget must be a RunBudget")
+        else:
+            try:
+                self.run_budget.validate()
+            except ModelValidationError as exc:
+                errors.extend(exc.errors)
+        if not isinstance(self.usage_ledger, UsageLedger):
+            errors.append("usage_ledger must be a UsageLedger")
+        else:
+            try:
+                self.usage_ledger.validate()
+            except ModelValidationError as exc:
+                errors.extend(exc.errors)
         for value, label in (
             (self.acceptance_criteria, "acceptance_criteria"),
             (self.retrieval_queries, "retrieval_queries"),
@@ -380,6 +398,8 @@ class CodingTaskState:
         payload["final_report"] = FinalReport.from_dict(final_report) if final_report else None
         pending = payload.get("pending_tool_call")
         payload["pending_tool_call"] = PendingToolCall.from_dict(pending) if pending else None
+        payload["run_budget"] = RunBudget.from_dict(payload.get("run_budget", {}))
+        payload["usage_ledger"] = UsageLedger.from_dict(payload.get("usage_ledger", {}))
         state = cls(**payload)
         state.validate()
         return state

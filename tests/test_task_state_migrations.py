@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import json
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
+from coding_agent.models.run_accounting import RunBudget, UsageLedger
 from coding_agent.models.task_state import CodingTaskState
 from coding_agent.models.validation import ModelValidationError
+from coding_agent.storage.checkpoint_store import CheckpointStore
 from coding_agent.storage.task_store import JsonTaskStore
+from coding_agent.storage.task_state_migrations import (
+    CURRENT_TASK_SCHEMA_VERSION,
+    TaskStateMigrationError,
+    TaskStateMigrator,
+)
 from coding_agent.storage.workspace import WorkspacePaths
 
 from tests.support import WorkspaceTestCase
@@ -26,15 +34,53 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
         target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return target
 
-    def test_version_1_golden_fixture_preserves_legacy_meaning(self) -> None:
+    def test_version_1_golden_fixture_migrates_without_mutating_input(self) -> None:
         payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        original = deepcopy(payload)
 
-        state = CodingTaskState.from_dict(payload)
+        migrated = TaskStateMigrator().migrate(payload)
+        state = CodingTaskState.from_dict(migrated)
 
+        self.assertEqual(payload, original)
         self.assertEqual(state.task_id, "legacy-v1")
         self.assertEqual(state.original_issue, "Analyze the legacy saved task")
-        self.assertEqual(state.schema_version, 1)
+        self.assertEqual(state.schema_version, CURRENT_TASK_SCHEMA_VERSION)
         self.assertFalse(state.read_only)
+        self.assertEqual(state.run_budget, RunBudget())
+        self.assertEqual(state.usage_ledger, UsageLedger())
+        self.assertEqual(TaskStateMigrator().migrate(migrated), migrated)
+
+    def test_load_then_save_creates_one_immutable_legacy_backup(self) -> None:
+        store = self.make_store()
+        payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        target = self.write_raw_task(store, payload)
+        original = target.read_bytes()
+
+        state = store.load("legacy-v1")
+        self.assertEqual(state.schema_version, CURRENT_TASK_SCHEMA_VERSION)
+        self.assertEqual(target.read_bytes(), original)
+
+        store.save(state)
+        backup = store.paths.resolve_runtime_path("task-backups/legacy-v1.v1.json")
+        self.assertEqual(backup.read_bytes(), original)
+        store.save(state)
+        self.assertEqual(backup.read_bytes(), original)
+        self.assertEqual(len(list(backup.parent.glob("legacy-v1.*.json"))), 1)
+
+    def test_conflicting_legacy_backup_blocks_state_replacement(self) -> None:
+        store = self.make_store()
+        payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        target = self.write_raw_task(store, payload)
+        backup = store.paths.resolve_runtime_path("task-backups/legacy-v1.v1.json")
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        backup.write_text("conflicting backup", encoding="utf-8")
+        state = store.load("legacy-v1")
+        original = target.read_bytes()
+
+        with self.assertRaisesRegex(TaskStateMigrationError, "backup differs"):
+            store.save(state)
+
+        self.assertEqual(target.read_bytes(), original)
 
     def test_store_rejects_future_version_without_rewriting_source(self) -> None:
         store = self.make_store()
@@ -43,7 +89,7 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
         target = self.write_raw_task(store, payload)
         original = target.read_bytes()
 
-        with self.assertRaisesRegex(ModelValidationError, "unsupported schema_version"):
+        with self.assertRaisesRegex(TaskStateMigrationError, "newer than supported"):
             store.load("future-task")
 
         self.assertEqual(target.read_bytes(), original)
@@ -62,6 +108,66 @@ class TaskStateCompatibilityTests(WorkspaceTestCase):
         self.assertEqual(target.read_bytes(), original)
         self.assertEqual(store.load("atomic-task").original_issue, "Original issue")
         self.assertEqual(list(target.parent.glob("*.tmp")), [])
+
+    def test_legacy_checkpoint_restores_through_same_migration_chain(self) -> None:
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+        payload["task_id"] = "legacy-checkpoint"
+        target = paths.resolve_runtime_path(
+            "checkpoints/legacy-checkpoint/checkpoint-0000-0001.json"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({"state": payload}), encoding="utf-8")
+
+        state = CheckpointStore(paths).restore(
+            "legacy-checkpoint", "checkpoint-0000-0001"
+        )
+
+        self.assertEqual(state.schema_version, CURRENT_TASK_SCHEMA_VERSION)
+        self.assertEqual(state.original_issue, "Analyze the legacy saved task")
+
+    def test_run_accounting_validates_records_merges_and_round_trips(self) -> None:
+        state = CodingTaskState.create("Issue", "repo", task_id="accounting")
+        state.run_budget = RunBudget(
+            maximum_model_tokens=100,
+            maximum_command_seconds=30,
+            maximum_output_bytes=4096,
+            maximum_wall_clock_seconds=120,
+        )
+        state.usage_ledger.record(
+            provider="openrouter",
+            model="stealth/ox-alpha",
+            input_tokens=10,
+            output_tokens=5,
+            reasoning_tokens=2,
+            latency_ms=80,
+        )
+        state.usage_ledger.merge(
+            UsageLedger(
+                model_calls=1,
+                input_tokens=2,
+                output_tokens=3,
+                total_tokens=5,
+                latency_ms=20,
+                providers=["openai"],
+                models=["gpt-test"],
+            )
+        )
+
+        restored = CodingTaskState.from_dict(state.to_dict())
+
+        self.assertEqual(restored.run_budget, state.run_budget)
+        self.assertEqual(restored.usage_ledger.total_tokens, 20)
+        self.assertEqual(restored.usage_ledger.model_calls, 2)
+        self.assertEqual(restored.usage_ledger.providers, ["openai", "openrouter"])
+        with self.assertRaisesRegex(ModelValidationError, "maximum_model_tokens"):
+            RunBudget(maximum_model_tokens=True).validate()
+        with self.assertRaisesRegex(ModelValidationError, "input_tokens"):
+            UsageLedger().record(
+                provider="openrouter",
+                model="stealth/ox-alpha",
+                input_tokens="invalid",  # type: ignore[arg-type]
+            )
 
 
 if __name__ == "__main__":

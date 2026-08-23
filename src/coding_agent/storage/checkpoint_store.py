@@ -13,6 +13,7 @@ from uuid import uuid4
 from ..models.records import CheckpointRecord
 from ..models.task_state import CodingTaskState, utc_now
 from .workspace import WorkspacePaths
+from .task_state_migrations import TaskStateMigrator
 
 
 CHECKPOINT_ID_PATTERN = re.compile(r"^checkpoint-[0-9]{4,}-[0-9]{4,}$")
@@ -27,6 +28,7 @@ class CheckpointStore:
 
     def __init__(self, paths: WorkspacePaths) -> None:
         self.paths = paths.ensure()
+        self.migrator = TaskStateMigrator()
 
     def create(
         self,
@@ -74,7 +76,7 @@ class CheckpointStore:
         with target.open("r", encoding="utf-8") as handle:
             payload = json.load(handle)
         state_payload = payload.get("state", payload)
-        state = CodingTaskState.from_dict(state_payload)
+        state = CodingTaskState.from_dict(self.migrator.migrate(state_payload))
         if state.task_id != task_id:
             raise ValueError("checkpoint task identity does not match requested task")
         self._restore_files(payload.get("files", {}))
@@ -87,7 +89,9 @@ class CheckpointStore:
                 continue
             with target.open("r", encoding="utf-8") as handle:
                 payload = json.load(handle)
-            state = CodingTaskState.from_dict(payload.get("state", payload))
+            state = CodingTaskState.from_dict(
+                self.migrator.migrate(payload.get("state", payload))
+            )
             if state.checkpoints:
                 records.append(state.checkpoints[-1])
         return tuple(sorted(records, key=lambda item: item.checkpoint_id))
