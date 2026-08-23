@@ -58,6 +58,13 @@ cause/evidence decision before repair, re-retrieval or failure.
 
 Phase 2 đã triển khai controlled MCP tools sau workspace policy và approval gate. Phase 3 đã bổ sung repository index/retrieval có citation, grounding và bounded stale recovery. Phase 4 đã kết nối structured LLM decisions, retriever và MCP thành agent loop bounded qua `CodingWorkflowOrchestrator`; mutation/test vẫn do controller và approval gate sở hữu.
 
+Project discovery chạy offline trước task mới. `ProjectInspector` ghi snapshot
+manifest, ecosystem, package manager và candidate argv nhưng không thực thi.
+`InstructionResolver` áp dụng `CLAUDE.md` rồi `AGENTS.md` từ root đến scope sâu,
+giới hạn byte/file, giữ SHA-256 provenance và từ chối symlink thoát workspace.
+Context đánh dấu toàn bộ instruction là `untrusted_repository_data`; controller
+policy, approval, read-only và workspace boundary luôn có quyền cao hơn.
+
 Phase 5 bổ sung `ContextProjector`/`ContextCompactor`, `CheckpointStore` và
 `ApprovalLedger`. Checkpoint được ghi trước operation rủi ro, có snapshot file
 bytes để rollback, còn approval ledger độc lập với task JSON để chịu được gián

@@ -29,6 +29,8 @@ Xây dựng một coding agent có thể phân tích issue, tìm bằng chứng 
 - Không có workflow loop vô hạn.
 - Redact metadata theo key nhạy cảm và các mẫu credential/token có nhãn trước khi ghi trace; caller vẫn không được đưa secret thô không nhãn vào metadata.
 - Mọi runtime artifact nằm trong workspace đã chọn trên ổ D.
+- `project inspect` phát hiện Python/Node, manifest, package manager, candidate
+  commands và scoped instructions mà không cần API key hoặc thực thi command.
 
 ## Tiêu chí nghiệm thu hiện tại
 

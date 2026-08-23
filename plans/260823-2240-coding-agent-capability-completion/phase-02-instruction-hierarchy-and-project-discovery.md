@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Instruction Hierarchy and Project Discovery"
-status: pending
+status: completed
 effort: "3-4 days"
 dependsOn: [1]
 ---
@@ -77,11 +77,11 @@ Teach the agent to understand the target repository before planning: discover sc
 
 ## Success Criteria
 
-- [ ] Python and Node fixtures produce deterministic project profiles offline.
-- [ ] Nested instruction scope and precedence pass positive and adversarial tests.
-- [ ] Target repositories without `.claude/skills` run successfully with external `--skill-root`.
-- [ ] Context citations identify every included instruction source.
-- [ ] No discovered content executes or expands safety permissions.
+- [x] Python and Node fixtures produce deterministic project profiles offline.
+- [x] Nested instruction scope and precedence pass positive and adversarial tests.
+- [x] Target repositories without `.claude/skills` run successfully with external `--skill-root`.
+- [x] Context citations identify every included instruction source.
+- [x] No discovered content executes or expands safety permissions.
 
 ## Risks and Rollback
 

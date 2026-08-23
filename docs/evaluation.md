@@ -25,7 +25,7 @@ and report artifacts remain inside the D-drive workspace. Missing optional
 coverage tooling is reported as `unavailable`; `--require-coverage` turns that
 condition into a failed required gate.
 
-Verified on 2026-08-23: 164 tests passed, branch coverage 82.49% against the
+Verified on 2026-08-23 after project discovery: 177 tests passed, branch coverage 82.44% against the
 80% threshold, wheel smoke passed, read-only workflow passed, and retrieval
 recall/citation correctness were both 1.0. No writable path targeted C.
 

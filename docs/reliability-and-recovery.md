@@ -39,6 +39,8 @@ checkpoint; recovery never resets limits.
 ## Saved-state migration
 
 Task state schema version 2 adds typed `run_budget` and `usage_ledger` records.
+Version 3 adds an immutable project-profile snapshot; version-2 tasks migrate
+with a null profile and are inspected only when a new task is created.
 `JsonTaskStore` and `CheckpointStore` migrate version-1 JSON through the same
 pure, ordered migration chain before strict model validation. Unknown future
 versions fail without rewriting the source.
