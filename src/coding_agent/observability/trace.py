@@ -19,6 +19,9 @@ SENSITIVE_TEXT_RE = re.compile(
     r"\s*[:=]\s*(?:bearer\s+)?)"
     r"([^\s,;]+)"
 )
+HIGH_CONFIDENCE_SECRET_RE = re.compile(
+    r"\b(?:sk-(?:or-v1-)?[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})\b"
+)
 
 
 def _redact(value: Any, key: str = "") -> Any:
@@ -38,7 +41,10 @@ def _redact(value: Any, key: str = "") -> Any:
 
 
 def redact_text(value: str) -> str:
-    return SENSITIVE_TEXT_RE.sub(lambda match: f"{match.group(1)}[REDACTED]", value)
+    labelled = SENSITIVE_TEXT_RE.sub(
+        lambda match: f"{match.group(1)}[REDACTED]", value
+    )
+    return HIGH_CONFIDENCE_SECRET_RE.sub("[REDACTED]", labelled)
 
 
 _redact_text = redact_text

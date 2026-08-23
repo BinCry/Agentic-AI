@@ -13,6 +13,7 @@ class ToolCategory(StrEnum):
     READ = "read"
     MUTATION = "mutation"
     TEST = "test"
+    PROCESS = "process"
     GIT = "git"
 
 

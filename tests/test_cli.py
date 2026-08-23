@@ -140,6 +140,10 @@ class CliTests(WorkspaceTestCase):
             "repo.create_file": ({"path": "new.py", "content": "value = 2\n"}, "EDITING"),
             "test.detect_framework": ({}, "EDITING"),
             "test.run": ({"profile": "unit"}, "TESTING"),
+            "process.run": (
+                {"executable": "python", "arguments": ["-m", "unittest"]},
+                "TESTING",
+            ),
             "git.status": ({}, "EDITING"),
             "git.diff": ({"paths": ["module.py"]}, "EDITING"),
             "git.changed_files": ({}, "EDITING"),

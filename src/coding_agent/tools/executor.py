@@ -14,6 +14,9 @@ from ..workflow.engine import InvalidTransitionError, WorkflowEngine
 from ..workflow.status import WorkflowStatus
 from .contracts import PendingToolCall, ToolRequest, ToolResult
 from .contracts import ToolCategory
+from .command_models import CommandRequest as ProcessCommandRequest
+from .command_service import CommandService, CommandValidationError
+from ..execution import ExecutionBoundaryError
 from .git_service import GitToolError, ReadOnlyGitService
 from .patch_service import PatchConflictError, PatchToolError, PatchService
 from .policy import (
@@ -49,6 +52,7 @@ class ToolExecutor:
         self.rag = RepositoryIndex(policy.paths, embedding_provider=embedding_provider)
         self.patch = PatchService(policy.paths)
         self.tests = AllowlistedTestRunner(policy.paths)
+        self.commands = CommandService(policy.paths)
         self.git = ReadOnlyGitService(policy.paths)
         self.checkpoints = CheckpointStore(policy.paths)
         self.approvals = ApprovalLedger(policy.paths)
@@ -78,7 +82,11 @@ class ToolExecutor:
         if decision.requires_approval:
             if state.pending_tool_call is not None:
                 raise ToolExecutionError("another tool approval is already pending")
-            if decision.spec.category in {ToolCategory.MUTATION, ToolCategory.TEST}:
+            if decision.spec.category in {
+                ToolCategory.MUTATION,
+                ToolCategory.TEST,
+                ToolCategory.PROCESS,
+            }:
                 file_paths = (
                     (str(request.arguments["path"]),)
                     if decision.spec.category is ToolCategory.MUTATION and "path" in request.arguments
@@ -182,6 +190,18 @@ class ToolExecutor:
             result = ToolResult.failure(
                 request.tool_name,
                 ErrorCode.TOOL_REQUEST_INVALID.value,
+                str(exc),
+            )
+        except CommandValidationError as exc:
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.TOOL_REQUEST_INVALID.value,
+                str(exc),
+            )
+        except ExecutionBoundaryError as exc:
+            result = ToolResult.failure(
+                request.tool_name,
+                ErrorCode.ACCESS_DENIED.value,
                 str(exc),
             )
         except (RepositoryToolError, PatchToolError, GitToolError, ToolPolicyError) as exc:
@@ -318,6 +338,57 @@ class ToolExecutor:
                     error_message=f"test profile failed: {arguments['profile']}",
                 )
             return ToolResult(request.tool_name, True, asdict(execution))
+        if request.tool_name == "process.run":
+            command = ProcessCommandRequest(
+                executable=arguments["executable"],
+                arguments=tuple(arguments.get("arguments", ())),
+                cwd=arguments.get("cwd", "."),
+                environment=arguments.get("environment", {}),
+                timeout_seconds=arguments.get(
+                    "timeout_seconds", decision.spec.timeout_seconds
+                ),
+                maximum_output_bytes=arguments.get(
+                    "maximum_output_bytes", decision.spec.maximum_output_bytes
+                ),
+            )
+            execution = self.commands.execute(
+                self.commands.prepare(command),
+                trust=self.policy.workspace_trust,
+            )
+            output = execution.to_dict()
+            metadata = {
+                "duration_ms": execution.duration_ms,
+                "stdout_sha256": execution.stdout_sha256,
+                "stderr_sha256": execution.stderr_sha256,
+            }
+            if execution.timed_out:
+                return ToolResult(
+                    request.tool_name,
+                    False,
+                    output=output,
+                    error_code=ErrorCode.TEST_TIMEOUT.value,
+                    error_message="process execution timed out",
+                    timed_out=True,
+                    truncated=execution.truncated,
+                    metadata=metadata,
+                )
+            if execution.exit_code != 0:
+                return ToolResult(
+                    request.tool_name,
+                    False,
+                    output=output,
+                    error_code=ErrorCode.TEST_FAILED.value,
+                    error_message=f"process exited with code {execution.exit_code}",
+                    truncated=execution.truncated,
+                    metadata=metadata,
+                )
+            return ToolResult(
+                request.tool_name,
+                True,
+                output,
+                truncated=execution.truncated,
+                metadata=metadata,
+            )
         if request.tool_name == "git.status":
             return ToolResult(request.tool_name, True, self.git.status())
         if request.tool_name == "git.diff":

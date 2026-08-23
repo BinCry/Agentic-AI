@@ -67,6 +67,48 @@ class ToolPermissionPolicyTests(WorkspaceTestCase):
         with self.assertRaisesRegex(ToolArgumentError, "PROCESS_ISOLATION_REQUIRED"):
             policy.evaluate(self.request("test.run", {"profile": "unit"}, "TESTING"))
 
+    def test_process_command_is_validated_then_approval_gated_in_every_edit_mode(self) -> None:
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        request = self.request(
+            "process.run",
+            {
+                "executable": "python",
+                "arguments": ["-B", "-m", "unittest", "discover", "-s", "tests"],
+            },
+            "TESTING",
+        )
+
+        decision = ToolPermissionPolicy(
+            paths, mode=ApprovalMode.AUTO_EDIT
+        ).evaluate(request)
+
+        self.assertTrue(decision.requires_approval)
+        self.assertEqual(decision.explanation.reason_code, "PROCESS_APPROVAL_REQUIRED")
+        self.assertEqual(
+            decision.normalized_arguments["command"][:3],
+            ["python", "-B", "-m"],
+        )
+
+    def test_invalid_or_untrusted_process_is_denied_before_approval(self) -> None:
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        unsafe = self.request(
+            "process.run",
+            {"executable": "python", "arguments": ["-c", "print('no')"]},
+            "TESTING",
+        )
+        with self.assertRaisesRegex(ToolArgumentError, "registered test modules"):
+            ToolPermissionPolicy(paths).evaluate(unsafe)
+
+        valid = self.request(
+            "process.run",
+            {"executable": "python", "arguments": ["-m", "unittest"]},
+            "TESTING",
+        )
+        with self.assertRaisesRegex(ToolArgumentError, "PROCESS_ISOLATION_REQUIRED"):
+            ToolPermissionPolicy(
+                paths, workspace_trust=WorkspaceTrust.UNTRUSTED
+            ).evaluate(valid)
+
     def test_legacy_custom_spec_cannot_silently_lose_approval(self) -> None:
         (self.test_root / "module.py").write_text("value = 1\n", encoding="utf-8")
         legacy = ToolSpec(

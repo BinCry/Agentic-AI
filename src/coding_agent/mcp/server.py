@@ -149,6 +149,18 @@ class McpToolServer:
             "repo.create_file": {"type": "object", "required": ["path", "content"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
             "test.detect_framework": {"type": "object", "properties": {}},
             "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit", "fixture"]}}},
+            "process.run": {
+                "type": "object",
+                "required": ["executable"],
+                "properties": {
+                    "executable": {"type": "string"},
+                    "arguments": {"type": "array", "items": {"type": "string"}},
+                    "cwd": {"type": "string"},
+                    "environment": {"type": "object", "additionalProperties": {"type": "string"}},
+                    "timeout_seconds": {"type": "number", "minimum": 0.05, "maximum": 600},
+                    "maximum_output_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+                },
+            },
             "git.status": {"type": "object", "properties": {}},
             "git.diff": {"type": "object", "properties": {"paths": {"type": "array", "items": {"type": "string"}}}},
             "git.changed_files": {"type": "object", "properties": {}},

@@ -59,6 +59,7 @@ class CommandServiceTests(WorkspaceTestCase):
             self.unittest_request(cwd=".."),
             self.unittest_request(environment={"OPENROUTER_API_KEY": "secret"}),
             self.unittest_request(environment={"PYTHONPATH": "outside"}),
+            self.unittest_request(environment={"CI": "sk-" + "a" * 32}),
         )
         for request in cases:
             with self.subTest(request=request), self.assertRaises(CommandValidationError):
@@ -81,6 +82,7 @@ class CommandServiceTests(WorkspaceTestCase):
             "class Sample(unittest.TestCase):\n"
             "    def test_output(self):\n"
             "        print('token=definitely-sensitive-value')\n"
+            "        print('sk-' + 'or-v1-' + 'a' * 32)\n"
             "        self.assertTrue(True)\n",
             encoding="utf-8",
         )

@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from ..execution.boundary import ExecutionBoundary, LocalTrustedBoundary
+from ..observability.trace import HIGH_CONFIDENCE_SECRET_RE
 from ..policy.models import WorkspaceTrust
 from ..storage.workspace import WorkspacePaths, WorkspacePolicyError
 from .command_models import CommandRequest, CommandResult, PreparedCommand
@@ -131,5 +132,9 @@ class CommandService:
                 raise CommandValidationError(f"environment variable is not allowlisted: {name}")
             if "\x00" in value or "\r" in value or "\n" in value:
                 raise CommandValidationError(f"environment value is invalid: {name}")
+            if HIGH_CONFIDENCE_SECRET_RE.search(value):
+                raise CommandValidationError(
+                    f"environment value resembles a credential: {name}"
+                )
             output.append((upper, value))
         return tuple(sorted(output))

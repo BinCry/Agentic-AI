@@ -12,6 +12,7 @@ from coding_agent.policy.models import ApprovalMode
 from coding_agent.storage.checkpoint_store import CheckpointStore
 from coding_agent.storage.workspace import WorkspacePaths
 from coding_agent.tools.contracts import ToolRequest
+from coding_agent.tools.command_models import CommandResult
 from coding_agent.tools.executor import ToolExecutionError, ToolExecutor
 from coding_agent.tools.policy import ToolPermissionPolicy
 from coding_agent.workflow.status import WorkflowStatus
@@ -249,6 +250,40 @@ class ToolExecutorTests(WorkspaceTestCase):
                 self.assertEqual(result.error_code, expected_code.value)
                 self.assertEqual(state.errors[-1].code, expected_code.value)
                 self.assertTrue(state.errors[-1].recoverable)
+
+    def test_process_run_uses_exact_approval_and_returns_structured_result(self) -> None:
+        state = self.make_state()
+        state.current_status = WorkflowStatus.TESTING
+        state.validate()
+        executor = self.make_executor()
+        request = ToolRequest(
+            "process-1",
+            state.task_id,
+            "process.run",
+            {"executable": "python", "arguments": ["-m", "unittest"]},
+            WorkflowStatus.TESTING.value,
+        )
+        execution = CommandResult(
+            ("python", "-m", "unittest"),
+            0,
+            False,
+            False,
+            False,
+            12,
+            "a" * 64,
+            "b" * 64,
+            "ok",
+            "",
+        )
+
+        pending = executor.request_execution(state, request)
+        self.assertEqual(pending.error_code, ErrorCode.APPROVAL_REQUIRED.value)
+        with patch.object(executor.commands, "execute", return_value=execution):
+            result = executor.approve_and_execute(state, request)
+
+        self.assertTrue(result.success)
+        self.assertEqual(result.output["stdout_excerpt"], "ok")
+        self.assertEqual(result.metadata["duration_ms"], 12)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,8 @@ from ..policy.models import (
 )
 from ..storage.workspace import WorkspacePaths, WorkspacePolicyError
 from .contracts import ToolCategory, ToolRequest, ToolRisk, ToolSpec
+from .command_models import CommandRequest as ProcessCommandRequest
+from .command_service import CommandService, CommandValidationError
 
 
 class ToolPolicyError(ValueError):
@@ -95,6 +97,15 @@ DEFAULT_TOOL_SPECS = (
         timeout_seconds=60.0,
         risks=frozenset({ToolRisk.PROCESS, ToolRisk.WORKSPACE_WRITE}),
     ),
+    ToolSpec(
+        "process.run",
+        ToolCategory.PROCESS,
+        False,
+        True,
+        TEST_STATES,
+        timeout_seconds=60.0,
+        risks=frozenset({ToolRisk.PROCESS, ToolRisk.WORKSPACE_WRITE}),
+    ),
     ToolSpec("git.status", ToolCategory.GIT, True, False, READ_STATES),
     ToolSpec("git.diff", ToolCategory.GIT, True, False, READ_STATES),
     ToolSpec("git.changed_files", ToolCategory.GIT, True, False, READ_STATES),
@@ -146,6 +157,28 @@ class ToolPermissionPolicy:
         normalized = dict(request.arguments)
         self._validate_arguments(spec.name, normalized)
         self._validate_paths(spec, normalized)
+        if spec.name == "process.run":
+            try:
+                CommandService(self.paths).prepare(
+                    ProcessCommandRequest(
+                        executable=normalized["executable"],
+                        arguments=tuple(normalized.get("arguments", ())),
+                        cwd=normalized.get("cwd", "."),
+                        environment=normalized.get("environment", {}),
+                        timeout_seconds=normalized.get(
+                            "timeout_seconds", spec.timeout_seconds
+                        ),
+                        maximum_output_bytes=normalized.get(
+                            "maximum_output_bytes", spec.maximum_output_bytes
+                        ),
+                    )
+                )
+            except CommandValidationError as exc:
+                raise ToolArgumentError(str(exc)) from exc
+            normalized["command"] = [
+                normalized["executable"],
+                *normalized.get("arguments", []),
+            ]
         explanation = self.engine.evaluate(
             PolicyInput(
                 spec.name,
@@ -199,6 +232,14 @@ class ToolPermissionPolicy:
             "repo.create_file": {"path", "content"},
             "test.detect_framework": set(),
             "test.run": {"profile"},
+            "process.run": {
+                "executable",
+                "arguments",
+                "cwd",
+                "environment",
+                "timeout_seconds",
+                "maximum_output_bytes",
+            },
             "git.status": set(),
             "git.diff": {"paths"},
             "git.changed_files": set(),
@@ -216,6 +257,7 @@ class ToolPermissionPolicy:
             "repo.create_file": ("path", "content"),
             "test.detect_framework": (),
             "test.run": ("profile",),
+            "process.run": ("executable",),
             "git.status": (),
             "git.diff": (),
             "git.changed_files": (),
@@ -223,7 +265,16 @@ class ToolPermissionPolicy:
         missing = [key for key in required[tool_name] if key not in arguments]
         if missing:
             raise ToolArgumentError(f"missing required arguments: {missing}")
-        for key in ("path", "query", "patch", "expected_sha256", "content", "profile"):
+        for key in (
+            "path",
+            "query",
+            "patch",
+            "expected_sha256",
+            "content",
+            "profile",
+            "executable",
+            "cwd",
+        ):
             if key in arguments and (not isinstance(arguments[key], str) or not arguments[key]):
                 raise ToolArgumentError(f"{key} must be a non-empty string")
         if "regular_expression" in arguments and not isinstance(arguments["regular_expression"], bool):
@@ -246,6 +297,29 @@ class ToolPermissionPolicy:
             paths = arguments["paths"]
             if not isinstance(paths, list) or any(not isinstance(item, str) or not item for item in paths):
                 raise ToolArgumentError("paths must be a list of non-empty strings")
+        if "arguments" in arguments:
+            values = arguments["arguments"]
+            if not isinstance(values, list) or any(
+                not isinstance(item, str) or not item for item in values
+            ):
+                raise ToolArgumentError("arguments must be a list of non-empty strings")
+        if "environment" in arguments:
+            environment = arguments["environment"]
+            if not isinstance(environment, dict) or any(
+                not isinstance(key, str)
+                or not key
+                or not isinstance(value, str)
+                for key, value in environment.items()
+            ):
+                raise ToolArgumentError("environment must map non-empty strings to strings")
+        if "timeout_seconds" in arguments:
+            timeout = arguments["timeout_seconds"]
+            if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+                raise ToolArgumentError("timeout_seconds must be a number")
+        if "maximum_output_bytes" in arguments:
+            maximum = arguments["maximum_output_bytes"]
+            if isinstance(maximum, bool) or not isinstance(maximum, int):
+                raise ToolArgumentError("maximum_output_bytes must be an integer")
 
     def _validate_paths(self, spec: ToolSpec, arguments: dict[str, Any]) -> None:
         candidates: list[tuple[str, bool]] = []
