@@ -8,6 +8,8 @@ from coding_agent.errors import ErrorCode
 from coding_agent.models.decisions import ImplementationPlan, ImplementationStep
 from coding_agent.models.records import TestExecution
 from coding_agent.models.task_state import CodingTaskState
+from coding_agent.policy.models import ApprovalMode
+from coding_agent.storage.checkpoint_store import CheckpointStore
 from coding_agent.storage.workspace import WorkspacePaths
 from coding_agent.tools.contracts import ToolRequest
 from coding_agent.tools.executor import ToolExecutionError, ToolExecutor
@@ -100,6 +102,27 @@ class ToolExecutorTests(WorkspaceTestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.output, "value = 1\n")
         self.assertEqual(state.current_status, WorkflowStatus.EDITING)
+
+    def test_auto_edit_mutation_runs_without_prompt_but_keeps_checkpoint(self) -> None:
+        state = self.make_state()
+        paths = WorkspacePaths.create(self.test_root).ensure()
+        executor = ToolExecutor(
+            ToolPermissionPolicy(paths, mode=ApprovalMode.AUTO_EDIT)
+        )
+        request = ToolRequest(
+            "create-auto",
+            state.task_id,
+            "repo.create_file",
+            {"path": "new.py", "content": "x = 1\n"},
+            WorkflowStatus.EDITING.value,
+        )
+
+        result = executor.request_execution(state, request)
+
+        self.assertTrue(result.success)
+        self.assertIsNone(state.pending_tool_call)
+        self.assertEqual((self.test_root / "new.py").read_text(encoding="utf-8"), "x = 1\n")
+        self.assertEqual(len(CheckpointStore(paths).list_records(state.task_id)), 1)
 
     def test_invalid_tool_call_is_rejected_and_traced(self) -> None:
         state = self.make_state()

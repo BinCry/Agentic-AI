@@ -110,6 +110,15 @@ class ToolExecutor:
                 error_message="tool execution is waiting for approval",
                 output=asdict(state.pending_tool_call),
             )
+        if decision.spec.category is ToolCategory.MUTATION:
+            file_paths = (
+                (str(request.arguments["path"]),) if "path" in request.arguments else ()
+            )
+            self.checkpoints.create(
+                state,
+                f"before policy-allowed {request.tool_name}",
+                file_paths=file_paths,
+            )
         return self._dispatch_and_trace(state, request, decision)
 
     def approve_and_execute(self, state: CodingTaskState, request: ToolRequest) -> ToolResult:

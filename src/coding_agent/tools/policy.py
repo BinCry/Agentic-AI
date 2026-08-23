@@ -6,8 +6,17 @@ from dataclasses import dataclass
 import re
 from typing import Any
 
+from ..policy.engine import PolicyEngine
+from ..policy.models import (
+    ApprovalMode,
+    PolicyAction,
+    PolicyDecision as ExplainedPolicyDecision,
+    PolicyInput,
+    PolicyRule,
+    WorkspaceTrust,
+)
 from ..storage.workspace import WorkspacePaths, WorkspacePolicyError
-from .contracts import ToolCategory, ToolRequest, ToolSpec
+from .contracts import ToolCategory, ToolRequest, ToolRisk, ToolSpec
 
 
 class ToolPolicyError(ValueError):
@@ -35,6 +44,7 @@ class PolicyDecision:
     spec: ToolSpec
     requires_approval: bool
     normalized_arguments: dict[str, Any]
+    explanation: ExplainedPolicyDecision
 
 
 READ_STATES = frozenset(
@@ -59,10 +69,32 @@ DEFAULT_TOOL_SPECS = (
     ToolSpec("repo.search_text", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.find_symbols", ToolCategory.READ, True, False, READ_STATES),
     ToolSpec("repo.retrieve", ToolCategory.READ, True, False, READ_STATES),
-    ToolSpec("repo.apply_patch", ToolCategory.MUTATION, False, True, EDIT_STATES),
-    ToolSpec("repo.create_file", ToolCategory.MUTATION, False, True, EDIT_STATES),
+    ToolSpec(
+        "repo.apply_patch",
+        ToolCategory.MUTATION,
+        False,
+        True,
+        EDIT_STATES,
+        risks=frozenset({ToolRisk.WORKSPACE_WRITE}),
+    ),
+    ToolSpec(
+        "repo.create_file",
+        ToolCategory.MUTATION,
+        False,
+        True,
+        EDIT_STATES,
+        risks=frozenset({ToolRisk.WORKSPACE_WRITE}),
+    ),
     ToolSpec("test.detect_framework", ToolCategory.READ, True, False, READ_STATES),
-    ToolSpec("test.run", ToolCategory.TEST, False, True, TEST_STATES, timeout_seconds=60.0),
+    ToolSpec(
+        "test.run",
+        ToolCategory.TEST,
+        False,
+        True,
+        TEST_STATES,
+        timeout_seconds=60.0,
+        risks=frozenset({ToolRisk.PROCESS, ToolRisk.WORKSPACE_WRITE}),
+    ),
     ToolSpec("git.status", ToolCategory.GIT, True, False, READ_STATES),
     ToolSpec("git.diff", ToolCategory.GIT, True, False, READ_STATES),
     ToolSpec("git.changed_files", ToolCategory.GIT, True, False, READ_STATES),
@@ -76,9 +108,16 @@ class ToolPermissionPolicy:
         self,
         paths: WorkspacePaths,
         specs: tuple[ToolSpec, ...] = DEFAULT_TOOL_SPECS,
+        *,
+        mode: ApprovalMode = ApprovalMode.ASK,
+        workspace_trust: WorkspaceTrust = WorkspaceTrust.TRUSTED,
+        rules: tuple[PolicyRule, ...] = (),
     ) -> None:
         self.paths = paths
         self._specs = {spec.name: spec for spec in specs}
+        self.mode = mode
+        self.workspace_trust = workspace_trust
+        self.engine = PolicyEngine(rules)
 
     def spec(self, tool_name: str) -> ToolSpec:
         try:
@@ -97,7 +136,52 @@ class ToolPermissionPolicy:
         normalized = dict(request.arguments)
         self._validate_arguments(spec.name, normalized)
         self._validate_paths(spec, normalized)
-        return PolicyDecision(spec, spec.requires_approval, normalized)
+        explanation = self.engine.evaluate(
+            PolicyInput(
+                spec.name,
+                normalized,
+                request.workflow_state,
+                spec.risks,
+                self.mode,
+                self.workspace_trust,
+            )
+        )
+        if (
+            spec.requires_approval
+            and spec.risks == frozenset({ToolRisk.READ})
+            and explanation.action is PolicyAction.ALLOW
+        ):
+            explanation = PolicyEngine(
+                (
+                    PolicyRule(
+                        f"compat.{spec.name}",
+                        layer=explanation.layer,
+                        action=PolicyAction.ASK,
+                        reason_code="LEGACY_APPROVAL_REQUIRED",
+                        tool=spec.name,
+                    ),
+                )
+            ).evaluate(
+                PolicyInput(
+                    spec.name,
+                    normalized,
+                    request.workflow_state,
+                    spec.risks,
+                    self.mode,
+                    self.workspace_trust,
+                )
+            )
+        if explanation.action is PolicyAction.DENY:
+            raise ToolAccessError(
+                f"policy denied {spec.name}: {explanation.reason_code} "
+                f"({explanation.rule_id})"
+            )
+        return PolicyDecision(
+            spec,
+            explanation.action is PolicyAction.ASK,
+            normalized,
+            explanation,
+        )
 
     def _validate_arguments(self, tool_name: str, arguments: dict[str, Any]) -> None:
         allowed: dict[str, set[str]] = {
