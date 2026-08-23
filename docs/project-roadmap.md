@@ -1,5 +1,10 @@
 # Project Roadmap
 
+OpenRouter Ox Alpha provider completed on 2026-08-23: live Responses API,
+environment-only credential, bounded reasoning/output, 136 tests, and 82%
+coverage. See the
+[completion report](../plans/260823-1730-openrouter-provider/reports/pm-260823-1841-openrouter-provider.md).
+
 Production completion passed on 2026-08-22: bounded retrieval, production AI
 providers, executable persisted CLI, 80% coverage gate, wheel smoke, and GitHub
 Actions on Python 3.11/3.12. See the

@@ -45,6 +45,10 @@ python -B -m coding_agent --workspace D:\Agentic-AI run `
 Mutation/test dừng xin duyệt theo mặc định. Xem start/resume, exit code và
 `--auto-approve` tại [Executable Coding Workflow](docs/executable-workflow.md).
 
+OpenRouter Responses dùng `--model-provider openrouter` và đọc key từ biến môi
+trường `OPENROUTER_API_KEY`; model mặc định là `stealth/ox-alpha`. OpenAI vẫn là
+mặc định; lựa chọn model provider độc lập với repository embeddings.
+
 Sau khi task đạt `COMPLETED`, xuất báo cáo đã xác minh bằng:
 
 ```powershell

@@ -10,7 +10,7 @@
   persisted start/resume and explicit auto-approval boundary.
 - `src/coding_agent/skills`: đọc metadata/content digest từ skill hiện hữu và route theo state.
 - `src/coding_agent/llm`: provider protocol, strict structured-output boundary,
-  bounded OpenAI HTTPS client và Responses adapter.
+  bounded OpenAI HTTPS client, OpenAI Responses, and OpenRouter Responses adapters.
 - `src/coding_agent/tools`: allowlisted repository, test and read-only Git/MCP
   tools with approval and trace boundaries.
 - `src/coding_agent/rag`: persistent repository index, grounded retrieval and

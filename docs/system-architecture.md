@@ -61,11 +61,17 @@ Phase 6 bổ sung evaluation runner độc lập với provider, benchmark schem
 version, metric retrieval/coding-agent và failure analysis JSON; metric tùy chọn
 không có sample sẽ trả `null` thay vì suy diễn.
 
-Production completion bổ sung `OpenAIResponsesProvider`, batched
-`OpenAIEmbeddingProvider` và `workflow.runtime`. CLI `run` tạo hoặc resume task,
+Production completion bổ sung `OpenAIResponsesProvider`,
+`OpenRouterResponsesProvider`, batched `OpenAIEmbeddingProvider` và
+`workflow.runtime`. CLI `run` tạo hoặc resume task,
 lưu sau mỗi attempted step, dừng approval theo mặc định và chỉ tự duyệt khi có
 `--auto-approve`. CI giữ deterministic embeddings và provider fixtures để không
 phụ thuộc credential/network.
+
+Model provider selection is run-scoped: OpenAI remains default, while OpenRouter
+uses `--model-provider openrouter` and `OPENROUTER_API_KEY`. Both pass through the
+same bounded structured-output and orchestration contracts; model selection does
+not change the embedding provider or controlled-tool policy.
 
 ## Phase 4 orchestration boundary
 

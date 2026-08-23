@@ -3,8 +3,9 @@
 ## Start
 
 The `run` command connects the persisted state machine, skill router,
-repository retrieval, controlled tools, and OpenAI Responses provider. The API
-key is read only from `OPENAI_API_KEY`; no secret option exists on the CLI.
+repository retrieval, controlled tools, and a selected model provider. OpenAI
+Responses remains the default and reads `OPENAI_API_KEY`; OpenRouter reads only
+`OPENROUTER_API_KEY`. No secret option exists on the CLI.
 
 From PowerShell in `D:\Agentic-AI`, with the credential already provided by a
 trusted process environment or secret manager:
@@ -24,6 +25,18 @@ python -B -m coding_agent --workspace D:\Agentic-AI run `
   --issue 'Apply the requested repository change' `
   --embedding-provider openai
 ```
+
+Select OpenRouter Responses independently from the embedding provider:
+
+```powershell
+$env:OPENROUTER_API_KEY = '<set through your trusted secret source>'
+python -B -m coding_agent --workspace D:\Agentic-AI run `
+  --issue 'Apply the requested repository change' `
+  --model-provider openrouter
+```
+
+Repeat `--model-provider openrouter` when resuming an OpenRouter-backed task;
+provider selection is run-scoped and is not persisted with task state.
 
 ## Approval and Resume
 
@@ -75,6 +88,7 @@ before exit.
 
 - `--maximum-steps`: 1 through 200; default 40.
 - `--structured-retries`: 0 through 8; default 2.
+- `--model-provider`: `openai` or `openrouter`; default `openai`.
 - `--embedding-provider`: `deterministic` or `openai`.
 - `--repository` is valid only with a new `--issue` run.
 - `--issue` and `--task-id` are mutually exclusive.
