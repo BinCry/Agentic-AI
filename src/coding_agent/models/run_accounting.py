@@ -30,6 +30,8 @@ class RunBudget:
     maximum_command_seconds: int = 0
     maximum_output_bytes: int = 0
     maximum_wall_clock_seconds: int = 0
+    maximum_turns: int = 0
+    maximum_repeated_actions: int = 0
 
     def validate(self) -> None:
         errors: list[str] = []
@@ -38,6 +40,8 @@ class RunBudget:
             "maximum_command_seconds",
             "maximum_output_bytes",
             "maximum_wall_clock_seconds",
+            "maximum_turns",
+            "maximum_repeated_actions",
         ):
             _validate_non_negative_integer(getattr(self, field_name), field_name, errors)
         if errors:
@@ -56,6 +60,8 @@ class RunBudget:
             "maximum_command_seconds",
             "maximum_output_bytes",
             "maximum_wall_clock_seconds",
+            "maximum_turns",
+            "maximum_repeated_actions",
         }
         unknown = set(payload) - allowed
         if unknown:
