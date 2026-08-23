@@ -51,7 +51,9 @@ class ToolExecutor:
         self.repository = RepositoryReadService(policy.paths)
         self.rag = RepositoryIndex(policy.paths, embedding_provider=embedding_provider)
         self.patch = PatchService(policy.paths)
-        self.tests = AllowlistedTestRunner(policy.paths)
+        self.tests = AllowlistedTestRunner(
+            policy.paths, workspace_trust=policy.workspace_trust
+        )
         self.commands = CommandService(policy.paths)
         self.git = ReadOnlyGitService(policy.paths)
         self.checkpoints = CheckpointStore(policy.paths)

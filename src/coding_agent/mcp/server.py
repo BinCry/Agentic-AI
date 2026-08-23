@@ -148,7 +148,7 @@ class McpToolServer:
             "repo.apply_patch": {"type": "object", "required": ["path", "patch", "expected_sha256"], "properties": {"path": {"type": "string"}, "patch": {"type": "string"}, "expected_sha256": {"type": "string"}}},
             "repo.create_file": {"type": "object", "required": ["path", "content"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}}},
             "test.detect_framework": {"type": "object", "properties": {}},
-            "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string", "enum": ["unit", "fixture"]}}},
+            "test.run": {"type": "object", "required": ["profile"], "properties": {"profile": {"type": "string"}}},
             "process.run": {
                 "type": "object",
                 "required": ["executable"],

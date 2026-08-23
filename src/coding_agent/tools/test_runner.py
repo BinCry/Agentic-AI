@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import re
-import sys
-import time
-from pathlib import Path
 
 from ..models.records import TestExecution
+from ..policy.models import WorkspaceTrust
 from ..storage.workspace import WorkspacePaths
-from .process import run_bounded, safe_environment
+from ..verification import VerificationProfileNotFoundError, VerificationRegistry
 
 
 class TestRunnerError(ValueError):
@@ -21,40 +19,41 @@ class TestProfileNotFoundError(TestRunnerError):
 
 
 class AllowlistedTestRunner:
-    PROFILES = {
-        "unit": ("-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py", "-v"),
-        "fixture": (
-            "-B",
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "tests/fixtures/sample_repo",
-            "-p",
-            "test_*.py",
-            "-v",
-        ),
-    }
+    PROFILES = ("fixture", "unit", "python.test", "node.test")
 
-    def __init__(self, paths: WorkspacePaths, *, maximum_output_bytes: int = 64_000) -> None:
+    def __init__(
+        self,
+        paths: WorkspacePaths,
+        *,
+        maximum_output_bytes: int = 64_000,
+        workspace_trust: WorkspaceTrust = WorkspaceTrust.TRUSTED,
+    ) -> None:
         self.paths = paths
         self.maximum_output_bytes = maximum_output_bytes
+        self.workspace_trust = workspace_trust
+        self.registry = VerificationRegistry(paths)
 
     def run(self, profile: str, *, timeout_seconds: float = 60.0) -> TestExecution:
         try:
-            suffix = self.PROFILES[profile]
+            detected = self.registry.detect(profile)
+            command = detected.command
+            command = type(command)(
+                command.executable,
+                command.arguments,
+                command.cwd,
+                command.environment,
+                timeout_seconds,
+                self.maximum_output_bytes,
+            )
+            result = self.registry.commands.execute(
+                self.registry.commands.prepare(command),
+                trust=self.workspace_trust,
+            )
         except KeyError as exc:
             raise TestProfileNotFoundError(f"test profile is not allowlisted: {profile}") from exc
-        started = time.perf_counter()
-        result = run_bounded(
-            [sys.executable, *suffix],
-            cwd=self.paths.workspace_root,
-            timeout_seconds=timeout_seconds,
-            maximum_output_bytes=self.maximum_output_bytes,
-            environment=safe_environment(self.paths.workspace_root, self.paths.runtime_root),
-        )
-        duration_ms = int((time.perf_counter() - started) * 1000)
-        report = result.stdout + "\n" + result.stderr
+        except VerificationProfileNotFoundError as exc:
+            raise TestProfileNotFoundError(str(exc)) from exc
+        report = result.stdout_excerpt + "\n" + result.stderr_excerpt
         ran = _first_int(r"Ran\s+(\d+)\s+tests?", report) or 0
         failures = _first_int(r"failures?=(\d+)", report) or 0
         errors = _first_int(r"errors?=(\d+)", report) or 0
@@ -67,9 +66,9 @@ class AllowlistedTestRunner:
             exit_code=result.exit_code,
             passed_count=max(ran - failed_count, 0),
             failed_count=failed_count,
-            duration_ms=duration_ms,
-            stdout_summary=result.stdout,
-            stderr_summary=result.stderr,
+            duration_ms=result.duration_ms,
+            stdout_summary=result.stdout_excerpt,
+            stderr_summary=result.stderr_excerpt,
             timed_out=result.timed_out,
         )
 
