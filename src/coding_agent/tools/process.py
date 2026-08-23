@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +19,7 @@ class BoundedProcessResult:
     timed_out: bool
     stdout_truncated: bool
     stderr_truncated: bool
+    duration_ms: int
 
 
 def run_bounded(
@@ -32,6 +34,7 @@ def run_bounded(
         raise ValueError("command must be a non-empty list of non-empty strings")
     if timeout_seconds <= 0 or maximum_output_bytes < 1:
         raise ValueError("timeout and output limits must be positive")
+    started = time.perf_counter()
     process = subprocess.Popen(
         command,
         cwd=str(cwd),
@@ -86,6 +89,7 @@ def run_bounded(
         timed_out=timed_out,
         stdout_truncated=stdout_size[0] > maximum_output_bytes,
         stderr_truncated=stderr_size[0] > maximum_output_bytes,
+        duration_ms=int((time.perf_counter() - started) * 1000),
     )
 
 

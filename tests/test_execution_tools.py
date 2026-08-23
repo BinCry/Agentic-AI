@@ -75,6 +75,7 @@ class ExecutionToolTests(WorkspaceTestCase):
         self.assertTrue(result.timed_out)
         self.assertTrue(result.stdout_truncated)
         self.assertLessEqual(len(result.stdout.encode("utf-8")), 32)
+        self.assertGreaterEqual(result.duration_ms, 0)
 
     def test_git_status_is_read_only_and_diff_rejects_escape(self) -> None:
         paths = self.make_git_paths()

@@ -37,8 +37,11 @@ def _redact(value: Any, key: str = "") -> Any:
     return _redact_text(repr(value))
 
 
-def _redact_text(value: str) -> str:
+def redact_text(value: str) -> str:
     return SENSITIVE_TEXT_RE.sub(lambda match: f"{match.group(1)}[REDACTED]", value)
+
+
+_redact_text = redact_text
 
 
 @dataclass(slots=True)
